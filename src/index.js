@@ -45,22 +45,44 @@ const yoga = createYoga({
   landingPage: false,
 });
 
-// ── Static public directory ─────────────────────────────────────────────────
-const PUBLIC_DIR = join(__dirname, '..', 'public');
+// ── Static directories ──────────────────────────────────────────────────────
+const PUBLIC_DIR   = join(__dirname, '..', 'public');
+const EXAMPLES_DIR = join(__dirname, '..', 'examples');
 
-function serveStatic(pathname, res) {
-  const safe = pathname.replace(/\.\./g, '').replace(/\/+/g, '/');
-  const filePath = join(PUBLIC_DIR, safe === '/' ? 'index.html' : safe);
+const MIME_MAP = {
+  html: 'text/html',
+  js:   'text/javascript',
+  css:  'text/css',
+  json: 'application/json',
+  ttl:  'text/turtle',
+  owl:  'application/rdf+xml',
+  rdf:  'application/rdf+xml',
+  txt:  'text/plain',
+};
+
+function serveFile(filePath, res) {
   try {
     const content = readFileSync(filePath);
-    const ext = filePath.split('.').pop();
-    const mime = { html: 'text/html', js: 'text/javascript', css: 'text/css' }[ext] || 'text/plain';
+    const ext = filePath.split('.').pop().toLowerCase();
+    const mime = MIME_MAP[ext] || 'application/octet-stream';
     res.writeHead(200, { 'Content-Type': `${mime}; charset=utf-8` });
     res.end(content);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
   }
+}
+
+function serveStatic(pathname, res) {
+  const safe = pathname.replace(/\.\./g, '').replace(/\/+/g, '/');
+
+  // Serve examples/ directory (queries.json, .ttl, .owl, …)
+  if (safe.startsWith('/examples/')) {
+    const relPath = safe.slice('/examples/'.length);
+    return serveFile(join(EXAMPLES_DIR, relPath), res);
+  }
+
+  serveFile(join(PUBLIC_DIR, safe === '/' ? 'index.html' : safe), res);
 }
 
 // ── HTTP server ─────────────────────────────────────────────────────────────

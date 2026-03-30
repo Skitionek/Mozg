@@ -2,18 +2,19 @@
 
 > A **"slow by design"** cross-database query layer with a single GraphQL endpoint.
 
-Mozg is not a database – it is an expressive language for describing **relations between entities that live in existing databases** (PostgreSQL, MySQL, SQLite).  A single `/graphql` endpoint accepts user-supplied credentials and executes federated queries that traverse those relations at query time.  A browser-based **query builder** lets you compose and run queries without writing GraphQL by hand.
+Mozg is not a database – it is an expressive language for describing **relations between entities that live in existing databases** (PostgreSQL, MySQL, SQLite, Neo4j, ArangoDB, BioCyc) and REST APIs.  A single `/graphql` endpoint accepts user-supplied credentials and executes federated queries that traverse those relations at query time.  A browser-based **query builder** lets you compose and run queries without writing GraphQL by hand.
 
 ---
 
 ## Features
 
-- 🔌 **One endpoint** – `/graphql` queries any supported database
+- 🔌 **One endpoint** – `/graphql` queries any supported database or REST API
 - 🔑 **Credentials in the query** – connection parameters are part of the GraphQL input
-- 🔗 **Relation traversal** – `hasMany`, `hasOne`, `belongsTo` across tables
+- 🔗 **Relation traversal** – `hasMany`, `hasOne`, `belongsTo` across tables / endpoints
 - 🗺 **Schema introspection** – discover tables & columns of any connected database
-- 🌐 **Web UI** – visual query builder at `/`
+- 🌐 **Web UI** – visual query builder at `/` with examples dropdown
 - 🧪 **GraphiQL** – full IDE at `/graphql`
+- 🦉 **OWL ontology ingestion** – parse Turtle, RDF/XML, OWL/XML and Manchester Syntax ontologies via `ingestOntology` mutation
 
 ---
 
@@ -39,6 +40,57 @@ The Codespace will automatically:
 2. Run `npm install`
 3. Start the dev server (`npm run dev`)
 4. Forward port **4000** and open a preview
+
+---
+
+## Public Databases & APIs
+
+The following free, public endpoints can be used directly — no sign-up required.
+
+| Name | Driver | Host | Database | User | Password | Notes |
+|------|--------|------|----------|------|----------|-------|
+| RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | `NWDMCE5xdipIjRrp` | RNA sequences |
+| RFAM | `mysql` | `mysql-rfam-public.ebi.ac.uk` | `Rfam` | `rfamro` | *(empty)* | RNA families |
+| Neo4j Movies | `neo4j` | `demo.neo4jlabs.com` | `movies` | `movies` | `movies` | Movie graph (scheme: `neo4j+s`) |
+| JSONPlaceholder | `rest` | – | `https://jsonplaceholder.typicode.com` | – | – | Fake REST data |
+| RestCountries | `rest` | – | `https://restcountries.com/v3.1` | – | – | Country data |
+| Open-Meteo | `rest` | – | `https://api.open-meteo.com/v1` | – | – | Weather (no key) |
+| PokéAPI | `rest` | – | `https://pokeapi.co/api/v2` | – | – | Pokémon |
+| Jikan | `rest` | – | `https://api.jikan.moe/v4` | – | – | Anime (MyAnimeList) |
+
+---
+
+## OWL Ontology Ingestion
+
+Mozg can parse OWL ontologies in Turtle, RDF/XML, OWL/XML or Manchester Syntax and extract classes, object properties and data properties.
+
+```graphql
+mutation {
+  ingestOntology(input: {
+    url: "https://raw.githubusercontent.com/Skitionek/Mozg/copilot/add-graphql-query-endpoint/examples/blog.ttl"
+    format: turtle
+  }) {
+    tripleCount
+    classes { iri label subClassOf }
+    objectProperties { iri label domain range relationType }
+    dataProperties { iri label domain range }
+  }
+}
+```
+
+You can also supply raw content instead of a URL:
+
+```graphql
+mutation {
+  ingestOntology(input: {
+    content: "@prefix : <http://example.org/> . :Foo a owl:Class ."
+    format: turtle
+  }) {
+    tripleCount
+    classes { iri label }
+  }
+}
+```
 
 ---
 

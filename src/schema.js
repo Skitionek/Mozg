@@ -53,6 +53,15 @@ const typeDefs = /* GraphQL */ `
     introspect(connection: ConnectionInput!): DatabaseSchema!
   }
 
+  type Mutation {
+    """
+    Parse an OWL ontology (Turtle, RDF/XML, OWL/XML, or Manchester Syntax) and
+    extract its classes, object properties, and data properties.
+    Supply either content (raw string) or url (fetched server-side).
+    """
+    ingestOntology(input: OntologyInput!): OntologyResult!
+  }
+
   input QueryInput {
     """Database connection credentials"""
     connection: ConnectionInput!
@@ -78,22 +87,32 @@ const typeDefs = /* GraphQL */ `
   input ConnectionInput {
     """Database driver"""
     driver: Driver!
-    """Host (not required for SQLite)"""
+    """Host (not required for SQLite or REST)"""
     host: String
     """Port (defaults to driver default when omitted)"""
     port: Int
-    """Database name or file path (SQLite)"""
+    """Database name, file path (SQLite), or base URL (REST)"""
     database: String!
-    """Username"""
+    """Username or API key value (REST)"""
     user: String
-    """Password"""
+    """Password; if user is set but password is omitted, user is treated as a Bearer token (REST)"""
     password: String
+    """Connection scheme, e.g. bolt, neo4j+s, http, https"""
+    scheme: String
+    """Default request headers as a JSON object (REST driver only)"""
+    headers: JSON
+    """Query-parameter name to use for the API key (REST driver only)"""
+    apiKeyParam: String
   }
 
   enum Driver {
     postgres
     mysql
     sqlite3
+    neo4j
+    arango
+    biocyc
+    rest
   }
 
   enum SortDirection {
@@ -154,6 +173,55 @@ const typeDefs = /* GraphQL */ `
     defaultValue: String
     isPrimaryKey: Boolean!
   }
+
+  input OntologyInput {
+    """Raw ontology content"""
+    content: String
+    """URL to fetch the ontology from"""
+    url: String
+    """Serialization format – auto-detected when omitted"""
+    format: OntologyFormat
+  }
+
+  enum OntologyFormat {
+    turtle
+    rdfxml
+    owlxml
+    manchester
+    auto
+  }
+
+  type OntologyResult {
+    classes: [OWLClass!]!
+    objectProperties: [OWLObjectProperty!]!
+    dataProperties: [OWLDataProperty!]!
+    tripleCount: Int!
+  }
+
+  type OWLClass {
+    iri: String!
+    label: String
+    comment: String
+    subClassOf: [String!]!
+  }
+
+  type OWLObjectProperty {
+    iri: String!
+    label: String
+    comment: String
+    domain: [String!]!
+    range: [String!]!
+    inverseOf: String
+    relationType: RelationType!
+  }
+
+  type OWLDataProperty {
+    iri: String!
+    label: String
+    comment: String
+    domain: [String!]!
+    range: [String!]!
+  }
 `;
 
 // ---------------------------------------------------------------------------
@@ -168,6 +236,9 @@ const resolvers = {
   Query: {
     query: (_parent, { input }) => executeQuery(input),
     introspect: (_parent, { connection }) => introspectDatabase(connection),
+  },
+  Mutation: {
+    ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input),
   },
 };
 

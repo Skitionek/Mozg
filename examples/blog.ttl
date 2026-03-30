@@ -1,0 +1,25 @@
+@prefix :    <http://mozg.example.org/blog#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:BlogOntology a owl:Ontology .
+
+:User a owl:Class ; rdfs:label "User" .
+:Post a owl:Class ; rdfs:label "Post" .
+:Comment a owl:Class ; rdfs:label "Comment" .
+
+:hasPosts a owl:ObjectProperty ;
+  rdfs:label "has posts" ;
+  rdfs:domain :User ;
+  rdfs:range :Post .
+
+:hasComments a owl:ObjectProperty ;
+  rdfs:label "has comments" ;
+  rdfs:domain :Post ;
+  rdfs:range :Comment .
+
+:name a owl:DatatypeProperty ; rdfs:domain :User ; rdfs:range xsd:string .
+:email a owl:DatatypeProperty ; rdfs:domain :User ; rdfs:range xsd:string .
+:title a owl:DatatypeProperty ; rdfs:domain :Post ; rdfs:range xsd:string .
+:body a owl:DatatypeProperty ; rdfs:domain :Post ; rdfs:range xsd:string .

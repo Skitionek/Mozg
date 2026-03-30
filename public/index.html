@@ -56,7 +56,7 @@
     /* ── Layout ─────────────────────────────────────────────── */
     .app {
       display: grid;
-      grid-template-columns: 300px 1fr;
+      grid-template-columns: 320px 1fr;
       grid-template-rows: 1fr;
       flex: 1;
       overflow: hidden;
@@ -268,6 +268,12 @@
   <!-- ── Sidebar ─────────────────────────────────────────────── -->
   <aside>
 
+    <!-- Examples dropdown -->
+    <div class="section-title" style="margin-top:0">Examples</div>
+    <select id="examples-select">
+      <option value="">— load an example —</option>
+    </select>
+
     <div class="section-title">Connection</div>
 
     <label>Driver</label>
@@ -275,8 +281,13 @@
       <option value="sqlite3">SQLite</option>
       <option value="postgres">PostgreSQL</option>
       <option value="mysql">MySQL</option>
+      <option value="neo4j">Neo4j</option>
+      <option value="arango">ArangoDB</option>
+      <option value="biocyc">BioCyc</option>
+      <option value="rest">REST API</option>
     </select>
 
+    <!-- Standard host/port/user/password group (SQL + graph DBs) -->
     <div id="conn-host-group">
       <div class="row2">
         <div>
@@ -294,6 +305,22 @@
       <input id="conn-password" type="password" placeholder="••••••••" />
     </div>
 
+    <!-- Scheme field (neo4j / arango) -->
+    <div id="conn-scheme-group" class="hidden">
+      <label>Scheme</label>
+      <input id="conn-scheme" type="text" placeholder="bolt" />
+    </div>
+
+    <!-- REST-specific fields -->
+    <div id="conn-rest-group" class="hidden">
+      <label>API Key / Bearer Token (optional)</label>
+      <input id="conn-api-key" type="text" placeholder="my-api-key" />
+      <label>API Key Query Param (optional, e.g. api_key)</label>
+      <input id="conn-api-key-param" type="text" placeholder="api_key" />
+      <label>Extra Headers (JSON object, optional)</label>
+      <textarea id="conn-headers" rows="2" placeholder='{"X-App-Id": "mozg"}'></textarea>
+    </div>
+
     <label id="conn-db-label">Database / File</label>
     <input id="conn-database" type="text" placeholder=":memory:" />
 
@@ -302,7 +329,7 @@
     <!-- ── Query ── -->
     <div class="section-title">Query</div>
 
-    <label>From (table / entity)</label>
+    <label>From (table / entity / path)</label>
     <input id="q-from" type="text" placeholder="users" list="tables-list" />
     <datalist id="tables-list"></datalist>
 
@@ -427,34 +454,91 @@
   // ── State ────────────────────────────────────────────────────
   const relations = [];
   let knownTables = [];
+  let examplesData = [];
 
-  // ── Driver toggle ─────────────────────────────────────────────
-  document.getElementById('conn-driver').addEventListener('change', function () {
-    const isSqlite = this.value === 'sqlite3';
-    document.getElementById('conn-host-group').style.display = isSqlite ? 'none' : 'block';
-    document.getElementById('conn-db-label').textContent = isSqlite ? 'Database File Path' : 'Database Name';
-    document.getElementById('conn-database').placeholder = isSqlite ? ':memory:' : 'mydb';
-    if (isSqlite) {
-      document.getElementById('conn-port').value = '';
-    } else {
-      document.getElementById('conn-port').placeholder = this.value === 'postgres' ? '5432' : '3306';
-    }
-    generateQuery();
+  // ── Load examples ─────────────────────────────────────────────
+  async function loadExamples() {
+    try {
+      const res = await fetch('/examples/queries.json');
+      if (!res.ok) return;
+      examplesData = await res.json();
+      const sel = document.getElementById('examples-select');
+      for (const ex of examplesData) {
+        const opt = document.createElement('option');
+        opt.value = ex.name;
+        opt.textContent = `[${ex.category}] ${ex.name}`;
+        sel.appendChild(opt);
+      }
+    } catch { /* examples not critical */ }
+  }
+
+  document.getElementById('examples-select').addEventListener('change', function () {
+    const ex = examplesData.find(e => e.name === this.value);
+    if (!ex) return;
+    document.getElementById('query-editor').value = ex.query;
+    toast(`Loaded: ${ex.name}`, 'success');
+    this.value = '';
   });
 
-  // Fire once to set initial state
-  document.getElementById('conn-driver').dispatchEvent(new Event('change'));
+  // ── Driver visibility toggle ──────────────────────────────────
+  function updateDriverUI() {
+    const driver = document.getElementById('conn-driver').value;
+    const isRest   = driver === 'rest';
+    const isGraph  = driver === 'neo4j' || driver === 'arango';
+    const isSqlite = driver === 'sqlite3';
+
+    document.getElementById('conn-host-group').style.display  = (isRest || isSqlite) ? 'none' : 'block';
+    document.getElementById('conn-scheme-group').classList.toggle('hidden', !isGraph);
+    document.getElementById('conn-rest-group').classList.toggle('hidden', !isRest);
+
+    const dbLabel = document.getElementById('conn-db-label');
+    const dbInput = document.getElementById('conn-database');
+    if (isRest) {
+      dbLabel.textContent = 'Base URL';
+      dbInput.placeholder = 'https://api.example.com';
+    } else if (isSqlite) {
+      dbLabel.textContent = 'Database File Path';
+      dbInput.placeholder = ':memory:';
+    } else {
+      dbLabel.textContent = 'Database Name';
+      dbInput.placeholder = 'mydb';
+    }
+
+    // Default ports
+    const portMap = { postgres: '5432', mysql: '3306', neo4j: '7687', arango: '8529' };
+    const portEl = document.getElementById('conn-port');
+    if (!isRest && !isSqlite) portEl.placeholder = portMap[driver] || '';
+
+    // Default scheme
+    const schemeEl = document.getElementById('conn-scheme');
+    if (driver === 'neo4j' && !schemeEl.value) schemeEl.placeholder = 'bolt';
+    if (driver === 'arango' && !schemeEl.value) schemeEl.placeholder = 'http';
+
+    generateQuery();
+  }
+
+  document.getElementById('conn-driver').addEventListener('change', updateDriverUI);
+
+  // Fire once on load
+  updateDriverUI();
 
   // Auto-generate on input changes
-  ['conn-driver','conn-host','conn-port','conn-user','conn-password','conn-database',
-   'q-from','q-select','q-where','q-limit','q-offset','q-order-by','q-order-dir']
-    .forEach(id => document.getElementById(id).addEventListener('input', generateQuery));
+  [
+    'conn-driver','conn-host','conn-port','conn-user','conn-password','conn-database',
+    'conn-scheme','conn-api-key','conn-api-key-param','conn-headers',
+    'q-from','q-select','q-where','q-limit','q-offset','q-order-by','q-order-dir',
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', generateQuery);
+  });
 
   // ── Connection builder ────────────────────────────────────────
   function buildConnection() {
     const driver = document.getElementById('conn-driver').value;
-    const conn = { driver, database: document.getElementById('conn-database').value || ':memory:' };
-    if (driver !== 'sqlite3') {
+    const database = document.getElementById('conn-database').value;
+    const conn = { driver, database: database || (driver === 'sqlite3' ? ':memory:' : '') };
+
+    if (driver !== 'sqlite3' && driver !== 'rest') {
       const host = document.getElementById('conn-host').value;
       const port = document.getElementById('conn-port').value;
       const user = document.getElementById('conn-user').value;
@@ -464,32 +548,53 @@
       if (user) conn.user = user;
       if (password) conn.password = password;
     }
+
+    if (driver === 'neo4j' || driver === 'arango') {
+      const scheme = document.getElementById('conn-scheme').value;
+      if (scheme) conn.scheme = scheme;
+    }
+
+    if (driver === 'rest') {
+      const apiKey      = document.getElementById('conn-api-key').value;
+      const apiKeyParam = document.getElementById('conn-api-key-param').value;
+      const headersRaw  = document.getElementById('conn-headers').value.trim();
+      if (apiKey) conn.user = apiKey;
+      if (apiKeyParam) conn.apiKeyParam = apiKeyParam;
+      if (headersRaw) {
+        try { conn.headers = JSON.parse(headersRaw); } catch { /* ignore */ }
+      }
+    }
+
     return conn;
   }
 
   function connToGQL(conn) {
-    const parts = Object.entries(conn).map(([k, v]) =>
-      typeof v === 'number' ? `${k}: ${v}` : `${k}: ${JSON.stringify(v)}`
-    ).join(', ');
-    return `{ ${parts} }`;
+    const parts = Object.entries(conn).map(([k, v]) => {
+      if (typeof v === 'number') return `${k}: ${v}`;
+      if (typeof v === 'object' && v !== null) return `${k}: ${JSON.stringify(v)}`;
+      return `${k}: ${JSON.stringify(v)}`;
+    });
+    return `{ ${parts.join(', ')} }`;
   }
 
   // ── Relations ────────────────────────────────────────────────
   function addRelation() {
-    const entity = document.getElementById('rel-entity').value.trim();
+    const entity     = document.getElementById('rel-entity').value.trim();
     const foreignKey = document.getElementById('rel-foreign-key').value.trim();
     if (!entity || !foreignKey) { toast('Entity and Foreign Key are required', 'error'); return; }
 
     const rel = {
       entity,
-      type: document.getElementById('rel-type').value,
+      type:       document.getElementById('rel-type').value,
       foreignKey,
-      localKey: document.getElementById('rel-local-key').value.trim() || null,
-      alias: document.getElementById('rel-alias').value.trim() || null,
+      localKey:   document.getElementById('rel-local-key').value.trim() || null,
+      alias:      document.getElementById('rel-alias').value.trim() || null,
     };
     relations.push(rel);
     renderRelations();
-    ['rel-entity','rel-foreign-key','rel-local-key','rel-alias'].forEach(id => { document.getElementById(id).value = ''; });
+    ['rel-entity','rel-foreign-key','rel-local-key','rel-alias'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
     generateQuery();
   }
 
@@ -512,21 +617,21 @@
   function relToGQL(rel) {
     let s = `{ entity: ${JSON.stringify(rel.entity)}, foreignKey: ${JSON.stringify(rel.foreignKey)}, type: ${rel.type}`;
     if (rel.localKey) s += `, localKey: ${JSON.stringify(rel.localKey)}`;
-    if (rel.alias) s += `, alias: ${JSON.stringify(rel.alias)}`;
+    if (rel.alias)    s += `, alias: ${JSON.stringify(rel.alias)}`;
     s += ' }';
     return s;
   }
 
   // ── Generate GraphQL ──────────────────────────────────────────
   function generateQuery() {
-    const conn = buildConnection();
-    const from = document.getElementById('q-from').value.trim() || 'example_table';
+    const conn      = buildConnection();
+    const from      = document.getElementById('q-from').value.trim() || 'example_table';
     const selectRaw = document.getElementById('q-select').value.trim();
-    const whereRaw = document.getElementById('q-where').value.trim();
-    const limit = document.getElementById('q-limit').value;
-    const offset = document.getElementById('q-offset').value;
-    const orderBy = document.getElementById('q-order-by').value.trim();
-    const orderDir = document.getElementById('q-order-dir').value;
+    const whereRaw  = document.getElementById('q-where').value.trim();
+    const limit     = document.getElementById('q-limit').value;
+    const offset    = document.getElementById('q-offset').value;
+    const orderBy   = document.getElementById('q-order-by').value.trim();
+    const orderDir  = document.getElementById('q-order-dir').value;
 
     let input = `connection: ${connToGQL(conn)}\n    from: ${JSON.stringify(from)}`;
 
@@ -535,13 +640,10 @@
       input += `\n    select: [${cols}]`;
     }
     if (whereRaw) {
-      try {
-        JSON.parse(whereRaw); // validate
-        input += `\n    where: ${whereRaw}`;
-      } catch { /* ignore invalid JSON */ }
+      try { JSON.parse(whereRaw); input += `\n    where: ${whereRaw}`; } catch { /* ignore */ }
     }
-    if (limit) input += `\n    limit: ${parseInt(limit, 10)}`;
-    if (offset) input += `\n    offset: ${parseInt(offset, 10)}`;
+    if (limit)   input += `\n    limit: ${parseInt(limit, 10)}`;
+    if (offset)  input += `\n    offset: ${parseInt(offset, 10)}`;
     if (orderBy) {
       input += `\n    orderBy: ${JSON.stringify(orderBy)}`;
       input += `\n    orderDirection: ${orderDir}`;
@@ -574,7 +676,6 @@
       const json = await res.json();
       const elapsed = ((performance.now() - t0) / 1000).toFixed(3);
       document.getElementById('timing').textContent = `${elapsed}s`;
-
       renderResult(json);
     } catch (err) {
       renderResult({ errors: [{ message: err.message }] });
@@ -584,7 +685,7 @@
   }
 
   function renderResult(json) {
-    const out = document.getElementById('result-output');
+    const out   = document.getElementById('result-output');
     const badge = document.getElementById('result-badge');
 
     if (json.errors) {
@@ -613,7 +714,8 @@
   }
 
   function clearResults() {
-    document.getElementById('result-output').innerHTML = '<span class="result-placeholder">Run a query to see results here.</span>';
+    document.getElementById('result-output').innerHTML =
+      '<span class="result-placeholder">Run a query to see results here.</span>';
     document.getElementById('result-badge').classList.add('hidden');
     document.getElementById('timing').textContent = '';
   }
@@ -639,7 +741,7 @@
       if (json.data && json.data.introspect) {
         knownTables = json.data.introspect.tables.map(t => t.name);
         const dl = document.getElementById('tables-list');
-        dl.innerHTML = knownTables.map(n => `<option value="${n}"></option>`).join('');
+        dl.innerHTML = knownTables.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
         toast(`Found ${knownTables.length} tables`, 'success');
       }
     } catch (err) {
@@ -666,7 +768,11 @@
   }
 
   function escapeHTML(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   function syntaxHighlight(json) {
@@ -682,7 +788,8 @@
     );
   }
 
-  // Initial query generation
+  // ── Init ──────────────────────────────────────────────────────
+  loadExamples();
   generateQuery();
 </script>
 </body>
