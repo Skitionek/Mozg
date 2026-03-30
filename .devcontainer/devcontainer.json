@@ -1,0 +1,44 @@
+{
+  "name": "Mozg",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+
+  // Install dependencies right after the container is created
+  "postCreateCommand": "npm install",
+
+  // Start the dev server automatically when the Codespace opens
+  "postStartCommand": "npm run dev",
+
+  // Forward the application port so it opens in the browser / preview panel
+  "forwardPorts": [4000],
+  "portsAttributes": {
+    "4000": {
+      "label": "Mozg Server",
+      "onAutoForward": "openPreview"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // GitHub Copilot
+        "github.copilot",
+        "github.copilot-chat",
+
+        // GraphQL
+        "GraphQL.vscode-graphql",
+        "GraphQL.vscode-graphql-syntax",
+
+        // JavaScript / Node.js
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "christian-kohler.npm-intellisense",
+        "eg2.vscode-npm-script"
+      ],
+      "settings": {
+        // Use project-local settings from .vscode/settings.json
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
+    }
+  }
+}

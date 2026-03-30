@@ -1,0 +1,23 @@
+{
+  // ── Editor ───────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
+  // ── Files ────────────────────────────────────────────────────
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // ── GraphQL ──────────────────────────────────────────────────
+  "graphql-config.load.rootDir": "./src",
+
+  // ── GitHub Copilot – commit message generation ───────────────
+  // Forces Copilot to always propose Conventional Commits messages.
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Always format commit messages following the Conventional Commits specification (https://www.conventionalcommits.org). Use the structure: <type>(<optional scope>): <short imperative description>. Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert. Valid scopes for this project: api, schema, db, ui, devcontainer, deps, docs. Rules: description must be lowercase and imperative mood (e.g. 'add', 'fix', 'remove'), no trailing period, subject line max 72 chars. Mark breaking changes with ! after type/scope and add a BREAKING CHANGE footer. Examples: 'feat(api): add introspect query', 'fix(db): handle null foreign key in belongsTo', 'chore(deps): upgrade mysql2 to 3.9.8'."
+    }
+  ]
+}

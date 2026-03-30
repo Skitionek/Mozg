@@ -16,7 +16,7 @@ async function introspectDatabase(connection) {
       .select('name')
       .from('sqlite_master')
       .where('type', 'table')
-      .whereNotLike('name', 'sqlite_%');
+      .whereRaw("name NOT LIKE 'sqlite_%'");
 
     for (const tableRow of tableRows) {
       const columns = await db.raw(`PRAGMA table_info("${tableRow.name}")`);
