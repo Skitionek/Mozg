@@ -4,13 +4,37 @@
 // Each loader is called lazily — the catalog file is require()'d only when
 // getCatalog() is invoked for that entry, not at server startup.
 const REGISTRY = {
+  // ── SQL ──────────────────────────────────────────────────────────────────
   blog:             () => require('./blog'),
   chinook:          () => require('./chinook'),
-  jsonplaceholder:  () => require('./jsonplaceholder'),
-  'neo4j-movies':   () => require('./neo4j-movies'),
   rnacentral:       () => require('./rnacentral'),
+  // ── Graph ────────────────────────────────────────────────────────────────
+  'neo4j-movies':   () => require('./neo4j-movies'),
+  // ── REST – entertainment & media ─────────────────────────────────────────
+  ghibli:           () => require('./ghibli'),
+  jikan:            () => require('./jikan'),
+  pokeapi:          () => require('./pokeapi'),
+  rickandmorty:     () => require('./rickandmorty'),
+  swapi:            () => require('./swapi'),
+  // ── REST – science & space ───────────────────────────────────────────────
+  nasa:             () => require('./nasa'),
+  spacex:           () => require('./spacex'),
+  // ── REST – commerce & finance ────────────────────────────────────────────
+  coingecko:        () => require('./coingecko'),
+  fakestore:        () => require('./fakestore'),
+  // ── REST – culture & knowledge ───────────────────────────────────────────
   artic:            () => require('./artic'),
+  dogs:             () => require('./dogs'),
+  github:           () => require('./github'),
+  jsonplaceholder:  () => require('./jsonplaceholder'),
+  metmuseum:        () => require('./metmuseum'),
+  musicbrainz:      () => require('./musicbrainz'),
+  openfoodfacts:    () => require('./openfoodfacts'),
+  openlibrary:      () => require('./openlibrary'),
   openbrewery:      () => require('./openbrewery'),
+  opentrivia:       () => require('./opentrivia'),
+  openmeteo:        () => require('./openmeteo'),
+  restcountries:    () => require('./restcountries'),
 };
 
 /**

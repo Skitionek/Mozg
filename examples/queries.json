@@ -60,7 +60,71 @@
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.artic.edu/api/v1\" }\n    from: \"/artworks\"\n    where: { limit: \"5\", fields: \"id,title,date_display,artist_id,artist_display\" }\n    select: [\"id\", \"title\", \"date_display\", \"artist_id\", \"artist_display\"]\n    relations: [{\n      entity: \"/artists\"\n      foreignKey: \"artist_id\"\n      type: belongsTo\n      alias: \"artist\"\n      select: [\"id\", \"title\", \"birth_date\", \"death_date\"]\n    }]\n  }) { count data }\n}"
   },
   {
-    "name": "REST – Open Brewery DB: micro-breweries in the US",
+    "name": "REST – SpaceX: launches with rocket and launchpad",
+    "description": "Fetch the last 5 SpaceX launches, each with its rocket and launchpad details resolved via belongsTo relations. The `rocket` and `launchpad` fields on each launch are IDs that are resolved by fetching /rockets/{id} and /launchpads/{id}.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.spacexdata.com/v4\" }\n    from: \"/launches\"\n    limit: 5\n    orderBy: \"flight_number\"\n    orderDirection: desc\n    select: [\"id\", \"name\", \"date_utc\", \"success\", \"flight_number\", \"rocket\", \"launchpad\"]\n    relations: [\n      { entity: \"/rockets\", foreignKey: \"rocket\", type: belongsTo, alias: \"rocketData\", select: [\"id\", \"name\", \"type\", \"country\"] }\n      { entity: \"/launchpads\", foreignKey: \"launchpad\", type: belongsTo, alias: \"launchpadData\", select: [\"id\", \"name\", \"region\", \"status\"] }\n    ]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – SpaceX: payloads → launch → rocket (3 levels, cross-entity REST)",
+    "description": "3-level cross-entity traversal entirely within the SpaceX REST API: list 3 payloads, resolve each payload's parent launch, and then resolve each launch's rocket. Demonstrates a 3-hop belongsTo chain across 3 entity types in a single REST database.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.spacexdata.com/v4\" }\n    from: \"/payloads\"\n    limit: 3\n    select: [\"id\", \"name\", \"type\", \"launch\"]\n    relations: [{\n      entity: \"/launches\"\n      foreignKey: \"launch\"\n      type: belongsTo\n      alias: \"launchData\"\n      select: [\"id\", \"name\", \"date_utc\", \"success\", \"rocket\"]\n      relations: [{\n        entity: \"/rockets\"\n        foreignKey: \"rocket\"\n        type: belongsTo\n        alias: \"rocketData\"\n        select: [\"id\", \"name\", \"type\", \"country\"]\n      }]\n    }]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Fake Store: carts with user details",
+    "description": "Fetch 5 shopping carts from the Fake Store API, each with its owner resolved via a belongsTo relation on the userId field.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://fakestoreapi.com\" }\n    from: \"/carts\"\n    limit: 5\n    select: [\"id\", \"userId\", \"date\", \"products\"]\n    relations: [\n      { entity: \"/users\", foreignKey: \"userId\", type: belongsTo, alias: \"user\", select: [\"id\", \"username\", \"email\"] }\n    ]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Rick and Morty: first 10 characters",
+    "description": "List the first 10 characters from the Rick and Morty API. Results are automatically unwrapped from the {results:[...]} envelope.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://rickandmortyapi.com/api\" }\n    from: \"/character\"\n    limit: 10\n    select: [\"id\", \"name\", \"status\", \"species\", \"gender\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – SWAPI: Star Wars planets",
+    "description": "List the first 10 Star Wars planets from SWAPI. Results are automatically unwrapped from the {results:[...]} envelope.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://swapi.dev/api\" }\n    from: \"/planets\"\n    limit: 10\n    select: [\"name\", \"climate\", \"terrain\", \"population\", \"diameter\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Studio Ghibli: films",
+    "description": "List all Studio Ghibli films from the public Ghibli API.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://ghibliapi.vercel.app\" }\n    from: \"/films\"\n    select: [\"id\", \"title\", \"director\", \"release_date\", \"rt_score\", \"running_time\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – CoinGecko: top 10 coins by market cap",
+    "description": "List the top 10 cryptocurrencies ranked by market cap from the CoinGecko free API. The vs_currency param is required.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.coingecko.com/api/v3\" }\n    from: \"/coins/markets\"\n    where: { vs_currency: \"usd\", order: \"market_cap_desc\", per_page: \"10\", page: \"1\" }\n    select: [\"id\", \"symbol\", \"name\", \"current_price\", \"market_cap\", \"price_change_percentage_24h\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – NASA: Astronomy Picture of the Day",
+    "description": "Fetch today's NASA Astronomy Picture of the Day. Use DEMO_KEY for testing (30 req/hour), or register for a free key at api.nasa.gov.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.nasa.gov\" }\n    from: \"/planetary/apod\"\n    where: { api_key: \"DEMO_KEY\" }\n    select: [\"date\", \"title\", \"explanation\", \"url\", \"media_type\", \"copyright\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – GitHub: search popular TypeScript repos",
+    "description": "Search GitHub for the most-starred TypeScript repositories using the public search API. No auth required for read-only queries.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: {\n      driver: rest\n      database: \"https://api.github.com\"\n      headers: { Accept: \"application/vnd.github.v3+json\" }\n    }\n    from: \"/search/repositories\"\n    where: { q: \"language:typescript stars:>10000\", sort: \"stars\", order: \"desc\", per_page: \"10\" }\n    select: [\"id\", \"full_name\", \"description\", \"stargazers_count\", \"language\", \"html_url\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Open Trivia: 10 science questions",
+    "description": "Fetch 10 multiple-choice science questions from the Open Trivia Database free API.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://opentdb.com\" }\n    from: \"/api.php\"\n    where: { amount: \"10\", category: \"17\", difficulty: \"medium\", type: \"multiple\" }\n    select: [\"category\", \"type\", \"difficulty\", \"question\", \"correct_answer\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – MusicBrainz: search for artists",
+    "description": "Search MusicBrainz for artists matching a query. Rate limit is 1 req/sec; the User-Agent header is required. Pass your search term via `where: { query: \"artist name\" }`.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: {\n      driver: rest\n      database: \"https://musicbrainz.org/ws/2\"\n      headers: { Accept: \"application/json\", \"User-Agent\": \"Mozg/0.1.0 (https://github.com/Skitionek/Mozg)\" }\n    }\n    from: \"/artist\"\n    where: { query: \"The Beatles\", limit: \"5\" }\n    select: [\"id\", \"name\", \"sort-name\", \"type\", \"country\", \"score\"]\n  }) { count data }\n}"
+  },
     "description": "List 10 micro-breweries in the United States from the Open Brewery DB free public API.",
     "category": "REST",
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.openbrewerydb.org/v1\" }\n    from: \"/breweries\"\n    where: { by_type: \"micro\", by_country: \"united_states\", per_page: \"10\" }\n    select: [\"id\", \"name\", \"brewery_type\", \"city\", \"state_province\", \"website_url\"]\n  }) { count data }\n}"
