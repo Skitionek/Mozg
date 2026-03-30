@@ -1,0 +1,62 @@
+[
+  {
+    "name": "SQLite – Blog: list users with posts",
+    "description": "List the first 5 users from the local SQLite blog database, each with their posts embedded.",
+    "category": "SQLite",
+    "query": "{\n  query(input: {\n    connection: { driver: sqlite3, database: \"examples/sample.db\" }\n    from: \"users\"\n    limit: 5\n    relations: [{ entity: \"posts\", foreignKey: \"user_id\", type: hasMany, select: [\"id\",\"title\"] }]\n  }) { count data }\n}"
+  },
+  {
+    "name": "SQLite – Blog: introspect schema",
+    "description": "Inspect the tables and columns of the local SQLite blog database.",
+    "category": "SQLite",
+    "query": "{\n  introspect(connection: { driver: sqlite3, database: \"examples/sample.db\" }) {\n    tables { name columns { name type nullable isPrimaryKey } }\n  }\n}"
+  },
+  {
+    "name": "PostgreSQL – RNAcentral: list RNA sequences",
+    "description": "List 10 RNA sequences from the public RNAcentral PostgreSQL database at EBI. Uses the publicly documented read-only credentials from https://rnacentral.org/help/public-database",
+    "category": "PostgreSQL",
+    "query": "{\n  query(input: {\n    connection: { driver: postgres, host: \"hh-pgsql-public.ebi.ac.uk\", port: 5432, database: \"pfmegrnargs\", user: \"reader\", password: \"NWDMCE5xdipIjRrp\" }\n    from: \"rna\"\n    select: [\"upi\",\"length\",\"seq_short\"]\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "Neo4j – Movies demo: actors and movies",
+    "description": "Query the public Neo4j Movies demo database for the first 5 Movie nodes. Uses the publicly documented read-only credentials from https://demo.neo4jlabs.com",
+    "category": "Neo4j",
+    "query": "{\n  query(input: {\n    connection: { driver: neo4j, host: \"demo.neo4jlabs.com\", database: \"movies\", user: \"movies\", password: \"movies\", scheme: \"neo4j+s\" }\n    from: \"Movie\"\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – JSONPlaceholder: posts with comments",
+    "description": "Fetch the first 5 posts from JSONPlaceholder and embed their comments.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://jsonplaceholder.typicode.com\" }\n    from: \"/posts\"\n    limit: 5\n    relations: [{ entity: \"comments\", foreignKey: \"id\", type: hasMany, alias: \"comments\" }]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – RestCountries: European countries",
+    "description": "List the first 10 European countries with name, capital, population and flags.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://restcountries.com/v3.1\" }\n    from: \"/region/europe\"\n    select: [\"name\",\"capital\",\"population\",\"flags\"]\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Open-Meteo: current weather in Berlin",
+    "description": "Get the current weather forecast for Berlin from the Open-Meteo free API.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.open-meteo.com/v1\" }\n    from: \"/forecast\"\n    where: { latitude: \"52.52\", longitude: \"13.41\", current_weather: \"true\" }\n    select: [\"current_weather\",\"latitude\",\"longitude\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – PokéAPI: first 10 Pokémon",
+    "description": "List the first 10 Pokémon from the PokéAPI.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://pokeapi.co/api/v2\" }\n    from: \"/pokemon\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Jikan: top anime",
+    "description": "List the top 5 anime titles from the Jikan MyAnimeList API.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.jikan.moe/v4\" }\n    from: \"/top/anime\"\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "OWL ingestion – Blog ontology (Turtle)",
+    "description": "Parse the blog OWL ontology in Turtle format and extract classes, properties and triple count.",
+    "category": "OWL",
+    "query": "mutation {\n  ingestOntology(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/copilot/add-graphql-query-endpoint/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    classes { iri label subClassOf }\n    objectProperties { iri label domain range relationType }\n    dataProperties { iri label domain range }\n  }\n}"
+  }
+]
