@@ -6,11 +6,10 @@
  *
  * No credentials required. All endpoints are publicly accessible.
  *
- * Relationship notes:
- *  - Each cart has a `userId` field. The REST driver resolves this by
- *    fetching /users/{userId} (belongsTo).
- *  - /users hasMany carts: the driver fetches /carts/{userId} for each user,
- *    but Fake Store exposes /carts/user/{userId} for per-user carts.
+ * Relationship map:
+ *  - /carts     → /users     (userId FK, belongsTo)
+ *  - /users     → /carts     (userId FK on carts, hasMany)
+ *  - /products  → /products/categories (category string, belongsTo by name)
  */
 module.exports = {
   name: 'fakestore',
@@ -41,7 +40,9 @@ module.exports = {
     {
       name: '/users',
       columns: ['id', 'email', 'username', 'phone', 'name', 'address'],
-      relations: [],
+      relations: [
+        { entity: '/carts', foreignKey: 'id', type: 'hasMany', alias: 'carts' },
+      ],
     },
   ],
 };

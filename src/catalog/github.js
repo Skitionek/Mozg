@@ -8,10 +8,13 @@
  * Rate limit: 60 req/hour unauthenticated; 5000/hour with a Personal Access Token.
  * Pass a token via `connection.user` (treated as a Bearer token by the REST driver).
  *
- * Relationship notes:
- *  - Repos belong to a user/org: repos have `owner.login`.
- *  - Issues belong to a repo (use /repos/{owner}/{repo}/issues directly).
- *  - The REST driver resolves /users/{login} via the `login` foreign key.
+ * Relationship map:
+ *  - /repos                → /users  (owner.login FK, belongsTo the owner)
+ *  - /search/repositories  → /users  (owner.login FK, belongsTo the owner)
+ *  - /users                → /repos  (login FK on repos, hasMany repos via
+ *                                     /users/{login}/repos)
+ *  - /orgs                 → /repos  (login FK on repos, hasMany repos via
+ *                                     /orgs/{login}/repos)
  */
 module.exports = {
   name: 'github',
@@ -33,8 +36,10 @@ module.exports = {
     },
     {
       name: '/repos',
-      columns: ['id', 'name', 'full_name', 'description', 'html_url', 'language', 'forks_count', 'stargazers_count', 'watchers_count', 'open_issues_count', 'default_branch', 'created_at', 'updated_at', 'pushed_at', 'topics', 'visibility'],
-      relations: [],
+      columns: ['id', 'name', 'full_name', 'description', 'html_url', 'language', 'forks_count', 'stargazers_count', 'watchers_count', 'open_issues_count', 'default_branch', 'created_at', 'updated_at', 'pushed_at', 'topics', 'visibility', 'owner'],
+      relations: [
+        { entity: '/users', foreignKey: 'owner.login', type: 'belongsTo', alias: 'owner' },
+      ],
     },
     {
       name: '/orgs',
@@ -44,7 +49,9 @@ module.exports = {
     {
       name: '/search/repositories',
       columns: ['id', 'name', 'full_name', 'description', 'language', 'stargazers_count', 'forks_count', 'open_issues_count', 'topics', 'html_url', 'owner'],
-      relations: [],
+      relations: [
+        { entity: '/users', foreignKey: 'owner.login', type: 'belongsTo', alias: 'owner' },
+      ],
     },
   ],
 };

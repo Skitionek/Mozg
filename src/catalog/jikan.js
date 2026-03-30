@@ -9,6 +9,12 @@
  * The REST driver automatically unwraps the `data` key.
  *
  * Rate limits: 3 req/sec, 60 req/min.
+ *
+ * Relationship notes:
+ *  - Each anime/manga record embeds an array of genres with {mal_id, name}.
+ *    The `mal_id` value can be used to look up /genres/anime or /genres/manga.
+ *  - /top/anime and /seasons/now are filtered views of /anime (same entity shape).
+ *  - /top/manga is a filtered view of /manga.
  */
 module.exports = {
   name: 'jikan',
@@ -22,12 +28,16 @@ module.exports = {
     {
       name: '/anime',
       columns: ['mal_id', 'title', 'title_english', 'type', 'source', 'episodes', 'status', 'airing', 'score', 'rank', 'popularity', 'season', 'year'],
-      relations: [],
+      relations: [
+        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
+      ],
     },
     {
       name: '/manga',
       columns: ['mal_id', 'title', 'title_english', 'type', 'chapters', 'volumes', 'status', 'score', 'rank', 'popularity'],
-      relations: [],
+      relations: [
+        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
+      ],
     },
     {
       name: '/characters',
@@ -52,17 +62,23 @@ module.exports = {
     {
       name: '/top/anime',
       columns: ['mal_id', 'title', 'type', 'episodes', 'score', 'rank', 'popularity', 'members'],
-      relations: [],
+      relations: [
+        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
+      ],
     },
     {
       name: '/top/manga',
       columns: ['mal_id', 'title', 'type', 'chapters', 'score', 'rank', 'popularity', 'members'],
-      relations: [],
+      relations: [
+        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
+      ],
     },
     {
       name: '/seasons/now',
       columns: ['mal_id', 'title', 'type', 'episodes', 'score', 'season', 'year'],
-      relations: [],
+      relations: [
+        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
+      ],
     },
   ],
 };

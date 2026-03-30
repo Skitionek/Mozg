@@ -26,32 +26,37 @@ module.exports = {
   entities: [
     {
       name: '/films',
-      columns: ['title', 'episode_id', 'opening_crawl', 'director', 'producer', 'release_date', 'url'],
+      columns: ['title', 'episode_id', 'opening_crawl', 'director', 'producer', 'release_date', 'characters', 'planets', 'starships', 'vehicles', 'species', 'url'],
       relations: [],
     },
     {
       name: '/people',
-      columns: ['name', 'height', 'mass', 'hair_color', 'skin_color', 'eye_color', 'birth_year', 'gender', 'homeworld', 'url'],
-      relations: [],
+      columns: ['name', 'height', 'mass', 'hair_color', 'skin_color', 'eye_color', 'birth_year', 'gender', 'homeworld', 'films', 'species', 'vehicles', 'starships', 'url'],
+      relations: [
+        { entity: '/planets', foreignKey: 'homeworld', type: 'belongsTo', alias: 'homeworld' },
+        { entity: '/species', foreignKey: 'url', type: 'hasMany', alias: 'species' },
+      ],
     },
     {
       name: '/planets',
-      columns: ['name', 'rotation_period', 'orbital_period', 'diameter', 'climate', 'gravity', 'terrain', 'surface_water', 'population', 'url'],
+      columns: ['name', 'rotation_period', 'orbital_period', 'diameter', 'climate', 'gravity', 'terrain', 'surface_water', 'population', 'residents', 'films', 'url'],
       relations: [],
     },
     {
       name: '/species',
-      columns: ['name', 'classification', 'designation', 'average_height', 'skin_colors', 'hair_colors', 'eye_colors', 'average_lifespan', 'language', 'homeworld', 'url'],
-      relations: [],
+      columns: ['name', 'classification', 'designation', 'average_height', 'skin_colors', 'hair_colors', 'eye_colors', 'average_lifespan', 'language', 'homeworld', 'people', 'films', 'url'],
+      relations: [
+        { entity: '/planets', foreignKey: 'homeworld', type: 'belongsTo', alias: 'homeworld' },
+      ],
     },
     {
       name: '/vehicles',
-      columns: ['name', 'model', 'manufacturer', 'cost_in_credits', 'length', 'max_atmosphering_speed', 'crew', 'passengers', 'cargo_capacity', 'vehicle_class', 'url'],
+      columns: ['name', 'model', 'manufacturer', 'cost_in_credits', 'length', 'max_atmosphering_speed', 'crew', 'passengers', 'cargo_capacity', 'vehicle_class', 'pilots', 'films', 'url'],
       relations: [],
     },
     {
       name: '/starships',
-      columns: ['name', 'model', 'manufacturer', 'cost_in_credits', 'length', 'max_atmosphering_speed', 'crew', 'passengers', 'cargo_capacity', 'hyperdrive_rating', 'MGLT', 'starship_class', 'url'],
+      columns: ['name', 'model', 'manufacturer', 'cost_in_credits', 'length', 'max_atmosphering_speed', 'crew', 'passengers', 'cargo_capacity', 'hyperdrive_rating', 'MGLT', 'starship_class', 'pilots', 'films', 'url'],
       relations: [],
     },
   ],

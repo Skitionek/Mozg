@@ -9,8 +9,11 @@
  *
  * Relationship notes:
  *  - Films contain arrays of people/location/species/vehicle URLs.
- *    The `people` and `locations` arrays hold full REST URLs
- *    (e.g. "https://ghibliapi.vercel.app/people/ba924631-…").
+ *  - `/people` has a `species` field (single URL) and a `films` array (URLs).
+ *  - `/locations` has a `residents` array of /people URLs and a `films` array.
+ *  - `/species` has a `people` array of /people URLs and a `films` array.
+ *  - `/vehicles` has a `pilot` field (single URL → /people) and a `films` array.
+ *  - All cross-entity references are full REST URLs, not plain IDs.
  */
 module.exports = {
   name: 'ghibli',
@@ -24,12 +27,19 @@ module.exports = {
     {
       name: '/films',
       columns: ['id', 'title', 'original_title', 'original_title_romanised', 'description', 'director', 'producer', 'release_date', 'running_time', 'rt_score', 'people', 'species', 'locations', 'vehicles', 'url'],
-      relations: [],
+      relations: [
+        { entity: '/people', foreignKey: 'url', type: 'hasMany', alias: 'people' },
+        { entity: '/locations', foreignKey: 'url', type: 'hasMany', alias: 'locations' },
+        { entity: '/species', foreignKey: 'url', type: 'hasMany', alias: 'species' },
+        { entity: '/vehicles', foreignKey: 'url', type: 'hasMany', alias: 'vehicles' },
+      ],
     },
     {
       name: '/people',
       columns: ['id', 'name', 'gender', 'age', 'eye_color', 'hair_color', 'films', 'species', 'url'],
-      relations: [],
+      relations: [
+        { entity: '/species', foreignKey: 'species', type: 'belongsTo', alias: 'species' },
+      ],
     },
     {
       name: '/locations',
@@ -44,7 +54,9 @@ module.exports = {
     {
       name: '/vehicles',
       columns: ['id', 'name', 'description', 'vehicle_class', 'length', 'pilot', 'films', 'url'],
-      relations: [],
+      relations: [
+        { entity: '/people', foreignKey: 'pilot', type: 'belongsTo', alias: 'pilot' },
+      ],
     },
   ],
 };

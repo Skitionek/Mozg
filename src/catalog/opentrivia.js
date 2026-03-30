@@ -13,6 +13,9 @@
  *
  * Response: /api.php wraps in `{response_code, results: [...]}`.
  * The REST driver automatically unwraps the `results` key.
+ *
+ * Relationship map:
+ *  - /api.php questions → /api_category.php (category int FK, belongsTo)
  */
 module.exports = {
   name: 'opentrivia',
@@ -26,12 +29,16 @@ module.exports = {
     {
       name: '/api.php',
       columns: ['type', 'difficulty', 'category', 'question', 'correct_answer', 'incorrect_answers'],
-      relations: [],
+      relations: [
+        { entity: '/api_category.php', foreignKey: 'category', type: 'belongsTo', alias: 'category' },
+      ],
     },
     {
       name: '/api_category.php',
       columns: ['id', 'name'],
-      relations: [],
+      relations: [
+        { entity: '/api.php', foreignKey: 'id', type: 'hasMany', alias: 'questions' },
+      ],
     },
   ],
 };

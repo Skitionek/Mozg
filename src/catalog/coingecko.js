@@ -11,6 +11,11 @@
  *  - /coins/markets requires `vs_currency` query param (e.g. usd).
  *    Pass it via `where: { vs_currency: "usd" }`.
  *  - /exchanges/{id} accepts the exchange id (e.g. "binance").
+ *
+ * Relationship map:
+ *  - /asset_platforms  → /coins/list  (native_coin_id FK, belongsTo)
+ *  - /coins/list       → /asset_platforms (platforms map keys are platform IDs)
+ *  - /coins/markets    → /asset_platforms (via atl_change_percentage, conceptual)
  */
 module.exports = {
   name: 'coingecko',
@@ -24,7 +29,9 @@ module.exports = {
     {
       name: '/coins/list',
       columns: ['id', 'symbol', 'name', 'platforms'],
-      relations: [],
+      relations: [
+        { entity: '/asset_platforms', foreignKey: 'id', type: 'hasMany', alias: 'platforms' },
+      ],
     },
     {
       name: '/coins/markets',
@@ -39,7 +46,9 @@ module.exports = {
     {
       name: '/asset_platforms',
       columns: ['id', 'chain_identifier', 'name', 'shortname', 'native_coin_id'],
-      relations: [],
+      relations: [
+        { entity: '/coins/list', foreignKey: 'native_coin_id', type: 'belongsTo', alias: 'nativeCoin' },
+      ],
     },
     {
       name: '/coins/categories/list',

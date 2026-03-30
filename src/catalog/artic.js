@@ -6,6 +6,10 @@
  *
  * No credentials required. Rate-limited to reasonable usage.
  * Use the `fields` query parameter (via `where`) to limit response size.
+ *
+ * Relationship map:
+ *  - /artworks  → /artists      (artist_id FK, belongsTo)
+ *  - /artists   → /artworks     (id FK on artworks, hasMany)
  */
 module.exports = {
   name: 'artic',
@@ -26,7 +30,9 @@ module.exports = {
     {
       name: '/artists',
       columns: ['id', 'title', 'birth_date', 'death_date', 'birth_place', 'death_place', 'description'],
-      relations: [],
+      relations: [
+        { entity: '/artworks', foreignKey: 'id', type: 'hasMany', alias: 'artworks' },
+      ],
     },
     {
       name: '/exhibitions',
