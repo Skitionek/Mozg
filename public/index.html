@@ -219,6 +219,17 @@
     .json-bool   { color: #f78bba; }
     .json-null   { color: var(--muted); }
 
+    /* ── Graph view ──────────────────────────────────────────── */
+    #result-graph {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg);
+      padding: 1rem;
+    }
+    .view-toggle { display: flex; gap: .3rem; }
+    .view-toggle .btn-sm { border: 1px solid var(--border); }
+    .view-toggle .btn-sm.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
     /* ── Toast ───────────────────────────────────────────────── */
     #toast {
       position: fixed;
@@ -268,8 +279,21 @@
   <!-- ── Sidebar ─────────────────────────────────────────────── -->
   <aside>
 
+    <!-- Known Databases catalog -->
+    <div class="section-title" style="margin-top:0">Known Databases</div>
+    <select id="catalog-select">
+      <option value="">— choose a known database —</option>
+    </select>
+    <div id="catalog-entity-group" class="hidden">
+      <label>Entity / endpoint</label>
+      <select id="catalog-entity-select">
+        <option value="">— select entity —</option>
+      </select>
+      <button class="btn btn-secondary btn-full btn-sm" onclick="applyCatalog()" style="margin-top:.4rem">⚡ Apply to Form</button>
+    </div>
+
     <!-- Examples dropdown -->
-    <div class="section-title" style="margin-top:0">Examples</div>
+    <div class="section-title">Examples</div>
     <select id="examples-select">
       <option value="">— load an example —</option>
     </select>
@@ -439,9 +463,17 @@
         <div class="panel-header">
           Result
           <span id="result-badge" class="badge hidden">0</span>
+          <span class="spacer" style="flex:1"></span>
+          <div class="view-toggle">
+            <button id="view-json-btn" class="btn btn-secondary btn-sm active" onclick="setResultView('json')">JSON</button>
+            <button id="view-graph-btn" class="btn btn-secondary btn-sm" onclick="setResultView('graph')">Graph</button>
+          </div>
         </div>
         <div id="result-output">
           <span class="result-placeholder">Run a query to see results here.</span>
+        </div>
+        <div id="result-graph" class="hidden">
+          <svg id="graph-svg" style="overflow:visible;display:block;"></svg>
         </div>
       </div>
     </div>
@@ -685,6 +717,7 @@
   }
 
   function renderResult(json) {
+    lastResult = json;
     const out   = document.getElementById('result-output');
     const badge = document.getElementById('result-badge');
 
@@ -710,12 +743,15 @@
     }
 
     out.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+    if (graphViewActive) renderGraph(json);
     toast('Query executed', 'success');
   }
 
   function clearResults() {
+    lastResult = null;
     document.getElementById('result-output').innerHTML =
       '<span class="result-placeholder">Run a query to see results here.</span>';
+    document.getElementById('graph-svg').innerHTML = '';
     document.getElementById('result-badge').classList.add('hidden');
     document.getElementById('timing').textContent = '';
   }
@@ -788,8 +824,262 @@
     );
   }
 
+  // ── Catalog ───────────────────────────────────────────────────
+  let catalogData = [];
+  let selectedCatalogEntry = null;
+  const CATALOG_DESC_PREVIEW = 50;  // characters of description shown in dropdown
+
+  async function loadCatalog() {
+    try {
+      const res = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `{
+          catalog {
+            name label description driver
+            connection { host port database user password scheme }
+            entities {
+              name columns
+              relations { entity foreignKey localKey alias type }
+            }
+          }
+        }` }),
+      });
+      const json = await res.json();
+      if (json.data && json.data.catalog) {
+        catalogData = json.data.catalog;
+        const sel = document.getElementById('catalog-select');
+        for (const entry of catalogData) {
+          const opt = document.createElement('option');
+          opt.value = entry.name;
+          opt.textContent = entry.label + (entry.description ? ` – ${entry.description.slice(0, CATALOG_DESC_PREVIEW)}` : '');
+          sel.appendChild(opt);
+        }
+      }
+    } catch { /* catalog loading is not critical */ }
+  }
+
+  document.getElementById('catalog-select').addEventListener('change', function () {
+    selectedCatalogEntry = catalogData.find(e => e.name === this.value) || null;
+    const group = document.getElementById('catalog-entity-group');
+    if (!selectedCatalogEntry) { group.classList.add('hidden'); return; }
+    group.classList.remove('hidden');
+    const entitySel = document.getElementById('catalog-entity-select');
+    entitySel.innerHTML = '<option value="">— select entity —</option>';
+    for (const entity of selectedCatalogEntry.entities) {
+      const opt = document.createElement('option');
+      opt.value = entity.name;
+      const preview = entity.columns.slice(0, 3).join(', ') + (entity.columns.length > 3 ? ', …' : '');
+      opt.textContent = entity.name + (preview ? ` (${preview})` : '');
+      entitySel.appendChild(opt);
+    }
+  });
+
+  function applyCatalog() {
+    if (!selectedCatalogEntry) return;
+    const entry = selectedCatalogEntry;
+    const entityName = document.getElementById('catalog-entity-select').value;
+
+    // Apply connection fields
+    document.getElementById('conn-driver').value = entry.driver;
+    const c = entry.connection;
+    if (c.host)     document.getElementById('conn-host').value = c.host;
+    if (c.port)     document.getElementById('conn-port').value = c.port;
+    if (c.database) document.getElementById('conn-database').value = c.database;
+    if (c.user)     document.getElementById('conn-user').value = c.user;
+    if (c.password) document.getElementById('conn-password').value = c.password;
+    if (c.scheme)   document.getElementById('conn-scheme').value = c.scheme;
+    updateDriverUI();
+
+    // Apply selected entity + its relations
+    if (entityName) {
+      const entity = entry.entities.find(e => e.name === entityName);
+      if (entity) {
+        document.getElementById('q-from').value = entity.name;
+        document.getElementById('q-select').value = entity.columns.join(', ');
+        relations.length = 0;
+        for (const rel of entity.relations) relations.push({ ...rel });
+        renderRelations();
+      }
+    }
+
+    generateQuery();
+    toast(`Applied: ${entry.label}`, 'success');
+  }
+
+  // ── Result view (JSON / Graph) ────────────────────────────────
+  let graphViewActive = false;
+  let lastResult = null;
+
+  function setResultView(view) {
+    graphViewActive = (view === 'graph');
+    document.getElementById('view-json-btn').classList.toggle('active', !graphViewActive);
+    document.getElementById('view-graph-btn').classList.toggle('active', graphViewActive);
+    document.getElementById('result-output').classList.toggle('hidden', graphViewActive);
+    document.getElementById('result-graph').classList.toggle('hidden', !graphViewActive);
+    if (graphViewActive && lastResult) renderGraph(lastResult);
+  }
+
+  // ── Graph renderer ────────────────────────────────────────────
+  // Caps keep the SVG responsive for large result sets; adjust to taste.
+  const GRAPH_MAX_ROOT     = 20;   // max root (top-level) nodes rendered
+  const GRAPH_MAX_CHILDREN = 5;    // max nested nodes rendered per parent
+  const GRAPH_MAX_NODES    = 80;   // hard cap on total SVG nodes (perf guard)
+  const GRAPH_NODE_R       = 18;   // circle radius (px)
+  const GRAPH_LEVEL_H      = 110;  // vertical gap between depth levels (px)
+  const GRAPH_MIN_COL_W    = 70;   // minimum horizontal space per node (px)
+
+  function graphNodeLabel(obj) {
+    const preferred = ['name', 'title', 'label', 'email', 'id'];
+    for (const k of preferred) {
+      if (obj[k] != null && typeof obj[k] !== 'object') {
+        const s = String(obj[k]);
+        return s.length > 14 ? s.slice(0, 13) + '…' : s;
+      }
+    }
+    for (const v of Object.values(obj)) {
+      if (v != null && typeof v !== 'object') {
+        const s = String(v);
+        return s.length > 14 ? s.slice(0, 13) + '…' : s;
+      }
+    }
+    return '●';
+  }
+
+  function graphEntityColor(name) {
+    const palette = ['#6c63ff', '#ff6584', '#43b89c', '#f7c67b', '#b5f081', '#ff9f7f', '#8fb8ff'];
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0;
+    return palette[h % palette.length];
+  }
+
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  }
+
+  function renderGraph(json) {
+    const svg = document.getElementById('graph-svg');
+    svg.innerHTML = '';
+
+    let data = null;
+    const rootEntity = document.getElementById('q-from').value.trim() || 'row';
+
+    if (json.data && json.data.query && Array.isArray(json.data.query.data)) {
+      data = json.data.query.data;
+    }
+
+    if (!data || data.length === 0) {
+      svg.appendChild(svgEl('text', { x: 200, y: 60, 'text-anchor': 'middle', fill: '#718096', 'font-size': '13' }))
+        .textContent = 'No relational data to visualise.';
+      svg.setAttribute('width', 400);
+      svg.setAttribute('height', 80);
+      return;
+    }
+
+    // Build nodes and edges
+    const nodes = [];  // { idx, label, entity, depth, x, y, children[] }
+    const edges = [];  // { from, to }
+
+    function addNode(obj, parentIdx, depth, entity) {
+      if (nodes.length >= GRAPH_MAX_NODES) return;
+      const idx = nodes.length;
+      nodes.push({ idx, label: graphNodeLabel(obj), entity, depth, x: 0, y: 0, children: [] });
+      if (parentIdx !== null) {
+        edges.push({ from: parentIdx, to: idx });
+        nodes[parentIdx].children.push(idx);
+      }
+      for (const [key, val] of Object.entries(obj)) {
+        if (nodes.length >= GRAPH_MAX_NODES) break;
+        if (Array.isArray(val)) {
+          for (const item of val.slice(0, GRAPH_MAX_CHILDREN)) {
+            if (item && typeof item === 'object' && !Array.isArray(item)) {
+              addNode(item, idx, depth + 1, key);
+            }
+          }
+        } else if (val && typeof val === 'object') {
+          addNode(val, idx, depth + 1, key);
+        }
+      }
+    }
+
+    for (const row of data.slice(0, GRAPH_MAX_ROOT)) addNode(row, null, 0, rootEntity);
+
+    const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0);
+    const maxPerLevel = Array.from({ length: maxDepth + 1 }, (_, d) =>
+      nodes.filter(n => n.depth === d).length,
+    ).reduce((m, c) => Math.max(m, c), 1);
+
+    const colW = Math.max(GRAPH_MIN_COL_W, GRAPH_NODE_R * 2 + 24);
+    const svgW = maxPerLevel * colW + 40;
+    const svgH = (maxDepth + 1) * GRAPH_LEVEL_H + GRAPH_NODE_R + 40;
+
+    for (let d = 0; d <= maxDepth; d++) {
+      const level = nodes.filter(n => n.depth === d);
+      const span = svgW / (level.length + 1);
+      level.forEach((n, i) => {
+        n.x = (i + 1) * span;
+        n.y = d * GRAPH_LEVEL_H + GRAPH_NODE_R + 30;
+      });
+    }
+
+    svg.setAttribute('width', svgW);
+    svg.setAttribute('height', svgH);
+
+    // Draw edges (below nodes)
+    const edgesG = svgEl('g', {});
+    for (const e of edges) {
+      const s = nodes[e.from], t = nodes[e.to];
+      const dy = (t.y - s.y) / 2;
+      edgesG.appendChild(svgEl('path', {
+        d: `M${s.x},${s.y + GRAPH_NODE_R} C${s.x},${s.y + GRAPH_NODE_R + dy} ${t.x},${t.y - dy} ${t.x},${t.y - GRAPH_NODE_R}`,
+        stroke: '#2d3047', 'stroke-width': '1.5', fill: 'none',
+      }));
+    }
+    svg.appendChild(edgesG);
+
+    // Draw nodes
+    for (const node of nodes) {
+      const color = graphEntityColor(node.entity);
+      const g = svgEl('g', { transform: `translate(${node.x},${node.y})` });
+
+      g.appendChild(svgEl('circle', {
+        r: GRAPH_NODE_R, fill: color, 'fill-opacity': '0.18',
+        stroke: color, 'stroke-width': '1.5',
+      }));
+
+      const lbl = svgEl('text', {
+        'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        fill: '#e2e8f0', 'font-size': '9', 'font-family': 'inherit',
+      });
+      lbl.textContent = node.label;
+      g.appendChild(lbl);
+
+      const etype = svgEl('text', {
+        'text-anchor': 'middle', y: GRAPH_NODE_R + 11,
+        fill: color, 'font-size': '8', 'font-family': 'inherit',
+      });
+      etype.textContent = node.entity;
+      g.appendChild(etype);
+
+      svg.appendChild(g);
+    }
+
+    // Truncation notice
+    if (nodes.length >= GRAPH_MAX_NODES) {
+      const note = svgEl('text', {
+        x: svgW / 2, y: svgH - 6, 'text-anchor': 'middle',
+        fill: '#718096', 'font-size': '9',
+      });
+      note.textContent = `(showing first ${GRAPH_MAX_NODES} nodes)`;
+      svg.appendChild(note);
+    }
+  }
+
   // ── Init ──────────────────────────────────────────────────────
   loadExamples();
+  loadCatalog();
   generateQuery();
 </script>
 </body>

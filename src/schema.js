@@ -53,6 +53,13 @@ const typeDefs = /* GraphQL */ `
     Introspect the schema of a database to discover tables and columns.
     """
     introspect(connection: ConnectionInput!): DatabaseSchema!
+
+    """
+    Return pre-defined database catalog entries.
+    When name is supplied only that entry is returned; omit to list all entries.
+    Catalog files are loaded lazily on first access.
+    """
+    catalog(name: String): [CatalogEntry!]!
   }
 
   type Mutation {
@@ -226,6 +233,51 @@ const typeDefs = /* GraphQL */ `
     domain: [String!]!
     range: [String!]!
   }
+
+  """A pre-defined database with known schema and relationships"""
+  type CatalogEntry {
+    """Unique identifier used in the catalog(name:) query"""
+    name: String!
+    """Human-readable display name"""
+    label: String!
+    """Short description of the database"""
+    description: String
+    """Driver required to connect"""
+    driver: Driver!
+    """Default connection parameters (credentials are public demo values where applicable)"""
+    connection: CatalogConnection!
+    """Known tables / node labels / REST paths with their columns and relations"""
+    entities: [CatalogEntity!]!
+  }
+
+  """Connection parameters template stored in a catalog entry"""
+  type CatalogConnection {
+    host: String
+    port: Int
+    database: String
+    user: String
+    """Included only for databases with publicly documented read-only credentials"""
+    password: String
+    scheme: String
+  }
+
+  """A table, node label, or API path defined in a catalog entry"""
+  type CatalogEntity {
+    name: String!
+    """Known column / property / field names"""
+    columns: [String!]!
+    """Pre-defined relations to other entities"""
+    relations: [CatalogRelation!]!
+  }
+
+  """A pre-defined relationship within a catalog entity"""
+  type CatalogRelation {
+    entity: String!
+    foreignKey: String!
+    localKey: String
+    alias: String
+    type: RelationType!
+  }
 `;
 
 // ---------------------------------------------------------------------------
@@ -240,6 +292,8 @@ const resolvers = {
   Query: {
     query: (_parent, { input }) => executeQuery(input),
     introspect: (_parent, { connection }) => introspectDatabase(connection),
+    // Catalog is lazy-required so the files are only loaded when the resolver runs
+    catalog: (_parent, { name }) => require('./catalog').getCatalog(name),
   },
   Mutation: {
     ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input),
