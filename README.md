@@ -49,9 +49,9 @@ The following free, public endpoints can be used directly — no sign-up require
 
 | Name | Driver | Host | Database | User | Password | Notes |
 |------|--------|------|----------|------|----------|-------|
-| RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | `NWDMCE5xdipIjRrp` | RNA sequences |
+| RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | *(public read-only — see [RNAcentral docs](https://rnacentral.org/help/public-database))* | RNA sequences |
 | RFAM | `mysql` | `mysql-rfam-public.ebi.ac.uk` | `Rfam` | `rfamro` | *(empty)* | RNA families |
-| Neo4j Movies | `neo4j` | `demo.neo4jlabs.com` | `movies` | `movies` | `movies` | Movie graph (scheme: `neo4j+s`) |
+| Neo4j Movies | `neo4j` | `demo.neo4jlabs.com` | `movies` | `movies` | *(public demo — see [Neo4j Labs](https://demo.neo4jlabs.com))* | Movie graph (scheme: `neo4j+s`) |
 | JSONPlaceholder | `rest` | – | `https://jsonplaceholder.typicode.com` | – | – | Fake REST data |
 | RestCountries | `rest` | – | `https://restcountries.com/v3.1` | – | – | Country data |
 | Open-Meteo | `rest` | – | `https://api.open-meteo.com/v1` | – | – | Weather (no key) |

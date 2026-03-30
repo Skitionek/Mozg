@@ -28,6 +28,8 @@ function parseLiteralJSON(ast) {
     }
     case Kind.LIST:
       return ast.values.map(parseLiteralJSON);
+    case Kind.ENUM:
+      return ast.value;
     default:
       return null;
   }
@@ -126,7 +128,9 @@ const typeDefs = /* GraphQL */ `
     entity: String!
     """Key on the parent entity (default: id)"""
     localKey: String
-    """Key on the related entity that references the parent"""
+    """Key linking to the related entity:
+       - for hasMany/hasOne: the column on the *related* entity that references the parent
+       - for belongsTo: the column on the *current* entity that references the parent"""
     foreignKey: String!
     """Property name in the result (defaults to entity name)"""
     alias: String

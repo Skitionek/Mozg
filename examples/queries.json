@@ -13,13 +13,13 @@
   },
   {
     "name": "PostgreSQL – RNAcentral: list RNA sequences",
-    "description": "List 10 RNA sequences from the public RNAcentral PostgreSQL database at EBI.",
+    "description": "List 10 RNA sequences from the public RNAcentral PostgreSQL database at EBI. Uses the publicly documented read-only credentials from https://rnacentral.org/help/public-database",
     "category": "PostgreSQL",
     "query": "{\n  query(input: {\n    connection: { driver: postgres, host: \"hh-pgsql-public.ebi.ac.uk\", port: 5432, database: \"pfmegrnargs\", user: \"reader\", password: \"NWDMCE5xdipIjRrp\" }\n    from: \"rna\"\n    select: [\"upi\",\"length\",\"seq_short\"]\n    limit: 10\n  }) { count data }\n}"
   },
   {
     "name": "Neo4j – Movies demo: actors and movies",
-    "description": "Query the public Neo4j Movies demo database for the first 5 Movie nodes.",
+    "description": "Query the public Neo4j Movies demo database for the first 5 Movie nodes. Uses the publicly documented read-only credentials from https://demo.neo4jlabs.com",
     "category": "Neo4j",
     "query": "{\n  query(input: {\n    connection: { driver: neo4j, host: \"demo.neo4jlabs.com\", database: \"movies\", user: \"movies\", password: \"movies\", scheme: \"neo4j+s\" }\n    from: \"Movie\"\n    limit: 5\n  }) { count data }\n}"
   },

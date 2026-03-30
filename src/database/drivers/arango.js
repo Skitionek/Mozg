@@ -1,6 +1,6 @@
 'use strict';
 
-const { Database, aql } = require('arangojs');
+const { Database } = require('arangojs');
 
 // Connection cache
 const dbCache = new Map();

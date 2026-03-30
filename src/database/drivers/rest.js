@@ -83,8 +83,8 @@ async function executeQuery(input) {
     relations,
     limit,
     offset,
-    orderBy,
-    orderDirection,
+    orderBy: _orderBy,
+    orderDirection: _orderDirection,
   } = input;
 
   const base = (connection.database || '').replace(/\/$/, '');
@@ -161,8 +161,9 @@ async function loadRelations(base, headers, rows, relations) {
         }
 
         row[resultKey] = type === 'hasMany' ? filtered : (filtered[0] ?? null);
-      } catch {
-        row[resultKey] = type === 'hasMany' ? [] : null;
+      } catch (err) {
+        // Surface the error so callers can see what went wrong (e.g. auth/404)
+        throw new Error(`REST relation fetch failed for ${entity}/${pathVal}: ${err.message}`, { cause: err });
       }
     }
   }

@@ -143,7 +143,7 @@ async function executeQuery(input) {
   return { data: rows, count: rows.length };
 }
 
-async function introspect(connection) {
+async function introspect(_connection) {
   // BioCyc has a well-known fixed schema; return it statically.
   const tables = BIOCYC_CLASSES.map((name) => ({
     name,
