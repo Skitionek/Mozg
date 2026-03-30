@@ -143,15 +143,16 @@ async function loadRelations(base, headers, rows, relations) {
     const entityPath = entity.startsWith('/') ? entity : `/${entity}`;
 
     for (const row of rows) {
-      const parentVal = row[localKey];
-      if (parentVal == null) {
+      // Use foreignKey field on the parent row as the path segment per the spec:
+      // sub-fetch to {base}/{entity}/{parentRow[foreignKey]}
+      const pathVal = row[foreignKey] ?? row[localKey];
+      if (pathVal == null) {
         row[resultKey] = type === 'hasMany' ? [] : null;
         continue;
       }
 
       try {
-        // Sub-fetch: {base}/{entity}/{parentRow[foreignKey]}
-        const subUrl = `${base}${entityPath}/${parentVal}`;
+        const subUrl = `${base}${entityPath}/${pathVal}`;
         const subRows = await fetchAndNormalise(subUrl, headers);
         const filtered = applySelect(subRows, select);
 

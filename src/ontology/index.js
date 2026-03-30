@@ -27,7 +27,9 @@ function formatFromExtension(url) {
   const path = url.split('?')[0].toLowerCase();
   if (path.endsWith('.ttl') || path.endsWith('.n3') || path.endsWith('.nt')) return 'turtle';
   if (path.endsWith('.rdf')) return 'rdfxml';
-  if (path.endsWith('.owl')) return 'rdfxml'; // most .owl files are RDF/XML
+  // .owl files are most commonly RDF/XML; users should pass format: owlxml explicitly
+  // when using the OWL/XML functional syntax
+  if (path.endsWith('.owl')) return 'rdfxml';
   if (path.endsWith('.owx')) return 'owlxml';
   if (path.endsWith('.manchstr') || path.endsWith('.omn')) return 'manchester';
   return null;

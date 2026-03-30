@@ -148,12 +148,10 @@ function parseManchesterSyntax(content) {
           if (commentM) op.comment = commentM[1];
         } else if (section === 'domain') {
           const val = l.replace(/^,\s*/, '').trim();
-          if (val && !val.includes(':')) { /* skip section headers */ }
-          else if (val) op.domain.push(expandCurie(val, prefixMap));
+          if (val && val.includes(':')) op.domain.push(expandCurie(val, prefixMap));
         } else if (section === 'range') {
           const val = l.replace(/^,\s*/, '').trim();
-          if (val && !val.includes(':')) { /* skip section headers */ }
-          else if (val) op.range.push(expandCurie(val, prefixMap));
+          if (val && val.includes(':')) op.range.push(expandCurie(val, prefixMap));
         }
       }
 
