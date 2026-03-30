@@ -62,7 +62,13 @@ async function loadRelations(db, rows, relations) {
       if (!parentIds.length) { rows.forEach((r) => { r[resultKey] = type === 'hasMany' ? [] : null; }); continue; }
 
       let relQ = db(entity).whereIn(foreignKey, parentIds);
-      relQ = select && select.length > 0 ? relQ.select(select) : relQ.select('*');
+      // Always include foreignKey so grouping works, even when caller specifies a select list
+      if (select && select.length > 0) {
+        const cols = select.includes(foreignKey) ? select : [foreignKey, ...select];
+        relQ = relQ.select(cols);
+      } else {
+        relQ = relQ.select('*');
+      }
       if (where) relQ = relQ.where(where);
       const relRows = await relQ;
 

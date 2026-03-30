@@ -67,7 +67,7 @@ Mozg can parse OWL ontologies in Turtle, RDF/XML, OWL/XML or Manchester Syntax a
 ```graphql
 mutation {
   ingestOntology(input: {
-    url: "https://raw.githubusercontent.com/Skitionek/Mozg/copilot/add-graphql-query-endpoint/examples/blog.ttl"
+    url: "https://raw.githubusercontent.com/Skitionek/Mozg/main/examples/blog.ttl"
     format: turtle
   }) {
     tripleCount

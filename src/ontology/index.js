@@ -7,7 +7,7 @@ const { parseManchesterSyntax } = require('./formats/manchester');
 const { extractOntology }      = require('./extractor');
 
 /**
- * Detect the serialisation format from a Content-Type header string.
+ * Detect the serialization format from a Content-Type header string.
  * Returns null when unrecognised.
  */
 function formatFromContentType(ct) {
@@ -20,7 +20,7 @@ function formatFromContentType(ct) {
 }
 
 /**
- * Detect the serialisation format from a file-path / URL extension.
+ * Detect the serialization format from a file-path / URL extension.
  * Returns null when unrecognised.
  */
 function formatFromExtension(url) {
@@ -36,7 +36,7 @@ function formatFromExtension(url) {
 }
 
 /**
- * Detect the serialisation format from the content of the file.
+ * Detect the serialization format from the content of the file.
  */
 function detectFormat(content) {
   const trimmed = content.trimStart();
