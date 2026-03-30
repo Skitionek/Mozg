@@ -1,0 +1,22 @@
+{
+  "name": "mozg",
+  "version": "0.1.0",
+  "description": "A 'slow by design' cross-database query layer with a single GraphQL endpoint",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "graphql": "^16.9.0",
+    "graphql-yoga": "^5.3.0",
+    "knex": "^3.1.0",
+    "pg": "^8.11.5",
+    "mysql2": "^3.9.8",
+    "sqlite3": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
