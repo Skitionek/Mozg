@@ -6,10 +6,22 @@
     "query": "{\n  query(input: {\n    connection: { driver: sqlite3, database: \"examples/sample.db\" }\n    from: \"users\"\n    limit: 5\n    relations: [{ entity: \"posts\", foreignKey: \"user_id\", type: hasMany, select: [\"id\",\"title\"] }]\n  }) { count data }\n}"
   },
   {
+    "name": "SQLite – Blog: users → posts → comments (3 levels)",
+    "description": "3-level traversal: list the first 3 users from the local SQLite blog database, each with their posts, and each post with its comments. Demonstrates cross-entity deep nesting within a single database.",
+    "category": "SQLite",
+    "query": "{\n  query(input: {\n    connection: { driver: sqlite3, database: \"examples/sample.db\" }\n    from: \"users\"\n    limit: 3\n    relations: [{\n      entity: \"posts\"\n      foreignKey: \"user_id\"\n      type: hasMany\n      select: [\"id\", \"title\"]\n      relations: [{\n        entity: \"comments\"\n        foreignKey: \"post_id\"\n        type: hasMany\n        select: [\"id\", \"body\"]\n      }]\n    }]\n  }) { count data }\n}"
+  },
+  {
     "name": "SQLite – Blog: introspect schema",
     "description": "Inspect the tables and columns of the local SQLite blog database.",
     "category": "SQLite",
     "query": "{\n  introspect(connection: { driver: sqlite3, database: \"examples/sample.db\" }) {\n    tables { name columns { name type nullable isPrimaryKey } }\n  }\n}"
+  },
+  {
+    "name": "SQLite – Chinook: artists → albums → tracks (3 levels)",
+    "description": "3-level traversal: list the first 3 artists from the Chinook music-store database, each with their albums, and each album with its tracks. Requires chinook.db in the working directory.",
+    "category": "SQLite",
+    "query": "{\n  query(input: {\n    connection: { driver: sqlite3, database: \"chinook.db\" }\n    from: \"Artist\"\n    limit: 3\n    relations: [{\n      entity: \"Album\"\n      foreignKey: \"ArtistId\"\n      type: hasMany\n      select: [\"AlbumId\", \"Title\"]\n      relations: [{\n        entity: \"Track\"\n        foreignKey: \"AlbumId\"\n        type: hasMany\n        select: [\"TrackId\", \"Name\", \"Milliseconds\"]\n      }]\n    }]\n  }) { count data }\n}"
   },
   {
     "name": "PostgreSQL – RNAcentral: list RNA sequences",
@@ -18,16 +30,40 @@
     "query": "{\n  query(input: {\n    connection: { driver: postgres, host: \"hh-pgsql-public.ebi.ac.uk\", port: 5432, database: \"pfmegrnargs\", user: \"reader\", password: \"NWDMCE5xdipIjRrp\" }\n    from: \"rna\"\n    select: [\"upi\",\"length\",\"seq_short\"]\n    limit: 10\n  }) { count data }\n}"
   },
   {
+    "name": "PostgreSQL – RNAcentral: sequences → xrefs → source databases (3 levels)",
+    "description": "3-level cross-entity traversal: list 3 RNA sequences, each with their cross-references, and each cross-reference resolved to its source database record. Demonstrates a 3-hop graph walk within the RNAcentral PostgreSQL database.",
+    "category": "PostgreSQL",
+    "query": "{\n  query(input: {\n    connection: { driver: postgres, host: \"hh-pgsql-public.ebi.ac.uk\", port: 5432, database: \"pfmegrnargs\", user: \"reader\", password: \"NWDMCE5xdipIjRrp\" }\n    from: \"rna\"\n    select: [\"upi\", \"length\"]\n    limit: 3\n    relations: [{\n      entity: \"xref\"\n      foreignKey: \"upi\"\n      type: hasMany\n      select: [\"upi\", \"ac\", \"db_id\"]\n      relations: [{\n        entity: \"rnc_database\"\n        foreignKey: \"db_id\"\n        type: belongsTo\n        alias: \"source_db\"\n        select: [\"id\", \"display_name\", \"url\"]\n      }]\n    }]\n  }) { count data }\n}"
+  },
+  {
     "name": "Neo4j – Movies demo: actors and movies",
     "description": "Query the public Neo4j Movies demo database for the first 5 Movie nodes. Uses the publicly documented read-only credentials from https://demo.neo4jlabs.com",
     "category": "Neo4j",
     "query": "{\n  query(input: {\n    connection: { driver: neo4j, host: \"demo.neo4jlabs.com\", database: \"movies\", user: \"movies\", password: \"movies\", scheme: \"neo4j+s\" }\n    from: \"Movie\"\n    limit: 5\n  }) { count data }\n}"
   },
   {
+    "name": "Neo4j – Movies demo: people with movies acted in",
+    "description": "Query the Neo4j Movies demo for the first 5 Person nodes, each with the movies they acted in via the ACTED_IN relationship.",
+    "category": "Neo4j",
+    "query": "{\n  query(input: {\n    connection: { driver: neo4j, host: \"demo.neo4jlabs.com\", database: \"movies\", user: \"movies\", password: \"movies\", scheme: \"neo4j+s\" }\n    from: \"Person\"\n    limit: 5\n    relations: [{ entity: \"Movie\", foreignKey: \"ACTED_IN\", type: hasMany, alias: \"actedIn\" }]\n  }) { count data }\n}"
+  },
+  {
     "name": "REST – JSONPlaceholder: posts with comments",
     "description": "Fetch the first 5 posts from JSONPlaceholder and embed their comments.",
     "category": "REST",
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://jsonplaceholder.typicode.com\" }\n    from: \"/posts\"\n    limit: 5\n    relations: [{ entity: \"comments\", foreignKey: \"id\", type: hasMany, alias: \"comments\" }]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Art Institute of Chicago: artworks with artist",
+    "description": "Fetch 5 artworks from the Art Institute of Chicago public API, each with its artist record embedded. Uses the `fields` API parameter via `where` to limit response payload.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.artic.edu/api/v1\" }\n    from: \"/artworks\"\n    where: { limit: \"5\", fields: \"id,title,date_display,artist_id,artist_display\" }\n    select: [\"id\", \"title\", \"date_display\", \"artist_id\", \"artist_display\"]\n    relations: [{\n      entity: \"/artists\"\n      foreignKey: \"artist_id\"\n      type: belongsTo\n      alias: \"artist\"\n      select: [\"id\", \"title\", \"birth_date\", \"death_date\"]\n    }]\n  }) { count data }\n}"
+  },
+  {
+    "name": "REST – Open Brewery DB: micro-breweries in the US",
+    "description": "List 10 micro-breweries in the United States from the Open Brewery DB free public API.",
+    "category": "REST",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.openbrewerydb.org/v1\" }\n    from: \"/breweries\"\n    where: { by_type: \"micro\", by_country: \"united_states\", per_page: \"10\" }\n    select: [\"id\", \"name\", \"brewery_type\", \"city\", \"state_province\", \"website_url\"]\n  }) { count data }\n}"
   },
   {
     "name": "REST – RestCountries: European countries",
@@ -52,6 +88,12 @@
     "description": "List the top 5 anime titles from the Jikan MyAnimeList API.",
     "category": "REST",
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.jikan.moe/v4\" }\n    from: \"/top/anime\"\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "Catalog – list all available databases",
+    "description": "Return all pre-defined catalog entries with their entity names, columns, and relationships.",
+    "category": "Catalog",
+    "query": "{\n  catalog {\n    name\n    label\n    description\n    driver\n    entities {\n      name\n      columns\n      relations { entity type alias foreignKey }\n    }\n  }\n}"
   },
   {
     "name": "OWL ingestion – Blog ontology (Turtle)",

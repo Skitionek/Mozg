@@ -4,10 +4,13 @@
 // Each loader is called lazily — the catalog file is require()'d only when
 // getCatalog() is invoked for that entry, not at server startup.
 const REGISTRY = {
+  blog:             () => require('./blog'),
   chinook:          () => require('./chinook'),
   jsonplaceholder:  () => require('./jsonplaceholder'),
   'neo4j-movies':   () => require('./neo4j-movies'),
   rnacentral:       () => require('./rnacentral'),
+  artic:            () => require('./artic'),
+  openbrewery:      () => require('./openbrewery'),
 };
 
 /**

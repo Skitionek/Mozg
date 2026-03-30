@@ -28,7 +28,10 @@ module.exports = {
     {
       name: 'Person',
       columns: ['name', 'born'],
-      relations: [],
+      relations: [
+        { entity: 'Movie', foreignKey: 'ACTED_IN', type: 'hasMany', alias: 'actedIn' },
+        { entity: 'Movie', foreignKey: 'DIRECTED', type: 'hasMany', alias: 'directed' },
+      ],
     },
   ],
 };
