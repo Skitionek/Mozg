@@ -2,7 +2,21 @@
 
 > A **"slow by design"** cross-database query layer with a single GraphQL endpoint.
 
-Mozg is not a database – it is an expressive language for describing **relations between entities that live in existing databases** (PostgreSQL, MySQL, SQLite, Neo4j, ArangoDB, BioCyc) and REST APIs.  A single `/graphql` endpoint accepts user-supplied credentials and executes federated queries that traverse those relations at query time.  A browser-based **query builder** lets you compose and run queries without writing GraphQL by hand.
+**Mozg** (Polish for "brain") is an experiment in thinking differently about data: instead of centralizing knowledge, it teaches systems how to connect it.
+
+At its core, Mozg is a **"slow by design" cognition layer** — a single GraphQL endpoint that doesn't store knowledge, but reasons across it. Rather than building yet another database, Mozg acts as a unifying language for describing relationships between entities that already exist: rows in PostgreSQL, nodes in Neo4j, documents in ArangoDB, pathways in BioCyc, or even resources behind REST APIs.
+
+Where most systems optimize for speed through precomputation and duplication, Mozg embraces a different trade-off: **freshness and flexibility over latency**. Every query is executed live, traversing connections across heterogeneous data sources at runtime. The result is not just data retrieval, but on-demand knowledge synthesis.
+
+The single `/graphql` endpoint becomes a kind of neural interface:
+
+- **You bring your own credentials**
+- **Mozg maps the relationships**
+- **The system resolves meaning across boundaries**
+
+And because not every user wants to think in GraphQL, Mozg includes a browser-based **query builder** — a visual way to compose complex, cross-database queries without writing a single line of code.
+
+> In essence, Mozg is less like a database and more like a brain-shaped abstraction layer: it doesn't store memories — it connects them.
 
 ---
 
