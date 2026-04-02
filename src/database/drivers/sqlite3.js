@@ -11,6 +11,8 @@
 
 const knex = require('knex');
 
+// Connection cache keyed by file path
+// TODO: add LRU eviction to prevent unbounded growth in long-running processes
 const connectionCache = new Map();
 
 function getKnexInstance(config) {
@@ -114,7 +116,9 @@ async function introspect(connection) {
     .whereRaw("name NOT LIKE 'sqlite_%'");
 
   for (const tableRow of tableRows) {
-    const columns = await db.raw(`PRAGMA table_info("${tableRow.name}")`);
+    // Escape double-quote chars in the identifier to prevent PRAGMA injection
+    const safeName = tableRow.name.replace(/"/g, '""');
+    const columns = await db.raw(`PRAGMA table_info("${safeName}")`);
     tables.push({
       name: tableRow.name,
       columns: columns.map((col) => ({

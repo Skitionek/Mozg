@@ -14,6 +14,7 @@ const { MeshStore, InMemoryStoreStorageAdapter } = require('@graphql-mesh/store'
 const { PubSub, DefaultLogger } = require('@graphql-mesh/utils');
 
 // Cache: connection key → { schema, executor }
+// TODO: add LRU eviction to prevent unbounded growth in long-running processes
 const meshSourceCache = new Map();
 
 // ── Handler config builders ───────────────────────────────────────────────────
@@ -104,7 +105,9 @@ function buildHandlerDescriptor(driver, connection) {
 
 async function getOrCreateMeshSource(connection) {
   const { driver, host, port, database, user } = connection;
-  // Key excludes password intentionally (mirrors existing sql.js behaviour)
+  // Key excludes password intentionally (same deferred concern as the legacy
+  // sql.js driver – tracked as a TODO; same-user different-password connections
+  // may reuse the same cached source).
   const cacheKey = JSON.stringify({ driver, host, port, database, user });
 
   if (meshSourceCache.has(cacheKey)) return meshSourceCache.get(cacheKey);
@@ -146,9 +149,9 @@ function unwrap(type) {
 }
 
 /** Return whether the root of the wrapping chain contains a List. */
-function wrapslist(type) {
+function wrapsList(type) {
   if (isListType(type)) return true;
-  if (isNonNullType(type)) return wrapslist(type.ofType);
+  if (isNonNullType(type)) return wrapsList(type.ofType);
   return false;
 }
 
@@ -245,7 +248,7 @@ function buildOrderByLiteral(arg, fieldName, direction) {
 
   const dir = (direction || 'asc').toLowerCase();
   const dirUpper = dir.toUpperCase();
-  const isList = wrapslist(arg.type);
+  const isList = wrapsList(arg.type);
   const namedType = unwrap(arg.type);
 
   if (isInputObjectType(namedType)) {
@@ -367,7 +370,9 @@ async function executeQuery(input) {
   return { data: rows, count: rows.length };
 }
 
-/** Load related entities via additional mesh queries (per-row N+1 pattern). */
+/** Load related entities via additional mesh queries (per-row N+1 pattern).
+ * TODO: batch hasMany/hasOne fetches to avoid N+1 round-trips (same deferred
+ * performance concern as rest.js). */
 async function loadRelations(connection, rows, relations) {
   for (const rel of relations) {
     const {
