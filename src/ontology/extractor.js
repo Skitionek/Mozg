@@ -135,7 +135,7 @@ function extractOntology(quads) {
       maxCard: maxCard !== null
         ? (existing.maxCard === null ? maxCard : Math.max(existing.maxCard, maxCard))
         : existing.maxCard,
-      required: existing.required || (minCard !== null && minCard >= 1) || someValuesFrom !== null,
+      required: existing.required || (minCard ?? -1) >= 1 || someValuesFrom !== null,
     });
   }
 

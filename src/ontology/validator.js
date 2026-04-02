@@ -103,7 +103,8 @@ function isTypeMismatch(dbType, graphqlType) {
     return !/float|double|real|decimal|numeric/.test(t);
   }
   if (graphqlType === 'Boolean') {
-    return !/bool|boolean|tinyint/.test(t);
+    // tinyint is intentionally excluded here – it is already accepted as Int above
+    return !/bool|boolean/.test(t);
   }
   // String is compatible with any type; ID and others treated as strings
   return false;

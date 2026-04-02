@@ -231,7 +231,7 @@ describe('mapOntology – typeDefs SDL', () => {
 
   test('SDL contains id field on each type', () => {
     const { typeDefs } = mapOntology(BLOG_PARSED);
-    const typeBlocks = typeDefs.split(/(?=type |interface )/);
+    const typeBlocks = typeDefs.split(/(?=^(?:type|interface) )/m);
     for (const block of typeBlocks) {
       if (!block.trim()) continue;
       assert.ok(block.includes('id: ID!'), `Block missing id field:\n${block}`);

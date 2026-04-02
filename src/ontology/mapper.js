@@ -41,7 +41,7 @@ function toFieldName(iri, label) {
 /** Convert a PascalCase type name to a snake_case database table name. */
 function toTableName(typeName) {
   return typeName
-    .replace(/([A-Z])/g, (c, _, i) => (i > 0 ? '_' : '') + c.toLowerCase())
+    .replace(/([A-Z])/g, (match, _group, offset) => (offset > 0 ? '_' : '') + match.toLowerCase())
     .toLowerCase();
 }
 
