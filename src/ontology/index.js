@@ -1,10 +1,22 @@
 'use strict';
 
+const crypto                   = require('node:crypto');
 const { parseTurtle }          = require('./formats/turtle');
 const { parseRdfXml }          = require('./formats/rdfxml');
 const { parseOwlXml }          = require('./formats/owlxml');
 const { parseManchesterSyntax } = require('./formats/manchester');
-const { extractOntology }      = require('./extractor');
+const { extractOntology, xsdToGraphqlType } = require('./extractor');
+const { mapOntology }          = require('./mapper');
+const { validateOntologyAgainstDb } = require('./validator');
+
+// ---------------------------------------------------------------------------
+// In-memory cache: SHA-256 (first 16 hex chars) of raw content → result
+// ---------------------------------------------------------------------------
+const ontologyCache = new Map();
+
+function contentHash(str) {
+  return crypto.createHash('sha256').update(str).digest('hex').slice(0, 16);
+}
 
 /**
  * Detect the serialization format from a Content-Type header string.
@@ -61,13 +73,46 @@ function detectFormat(content) {
 }
 
 /**
- * Main entry point – parse an OWL ontology and return an OntologyResult.
+ * Ensure every parsed result has the full set of fields introduced by the
+ * enhanced extractor, regardless of which parser produced it.  Parsers that
+ * pre-date those fields (owlxml, manchester) may omit them; this fills in
+ * safe defaults so downstream code never has to guard for undefined.
+ */
+function normalizeResult(parsed) {
+  return {
+    ...parsed,
+    classes: parsed.classes.map((c) => ({
+      equivalentTo: [],
+      disjointWith: [],
+      ...c,
+    })),
+    objectProperties: parsed.objectProperties.map((op) => ({
+      isFunctional: op.relationType === 'hasOne',
+      minCard: null,
+      maxCard: null,
+      ...op,
+    })),
+    dataProperties: parsed.dataProperties.map((dp) => ({
+      graphqlType: xsdToGraphqlType(dp.range[0] ?? null),
+      required: false,
+      ...dp,
+    })),
+  };
+}
+
+/**
+ * Main entry point – parse an OWL ontology, map it to a GraphQL schema, and
+ * (optionally) validate it against a live database.
  *
- * @param {{ content?: string, url?: string, format?: string }} input
- * @returns {Promise<{ classes, objectProperties, dataProperties, tripleCount }>}
+ * Results are cached by content hash so repeated ingestion of the same
+ * ontology is free.
+ *
+ * @param {{ content?: string, url?: string, format?: string,
+ *           validate?: boolean, connection?: object }} input
+ * @returns {Promise<OntologyResult>}
  */
 async function parseOntology(input) {
-  let { content, url, format } = input || {};
+  let { content, url, format, validate, connection } = input || {};
 
   // ── Fetch from URL if content not provided ─────────────────────────────
   if (url && !content) {
@@ -94,23 +139,69 @@ async function parseOntology(input) {
     format = detectFormat(content);
   }
 
+  // ── Check cache ─────────────────────────────────────────────────────────
+  const hash = contentHash(content);
+  if (ontologyCache.has(hash) && !validate) {
+    return ontologyCache.get(hash);
+  }
+
   // ── Route to parser ─────────────────────────────────────────────────────
+  let raw;
   switch (format) {
     case 'turtle': {
       const quads = await parseTurtle(content);
-      return extractOntology(quads);
+      raw = extractOntology(quads);
+      break;
     }
     case 'rdfxml': {
       const quads = await parseRdfXml(content);
-      return extractOntology(quads);
+      raw = extractOntology(quads);
+      break;
     }
     case 'owlxml':
-      return parseOwlXml(content);
+      raw = parseOwlXml(content);
+      break;
     case 'manchester':
-      return parseManchesterSyntax(content);
+      raw = parseManchesterSyntax(content);
+      break;
     default:
       throw new Error(`Unknown ontology format: ${format}`);
   }
+
+  // ── Normalize + map ─────────────────────────────────────────────────────
+  const parsed = normalizeResult(raw);
+  const { typeDefs: generatedTypeDefs, entityMap } = mapOntology(parsed);
+
+  const generatedTypes = [];
+  for (const [name, entity] of entityMap) {
+    generatedTypes.push({
+      name,
+      iri: entity.iri,
+      isAbstract: entity.isAbstract,
+      fieldCount: entity.fields.length,
+      relationCount: entity.relations.length,
+    });
+  }
+
+  // ── Optional validation against live DB ────────────────────────────────
+  let validationReport = null;
+  if (validate && connection) {
+    validationReport = await validateOntologyAgainstDb(entityMap, connection);
+  }
+
+  const result = {
+    ...parsed,
+    generatedTypeDefs,
+    generatedTypes,
+    validationReport,
+  };
+
+  // Cache only when not doing validation (validation depends on external DB state)
+  if (!validate) {
+    ontologyCache.set(hash, result);
+  }
+
+  return result;
 }
 
 module.exports = { parseOntology };
