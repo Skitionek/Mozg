@@ -304,6 +304,20 @@
     #toast.success { border-color: var(--success); color: var(--success); }
     #toast.error   { border-color: var(--error);   color: var(--error); }
 
+    /* ── Static-mode notice ──────────────────────────────────── */
+    #static-notice {
+      background: #1e1a0a;
+      border-bottom: 1px solid #5c4d00;
+      color: #f7c67b;
+      font-size: .8rem;
+      padding: .55rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      flex-shrink: 0;
+    }
+    #static-notice a { color: var(--accent); text-decoration: underline; }
+
     /* ── Loading spinner ─────────────────────────────────────── */
     .spinner {
       display: inline-block;
@@ -319,6 +333,12 @@
   </style>
 </head>
 <body>
+
+<div id="static-notice" class="hidden">
+  🔒 <strong>Demo preview</strong> — No backend is running here.
+  Build and run your own <a href="https://github.com/Skitionek/Mozg" target="_blank" rel="noopener">Mozg instance</a>
+  to execute queries, or copy the generated GraphQL and paste it into your local instance.
+</div>
 
 <header>
   <h1><span>Mozg</span> – Cross-Database Query Interface</h1>
@@ -405,7 +425,7 @@
     <label id="conn-db-label">Database / File</label>
     <input id="conn-database" type="text" placeholder=":memory:" />
 
-    <button class="btn btn-secondary btn-full" onclick="introspect()">🔍 Introspect Schema</button>
+    <button class="btn btn-secondary btn-full" id="introspect-btn" onclick="introspect()">🔍 Introspect Schema</button>
 
     <!-- ── Query ── -->
     <div class="section-title">Query</div>
@@ -486,7 +506,7 @@
   <!-- ── Main ────────────────────────────────────────────────── -->
   <main>
     <div class="main-toolbar">
-      <button class="btn btn-primary" onclick="runQuery()">
+      <button class="btn btn-primary" id="run-query-btn" onclick="runQuery()">
         <span class="spinner hidden" id="run-spinner"></span>
         ▶ Run Query
       </button>
@@ -554,6 +574,15 @@
 <div id="toast"></div>
 
 <script>
+  // ── Static-mode detection ────────────────────────────────────
+  const STATIC_MODE = window.location.hostname.endsWith('.github.io') ||
+                      window.location.protocol === 'file:';
+  if (STATIC_MODE) {
+    document.getElementById('static-notice').classList.remove('hidden');
+    document.getElementById('run-query-btn').title = 'Backend not available in demo mode';
+    document.getElementById('introspect-btn').title = 'Backend not available in demo mode';
+  }
+
   // ── State ────────────────────────────────────────────────────
   const relations = [];
   let knownTables = [];
@@ -762,6 +791,10 @@
 
   // ── Run Query ────────────────────────────────────────────────
   async function runQuery() {
+    if (STATIC_MODE) {
+      toast('No backend running here — copy the query and run it on your own Mozg instance.', 'error');
+      return;
+    }
     const queryText = document.getElementById('query-editor').value.trim();
     if (!queryText) { toast('Query is empty', 'error'); return; }
 
@@ -829,6 +862,10 @@
 
   // ── Introspect ────────────────────────────────────────────────
   async function introspect() {
+    if (STATIC_MODE) {
+      toast('No backend running here — run your own Mozg instance to introspect schemas.', 'error');
+      return;
+    }
     const conn = buildConnection();
     const gql = `{ introspect(connection: ${connToGQL(conn)}) { tables { name columns { name type nullable isPrimaryKey } } } }`;
     document.getElementById('query-editor').value = gql;
