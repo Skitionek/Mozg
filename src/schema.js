@@ -60,13 +60,22 @@ const typeDefs = /* GraphQL */ `
     Catalog files are loaded lazily on first access.
     """
     catalog(name: String): [CatalogEntry!]!
+
+    """
+    Parse an OWL ontology and return the GraphQL schema that would be generated
+    from its TBox, without caching the result (read-only counterpart to
+    ingestOntology).
+    """
+    generateSchema(input: OntologyInput!): OntologyResult!
   }
 
   type Mutation {
     """
-    Parse an OWL ontology (Turtle, RDF/XML, OWL/XML, or Manchester Syntax) and
-    extract its classes, object properties, and data properties.
+    Parse an OWL ontology (Turtle, RDF/XML, OWL/XML, or Manchester Syntax),
+    extract its TBox, map it to a GraphQL schema, and cache the result.
     Supply either content (raw string) or url (fetched server-side).
+    Set validate: true and supply connection to validate the mapped schema
+    against a live database.
     """
     ingestOntology(input: OntologyInput!): OntologyResult!
   }
@@ -192,6 +201,10 @@ const typeDefs = /* GraphQL */ `
     url: String
     """Serialization format – auto-detected when omitted"""
     format: OntologyFormat
+    """When true, validate the mapped schema against the supplied database connection"""
+    validate: Boolean
+    """Database connection used for schema validation (required when validate is true)"""
+    connection: ConnectionInput
   }
 
   enum OntologyFormat {
@@ -207,6 +220,46 @@ const typeDefs = /* GraphQL */ `
     objectProperties: [OWLObjectProperty!]!
     dataProperties: [OWLDataProperty!]!
     tripleCount: Int!
+    """GraphQL SDL generated from the TBox"""
+    generatedTypeDefs: String!
+    """Summary of the GraphQL types generated from the TBox"""
+    generatedTypes: [GeneratedType!]!
+    """Validation report against a live database (present only when validate: true)"""
+    validationReport: ValidationReport
+  }
+
+  """A GraphQL type generated from an OWL class"""
+  type GeneratedType {
+    name: String!
+    iri: String!
+    isAbstract: Boolean!
+    fieldCount: Int!
+    relationCount: Int!
+  }
+
+  """Result of validating a mapped ontology schema against a live database"""
+  type ValidationReport {
+    valid: Boolean!
+    warnings: [ValidationWarning!]!
+    matchedTables: [TableMatch!]!
+    missingTables: [TableMismatch!]!
+  }
+
+  type ValidationWarning {
+    type: String!
+    typeName: String!
+    fieldName: String
+    message: String!
+  }
+
+  type TableMatch {
+    typeName: String!
+    tableName: String!
+  }
+
+  type TableMismatch {
+    typeName: String!
+    tableName: String!
   }
 
   type OWLClass {
@@ -214,6 +267,8 @@ const typeDefs = /* GraphQL */ `
     label: String
     comment: String
     subClassOf: [String!]!
+    equivalentTo: [String!]!
+    disjointWith: [String!]!
   }
 
   type OWLObjectProperty {
@@ -224,6 +279,9 @@ const typeDefs = /* GraphQL */ `
     range: [String!]!
     inverseOf: String
     relationType: RelationType!
+    isFunctional: Boolean!
+    minCard: Int
+    maxCard: Int
   }
 
   type OWLDataProperty {
@@ -232,6 +290,10 @@ const typeDefs = /* GraphQL */ `
     comment: String
     domain: [String!]!
     range: [String!]!
+    """GraphQL scalar type derived from the xsd datatype (String, Int, Float, Boolean)"""
+    graphqlType: String!
+    """True when a cardinality restriction (min ≥ 1) or someValuesFrom makes the property required"""
+    required: Boolean!
   }
 
   """A pre-defined database with known schema and relationships"""
@@ -294,6 +356,7 @@ const resolvers = {
     introspect: (_parent, { connection }) => introspectDatabase(connection),
     // Catalog is lazy-required so the files are only loaded when the resolver runs
     catalog: (_parent, { name }) => require('./catalog').getCatalog(name),
+    generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input),
   },
   Mutation: {
     ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input),
