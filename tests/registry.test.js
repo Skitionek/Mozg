@@ -5,24 +5,60 @@ const assert = require('node:assert/strict');
 const { getDriver } = require('../src/database/registry');
 
 describe('registry.getDriver', () => {
-  test('resolves sqlite3 to sql driver', () => {
-    const d = getDriver('sqlite3');
+  // ── Mesh-backed drivers ──────────────────────────────────────────────────
+
+  test('resolves postgres to mesh adapter', () => {
+    const d = getDriver('postgres');
     assert.equal(typeof d.executeQuery, 'function');
     assert.equal(typeof d.introspect, 'function');
   });
 
-  test('resolves postgres to sql driver', () => {
-    const d = getDriver('postgres');
-    assert.equal(typeof d.executeQuery, 'function');
-  });
-
-  test('resolves mysql to sql driver', () => {
+  test('resolves mysql to mesh adapter', () => {
     const d = getDriver('mysql');
     assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
   });
 
-  test('resolves neo4j driver', () => {
+  test('resolves neo4j to mesh adapter', () => {
     const d = getDriver('neo4j');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
+  test('resolves openapi to mesh adapter', () => {
+    const d = getDriver('openapi');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
+  test('resolves soap to mesh adapter', () => {
+    const d = getDriver('soap');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
+  test('resolves odata to mesh adapter', () => {
+    const d = getDriver('odata');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
+  test('resolves thrift to mesh adapter', () => {
+    const d = getDriver('thrift');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
+  test('resolves mongodb to mesh adapter', () => {
+    const d = getDriver('mongodb');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
+  // ── Legacy custom drivers ────────────────────────────────────────────────
+
+  test('resolves sqlite3 to legacy sql driver', () => {
+    const d = getDriver('sqlite3');
     assert.equal(typeof d.executeQuery, 'function');
     assert.equal(typeof d.introspect, 'function');
   });
@@ -52,3 +88,4 @@ describe('registry.getDriver', () => {
     );
   });
 });
+

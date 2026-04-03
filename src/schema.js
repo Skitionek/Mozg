@@ -109,7 +109,7 @@ const typeDefs = /* GraphQL */ `
     host: String
     """Port (defaults to driver default when omitted)"""
     port: Int
-    """Database name, file path (SQLite), or base URL (REST)"""
+    """Database name, file path (SQLite), base URL (REST/openapi), spec URL (openapi/soap/odata/thrift), or connection string (mongodb)"""
     database: String!
     """Username or API key value (REST)"""
     user: String
@@ -124,13 +124,35 @@ const typeDefs = /* GraphQL */ `
   }
 
   enum Driver {
+    """PostgreSQL (via @graphql-mesh/postgraphile)"""
     postgres
+    """MySQL (via @graphql-mesh/mysql)"""
     mysql
+    """SQLite3 (legacy custom driver)"""
     sqlite3
+    """Neo4j (via @graphql-mesh/neo4j)"""
     neo4j
+    """ArangoDB (legacy custom driver)"""
     arango
+    """BioCyc biological databases (legacy custom driver)"""
     biocyc
+    """Plain REST API without an OpenAPI specification (legacy custom driver)"""
     rest
+    """REST API with an OpenAPI / Swagger specification (via @graphql-mesh/openapi);
+       set database to the spec URL/path and host to the API base URL"""
+    openapi
+    """SOAP / WSDL web service (via @graphql-mesh/soap);
+       set database to the WSDL URL"""
+    soap
+    """OData endpoint, e.g. Microsoft Graph (via @graphql-mesh/odata);
+       set database to the service root URL"""
+    odata
+    """Apache Thrift service (via @graphql-mesh/thrift);
+       set database to the service endpoint"""
+    thrift
+    """MongoDB via Mongoose models (via @graphql-mesh/mongoose);
+       set database to the mongodb:// connection string"""
+    mongodb
   }
 
   enum SortDirection {
