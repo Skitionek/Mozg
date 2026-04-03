@@ -156,7 +156,7 @@ function createStreamHandler(executeQuery) {
     const rows = baseResult.data;
 
     // Resolve $1 — count
-    writeChunk(res, 1, rows.length);
+    writeChunk(res, 1, baseResult.count);
 
     if (relations.length === 0) {
       // No relations: data is already complete
