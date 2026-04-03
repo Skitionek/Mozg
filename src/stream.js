@@ -8,15 +8,16 @@
  * The response is a newline-separated stream of JSON chunks.  Each chunk is
  * either the initial envelope or a placeholder resolution:
  *
- *   {"count":3,"data":["$1","$2","$3"]}
- *   [dollar1] {"id":1,"name":"Alice","posts":"$4"}
- *   [dollar2] {"id":2,"name":"Bob","posts":"$5"}
- *   [dollar3] {"id":3,"name":"Charlie","posts":"$6"}
- *   [dollar4] [{"id":10,"title":"Post A"}]
- *   [dollar5] []
- *   [dollar6] [{"id":11,"title":"Post B"}]
+ *   {"count":3,"data":"$1"}
+ *   [dollar1] [{"id":1,"name":"Alice","posts":"$2"},{"id":2,"name":"Bob","posts":"$3"},{"id":3,"name":"Charlie","posts":"$4"}]
+ *   [dollar2] [{"id":10,"title":"Post A"}]
+ *   [dollar3] []
+ *   [dollar4] [{"id":11,"title":"Post B"}]
  *
  * In the actual stream the [dollarN] prefix is written as: slash-star space $N space star-slash
+ * One ref = one data-source query round-trip:
+ *   $1 is always the main entity query (the full rows array).
+ *   $2…$N are individual per-row relation queries.
  * Strings of the form "$N" (where N is a positive integer) are placeholders.
  * Each subsequent line whose prefix matches that pattern resolves the
  * placeholder.  All placeholder lines are valid JSON after stripping the prefix.
@@ -122,29 +123,28 @@ async function streamQuery(input, res) {
       return;
     }
 
-    // Assign a placeholder id to every row in the result set.
-    const rowIds = rows.map(() => next());
+    // One placeholder for the whole data array (one data-source query = one ref).
+    const dataRef = next();
 
-    // Stream the envelope immediately so the client knows the total count and
-    // the overall shape of the data array.
-    res.write(JSON.stringify({ count, data: rowIds }) + '\n');
-
-    // Pre-assign placeholder ids for every (row × relation) pair.  We do this
-    // before writing any row lines so that each row line can inline the correct
-    // relation placeholder strings.
+    // Pre-assign placeholder ids for every (row × relation) pair before writing
+    // anything, so that the data line can embed the correct refs.
     // relIds[rowIndex][relIndex] = placeholder string
     const relIds = rows.map(() => relations.map(() => next()));
 
-    // Stream each row immediately (we already have all rows from phase 1),
-    // embedding the pre-assigned relation placeholder strings.
-    for (let i = 0; i < rows.length; i++) {
-      const rowData = { ...rows[i] };
+    // Stream the envelope immediately so the client knows the total count and
+    // the placeholder for the rows array.
+    res.write(JSON.stringify({ count, data: dataRef }) + '\n');
+
+    // Stream the rows array as the resolution of dataRef, embedding the
+    // pre-assigned relation placeholder strings in each row.
+    const rowsWithPlaceholders = rows.map((row, i) => {
+      const rowData = { ...row };
       for (let j = 0; j < relations.length; j++) {
-        const rel = relations[j];
-        rowData[rel.alias || rel.entity] = relIds[i][j];
+        rowData[relations[j].alias || relations[j].entity] = relIds[i][j];
       }
-      res.write(`/* ${rowIds[i]} */ ${JSON.stringify(rowData)}\n`);
-    }
+      return rowData;
+    });
+    res.write(`/* ${dataRef} */ ${JSON.stringify(rowsWithPlaceholders)}\n`);
 
     // Phase 2 – fetch all relations concurrently.  Each relation result is
     // streamed as soon as it resolves, so faster relations appear earlier in

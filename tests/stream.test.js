@@ -94,7 +94,7 @@ describe('streamQuery', () => {
     assert.deepEqual(envelope.data, []);
   });
 
-  test('streams envelope + row lines + relation lines when relations present', async () => {
+  test('streams envelope + data line + relation lines when relations present', async () => {
     let callCount = 0;
     mock.method(connector, 'executeQuery', async (input) => {
       callCount++;
@@ -126,32 +126,27 @@ describe('streamQuery', () => {
     assert.ok(res.ended);
 
     const lines = res.body().trim().split('\n');
-    // envelope + 2 row lines + 2 relation lines = 5
-    assert.equal(lines.length, 5, `expected 5 lines, got: ${res.body()}`);
+    // envelope + 1 data line + 2 relation lines = 4
+    assert.equal(lines.length, 4, `expected 4 lines, got: ${res.body()}`);
 
-    // Line 0: envelope
+    // Line 0: envelope — data is a single placeholder ref string
     const envelope = JSON.parse(lines[0]);
     assert.equal(envelope.count, 2);
-    assert.ok(Array.isArray(envelope.data));
-    assert.equal(envelope.data.length, 2);
-    // Row placeholders should be strings like "$1", "$2"
-    assert.match(envelope.data[0], /^\$\d+$/);
-    assert.match(envelope.data[1], /^\$\d+$/);
+    assert.match(envelope.data, /^\$\d+$/, 'data should be a single ref string');
 
-    // Lines 1–2: row resolutions
-    const rowLine0 = lines[1];
-    assert.match(rowLine0, /^\/\* \$\d+ \*\/ /);
-    const row0 = JSON.parse(rowLine0.replace(/^\/\* \$\d+ \*\/ /, ''));
+    // Line 1: data array resolution — all rows with relation placeholders
+    assert.match(lines[1], /^\/\* \$\d+ \*\/ /);
+    const rowsData = JSON.parse(lines[1].replace(/^\/\* \$\d+ \*\/ /, ''));
+    assert.ok(Array.isArray(rowsData), 'data resolution should be an array of rows');
+    assert.equal(rowsData.length, 2);
+    const row0 = rowsData[0];
     assert.equal(row0.id, 1);
     assert.equal(row0.name, 'Alice');
     // The posts field should be a placeholder string
     assert.match(row0.posts, /^\$\d+$/);
 
-    // Lines 3–4: relation resolutions
-    const rel0line = lines[3];
-    assert.match(rel0line, /^\/\* \$\d+ \*\/ /);
-    // One of the two relation lines should contain the post
-    const bodies = lines.slice(3).map((l) => JSON.parse(l.replace(/^\/\* \$\d+ \*\/ /, '')));
+    // Lines 2–3: relation resolutions
+    const bodies = lines.slice(2).map((l) => JSON.parse(l.replace(/^\/\* \$\d+ \*\/ /, '')));
     const withPost = bodies.find((b) => Array.isArray(b) && b.length > 0);
     assert.ok(withPost, 'at least one relation result should be non-empty');
     assert.equal(withPost[0].id, 10);
@@ -174,9 +169,12 @@ describe('streamQuery', () => {
     );
 
     const lines = res.body().trim().split('\n');
-    const rowLine = JSON.parse(lines[1].replace(/^\/\* \$\d+ \*\/ /, ''));
-    assert.ok('articles' in rowLine, 'alias should be used as the key');
-    assert.ok(!('posts' in rowLine), 'entity name should not appear when alias is set');
+    // lines[1] is the data array: /* $1 */ [{"id":1,"articles":"$2"}]
+    const rowsData = JSON.parse(lines[1].replace(/^\/\* \$\d+ \*\/ /, ''));
+    assert.ok(Array.isArray(rowsData), 'data resolution should be an array');
+    const rowData = rowsData[0];
+    assert.ok('articles' in rowData, 'alias should be used as the key');
+    assert.ok(!('posts' in rowData), 'entity name should not appear when alias is set');
   });
 
   test('streams an error object for a failing relation without aborting other relations', async () => {
@@ -199,7 +197,8 @@ describe('streamQuery', () => {
     );
 
     const lines = res.body().trim().split('\n');
-    const relLines = lines.slice(3).map((l) => JSON.parse(l.replace(/^\/\* \$\d+ \*\/ /, '')));
+    // envelope + 1 data line + 2 relation lines = 4
+    const relLines = lines.slice(2).map((l) => JSON.parse(l.replace(/^\/\* \$\d+ \*\/ /, '')));
 
     const errLine = relLines.find((b) => b && b.error);
     assert.ok(errLine, 'failed relation should produce an error object');

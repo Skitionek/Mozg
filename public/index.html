@@ -1058,8 +1058,8 @@
 
   /**
    * Render the envelope as a DOM fragment.
-   * Only items inside the `data` array are checked for "$N" placeholder
-   * strings, so legitimate data values elsewhere cannot be confused with refs.
+   * The `data` field is either a single `"$1"` placeholder string (when
+   * relations are requested) or an inline array (no relations / empty result).
    */
   function renderEnvelopeJSON(envelope) {
     const frag = document.createDocumentFragment();
@@ -1077,30 +1077,63 @@
     const dk = document.createElement('span');
     dk.innerHTML = syntaxHighlight('"data"');
     frag.appendChild(dk);
-    frag.appendChild(document.createTextNode(': [\n'));
+    frag.appendChild(document.createTextNode(': '));
 
-    const data = Array.isArray(envelope.data) ? envelope.data : [];
-    data.forEach((item, i) => {
-      frag.appendChild(document.createTextNode('    '));
-      if (typeof item === 'string' && /^\$\d+$/.test(item)) {
-        // Server-generated placeholder — render as a pending badge
-        const refId = item.slice(1);
-        const badge = document.createElement('span');
-        badge.className   = 'ph-ref pending';
-        badge.dataset.ref = refId;
-        badge.textContent = '$' + refId;
-        streamRefs.set(refId, badge);
-        frag.appendChild(badge);
-      } else {
+    const data = envelope.data;
+    if (typeof data === 'string' && /^\$\d+$/.test(data)) {
+      // data is a single ref for the whole rows query
+      const refId = data.slice(1);
+      const badge = document.createElement('span');
+      badge.className   = 'ph-ref pending';
+      badge.dataset.ref = refId;
+      badge.textContent = data;
+      streamRefs.set(refId, badge);
+      frag.appendChild(badge);
+    } else {
+      // data is already inlined (no relations or empty result)
+      const span = document.createElement('span');
+      span.innerHTML = syntaxHighlight(JSON.stringify(data));
+      frag.appendChild(span);
+    }
+
+    frag.appendChild(document.createTextNode('\n}'));
+    return frag;
+  }
+
+  /**
+   * Serialize `value` to pretty JSON and render it as a DOM fragment.
+   * Any string value that is exactly "$N" is rendered as a pulsing pending
+   * badge and registered in streamRefs so it can be resolved later.
+   * This handles nested refs inside data-array resolutions (the relation
+   * placeholders embedded in each row object).
+   */
+  function renderJSONWithRefs(value) {
+    const str = JSON.stringify(value, null, 2);
+    const frag = document.createDocumentFragment();
+    // Match "$N" as a JSON value — not a key (keys are followed by ':')
+    const rx = /"(\$\d+)"(?!\s*:)/g;
+    let last = 0, m;
+
+    while ((m = rx.exec(str)) !== null) {
+      if (m.index > last) {
         const span = document.createElement('span');
-        span.innerHTML = syntaxHighlight(JSON.stringify(item));
+        span.innerHTML = syntaxHighlight(str.slice(last, m.index));
         frag.appendChild(span);
       }
-      if (i < data.length - 1) frag.appendChild(document.createTextNode(','));
-      frag.appendChild(document.createTextNode('\n'));
-    });
-
-    frag.appendChild(document.createTextNode('  ]\n}'));
+      const refId = m[1];
+      const badge = document.createElement('span');
+      badge.className   = 'ph-ref pending';
+      badge.dataset.ref = refId;
+      badge.textContent = '$' + refId;
+      streamRefs.set(refId, badge);
+      frag.appendChild(badge);
+      last = rx.lastIndex;
+    }
+    if (last < str.length) {
+      const span = document.createElement('span');
+      span.innerHTML = syntaxHighlight(str.slice(last));
+      frag.appendChild(span);
+    }
     return frag;
   }
 
@@ -1236,7 +1269,9 @@
               badgeEl.classList.add('resolved');
             }
 
-            // Render the resolution line
+            // Render the resolution line — use renderJSONWithRefs so any $N
+            // strings embedded in the resolved value (e.g. relation placeholders
+            // inside a rows array) also become pulsing badges.
             const isErr = val && typeof val === 'object' && !Array.isArray(val) && 'error' in val;
             appendStreamLine(
               out,
@@ -1244,7 +1279,7 @@
               '$' + refId,
               isErr
                 ? `<span style="color:var(--error)">${escapeHTML(val.error)}</span>`
-                : syntaxHighlight(JSON.stringify(val, null, 2)),
+                : renderJSONWithRefs(val),
             );
           }
         }
