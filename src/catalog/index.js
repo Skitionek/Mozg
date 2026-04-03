@@ -8,6 +8,7 @@ const REGISTRY = {
   blog:             () => require('./blog'),
   chinook:          () => require('./chinook'),
   rnacentral:       () => require('./rnacentral'),
+  rfam:             () => require('./rfam'),
   // ── Graph ────────────────────────────────────────────────────────────────
   'neo4j-movies':   () => require('./neo4j-movies'),
   // ── REST – entertainment & media ─────────────────────────────────────────

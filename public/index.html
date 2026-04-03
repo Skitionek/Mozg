@@ -330,6 +330,107 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .hidden { display: none !important; }
+
+    /* ── Table view ──────────────────────────────────────────────── */
+    .result-table-wrap {
+      flex: 1;
+      overflow: auto;
+    }
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .78rem;
+      font-family: var(--mono);
+      line-height: 1.5;
+    }
+    .result-table thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: .65rem;
+      letter-spacing: .8px;
+      padding: .5rem .75rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      white-space: nowrap;
+    }
+    .result-table tbody tr:nth-child(even) { background: rgba(255,255,255,.025); }
+    .result-table tbody tr:hover { background: rgba(108,99,255,.08); }
+    .result-table td {
+      padding: .35rem .75rem;
+      border-bottom: 1px solid rgba(45,48,71,.6);
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .result-table td.cell-null { color: var(--muted); font-style: italic; }
+    .result-table td.cell-num  { color: #b5f081; }
+    .result-table td.cell-bool { color: #f78bba; }
+    .result-table td.cell-obj  { color: var(--muted); font-size: .72rem; }
+
+    /* ── Welcome / onboarding panel ──────────────────────────────── */
+    .welcome-wrap {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+    .welcome-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: .9rem;
+      max-width: 640px;
+      width: 100%;
+    }
+    .welcome-panel .wlogo { font-size: 2.8rem; line-height: 1; }
+    .welcome-panel h2 { font-size: 1.4rem; font-weight: 700; margin: 0; }
+    .welcome-panel h2 span { color: var(--accent); }
+    .welcome-panel .tagline { color: var(--muted); font-size: .88rem; margin: 0; }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .65rem;
+      width: 100%;
+      margin-top: .3rem;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .8rem .9rem;
+      display: flex;
+      gap: .6rem;
+      text-align: left;
+    }
+    .feature-card .fi { font-size: 1.3rem; flex-shrink: 0; line-height: 1; padding-top: .1rem; }
+    .feature-card strong { display: block; font-size: .8rem; margin-bottom: .2rem; }
+    .feature-card small { color: var(--muted); font-size: .75rem; line-height: 1.4; display: block; }
+    .driver-pills { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; }
+    .driver-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: .2rem .65rem;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    .welcome-cta {
+      color: var(--muted);
+      font-size: .8rem;
+      padding: .6rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+    }
+    .welcome-cta strong { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -506,11 +607,12 @@
   <!-- ── Main ────────────────────────────────────────────────── -->
   <main>
     <div class="main-toolbar">
-      <button class="btn btn-primary" id="run-query-btn" onclick="runQuery()">
+      <button class="btn btn-primary" id="run-query-btn" onclick="runQuery()" title="Run query (Ctrl+Enter / ⌘+Enter)">
         <span class="spinner hidden" id="run-spinner"></span>
         ▶ Run Query
       </button>
       <button class="btn btn-secondary" onclick="clearResults()">✕ Clear</button>
+      <button class="btn btn-secondary" onclick="shareQuery()" title="Copy permalink to clipboard">🔗 Share</button>
       <div class="spacer"></div>
       <span id="timing" style="font-size:.75rem;color:var(--muted)"></span>
     </div>
@@ -543,14 +645,57 @@
           <span class="spacer" style="flex:1"></span>
           <div class="view-toggle">
             <button id="view-json-btn" class="btn btn-secondary btn-sm active" onclick="setResultView('json')">JSON</button>
+            <button id="view-table-btn" class="btn btn-secondary btn-sm" onclick="setResultView('table')">Table</button>
             <button id="view-graph-btn" class="btn btn-secondary btn-sm" onclick="setResultView('graph')">Graph</button>
           </div>
         </div>
-        <div id="result-output">
-          <span class="result-placeholder">Run a query to see results here.</span>
+        <div id="result-welcome" class="welcome-wrap">
+          <div class="welcome-panel">
+            <div class="wlogo">🧠</div>
+            <h2>Welcome to <span>Mozg</span></h2>
+            <p class="tagline">A federated GraphQL query layer — one endpoint for every data source</p>
+            <div class="feature-grid">
+              <div class="feature-card">
+                <span class="fi">⚡</span>
+                <div><strong>Universal endpoint</strong><small>Query PostgreSQL, MySQL, Neo4j, MongoDB, REST APIs and more through a single /graphql URL — no ETL, no data duplication</small></div>
+              </div>
+              <div class="feature-card">
+                <span class="fi">🔗</span>
+                <div><strong>Cross-entity relations</strong><small>Traverse hasMany, hasOne and belongsTo relationships across tables and REST endpoints in a single query</small></div>
+              </div>
+              <div class="feature-card">
+                <span class="fi">🔍</span>
+                <div><strong>Schema introspection</strong><small>Discover tables, columns and types in any live database dynamically — no prior configuration required</small></div>
+              </div>
+              <div class="feature-card">
+                <span class="fi">🦉</span>
+                <div><strong>OWL ontology support</strong><small>Parse OWL ontologies (Turtle, RDF/XML, Manchester) and generate GraphQL types from their TBox automatically</small></div>
+              </div>
+            </div>
+            <div class="driver-pills">
+              <span class="driver-pill">SQLite</span>
+              <span class="driver-pill">PostgreSQL</span>
+              <span class="driver-pill">MySQL</span>
+              <span class="driver-pill">Neo4j</span>
+              <span class="driver-pill">ArangoDB</span>
+              <span class="driver-pill">MongoDB</span>
+              <span class="driver-pill">REST API</span>
+              <span class="driver-pill">OpenAPI</span>
+              <span class="driver-pill">OData</span>
+              <span class="driver-pill">SOAP</span>
+            </div>
+            <p class="welcome-cta">← Select a <strong>Known Database</strong> or load an <strong>Example</strong> from the sidebar, then press <strong>▶ Run Query</strong></p>
+          </div>
         </div>
+        <div id="result-output" class="hidden"></div>
         <div id="result-graph" class="hidden">
           <svg id="graph-svg" style="overflow:visible;display:block;"></svg>
+        </div>
+        <div id="result-table-wrap" class="result-table-wrap hidden">
+          <table class="result-table">
+            <thead id="result-table-head"></thead>
+            <tbody id="result-table-body"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -825,13 +970,25 @@
     const out   = document.getElementById('result-output');
     const badge = document.getElementById('result-badge');
 
+    // Switch from welcome panel to result views
+    document.getElementById('result-welcome').classList.add('hidden');
+
     if (json.errors) {
       badge.textContent = '!';
       badge.className = 'badge error';
       badge.classList.remove('hidden');
+      // Always show JSON for errors
+      out.classList.remove('hidden');
+      document.getElementById('result-table-wrap').classList.add('hidden');
+      document.getElementById('result-graph').classList.add('hidden');
       out.innerHTML = `<span style="color:var(--error)">${escapeHTML(json.errors.map(e => e.message).join('\n'))}</span>`;
       return;
     }
+
+    // Show the appropriate view
+    out.classList.toggle('hidden', currentView !== 'json');
+    document.getElementById('result-table-wrap').classList.toggle('hidden', currentView !== 'table');
+    document.getElementById('result-graph').classList.toggle('hidden', currentView !== 'graph');
 
     const data = json.data;
     if (data && data.query) {
@@ -847,15 +1004,20 @@
     }
 
     out.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
-    if (graphViewActive) renderGraph(json);
+    if (currentView === 'graph') renderGraph(json);
+    if (currentView === 'table') renderTable(json);
     toast('Query executed', 'success');
   }
 
   function clearResults() {
     lastResult = null;
-    document.getElementById('result-output').innerHTML =
-      '<span class="result-placeholder">Run a query to see results here.</span>';
+    document.getElementById('result-welcome').classList.remove('hidden');
+    document.getElementById('result-output').classList.add('hidden');
+    document.getElementById('result-graph').classList.add('hidden');
+    document.getElementById('result-table-wrap').classList.add('hidden');
     document.getElementById('graph-svg').innerHTML = '';
+    document.getElementById('result-table-head').innerHTML = '';
+    document.getElementById('result-table-body').innerHTML = '';
     document.getElementById('result-badge').classList.add('hidden');
     document.getElementById('timing').textContent = '';
   }
@@ -1015,18 +1177,131 @@
     toast(`Applied: ${entry.label}`, 'success');
   }
 
-  // ── Result view (JSON / Graph) ────────────────────────────────
-  let graphViewActive = false;
+  // ── Result view (JSON / Table / Graph) ───────────────────────
+  let currentView = 'json';
   let lastResult = null;
 
   function setResultView(view) {
-    graphViewActive = (view === 'graph');
-    document.getElementById('view-json-btn').classList.toggle('active', !graphViewActive);
-    document.getElementById('view-graph-btn').classList.toggle('active', graphViewActive);
-    document.getElementById('result-output').classList.toggle('hidden', graphViewActive);
-    document.getElementById('result-graph').classList.toggle('hidden', !graphViewActive);
-    if (graphViewActive && lastResult) renderGraph(lastResult);
+    currentView = view;
+    document.getElementById('view-json-btn').classList.toggle('active', view === 'json');
+    document.getElementById('view-table-btn').classList.toggle('active', view === 'table');
+    document.getElementById('view-graph-btn').classList.toggle('active', view === 'graph');
+    document.getElementById('result-output').classList.toggle('hidden', view !== 'json');
+    document.getElementById('result-table-wrap').classList.toggle('hidden', view !== 'table');
+    document.getElementById('result-graph').classList.toggle('hidden', view !== 'graph');
+    if (view === 'graph' && lastResult) renderGraph(lastResult);
+    if (view === 'table' && lastResult) renderTable(lastResult);
   }
+
+  // ── Table renderer ────────────────────────────────────────────
+  // Maximum number of rows sampled when collecting column keys for the table header.
+  const TABLE_KEY_SAMPLE_ROWS = 50;
+
+  function renderTable(json) {
+    const thead = document.getElementById('result-table-head');
+    const tbody = document.getElementById('result-table-body');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    let rows = null;
+    if (json.data && json.data.query && Array.isArray(json.data.query.data)) {
+      rows = json.data.query.data;
+    } else if (json.data && json.data.introspect && Array.isArray(json.data.introspect.tables)) {
+      rows = json.data.introspect.tables;
+    }
+
+    if (!rows || rows.length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.style.cssText = 'color:var(--muted);padding:1rem;font-style:italic';
+      td.textContent = 'No tabular data to display — switch to JSON view for mutations and nested results.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    // Collect all keys from first TABLE_KEY_SAMPLE_ROWS rows
+    const keys = [];
+    const keySet = new Set();
+    for (const row of rows.slice(0, TABLE_KEY_SAMPLE_ROWS)) {
+      if (row && typeof row === 'object') {
+        for (const k of Object.keys(row)) {
+          if (!keySet.has(k)) { keySet.add(k); keys.push(k); }
+        }
+      }
+    }
+
+    // Header row
+    const hr = document.createElement('tr');
+    for (const k of keys) {
+      const th = document.createElement('th');
+      th.textContent = k;
+      hr.appendChild(th);
+    }
+    thead.appendChild(hr);
+
+    // Data rows
+    for (const row of rows) {
+      const tr = document.createElement('tr');
+      for (const k of keys) {
+        const td = document.createElement('td');
+        const v = (row && typeof row === 'object') ? row[k] : undefined;
+        if (v === null || v === undefined) {
+          td.textContent = '—';
+          td.className = 'cell-null';
+        } else if (typeof v === 'object') {
+          const s = JSON.stringify(v);
+          td.textContent = s.length > 60 ? s.slice(0, 59) + '…' : s;
+          td.className = 'cell-obj';
+          td.title = JSON.stringify(v, null, 2);
+        } else if (typeof v === 'number') {
+          td.textContent = v;
+          td.className = 'cell-num';
+        } else if (typeof v === 'boolean') {
+          td.textContent = v ? 'true' : 'false';
+          td.className = 'cell-bool';
+        } else {
+          const s = String(v);
+          td.textContent = s.length > 80 ? s.slice(0, 79) + '…' : s;
+          if (s.length > 80) td.title = s;
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+  }
+
+  // ── Share / permalink ─────────────────────────────────────────
+  function shareQuery() {
+    const q = document.getElementById('query-editor').value.trim();
+    if (!q) { toast('No query to share', 'error'); return; }
+    const hash = '#q=' + encodeURIComponent(q);
+    window.history.replaceState(null, '', hash);
+    navigator.clipboard.writeText(window.location.href)
+      .then(() => toast('Permalink copied to clipboard!', 'success'))
+      .catch(() => toast('URL updated — copy from the address bar', 'success'));
+  }
+
+  function loadFromHash() {
+    const hash = window.location.hash;
+    if (hash.startsWith('#q=')) {
+      try {
+        const q = decodeURIComponent(hash.slice(3));
+        if (q) {
+          document.getElementById('query-editor').value = q;
+          toast('Query loaded from URL', 'success');
+        }
+      } catch { /* ignore malformed hash */ }
+    }
+  }
+
+  // ── Keyboard shortcut: Ctrl+Enter / ⌘+Enter ──────────────────
+  document.getElementById('query-editor').addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runQuery();
+    }
+  });
 
   // ── Graph renderer ────────────────────────────────────────────
   // Caps keep the SVG responsive for large result sets; adjust to taste.
@@ -1405,6 +1680,7 @@
   // ── Init ──────────────────────────────────────────────────────
   loadExamples();
   loadCatalog();
+  loadFromHash();
   generateQuery();
 </script>
 </body>
