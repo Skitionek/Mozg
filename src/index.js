@@ -5,6 +5,7 @@ const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { createYoga, createSchema } = require('graphql-yoga');
 const { typeDefs, resolvers } = require('./schema');
+const { handleStream } = require('./stream');
 
 const PORT = process.env.PORT || 4000;
 
@@ -93,6 +94,15 @@ const server = createServer((req, res) => {
     return yoga(req, res);
   }
 
+  if (url.pathname === '/stream') {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'text/plain', 'Allow': 'POST' });
+      res.end('Method Not Allowed');
+      return;
+    }
+    return handleStream(req, res);
+  }
+
   serveStatic(url.pathname, res);
 });
 
@@ -100,4 +110,5 @@ server.listen(PORT, () => {
   console.log(`Mozg server is running`);
   console.log(`  Web interface  →  http://localhost:${PORT}/`);
   console.log(`  GraphQL API    →  http://localhost:${PORT}/graphql`);
+  console.log(`  Stream API     →  http://localhost:${PORT}/stream`);
 });
