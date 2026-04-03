@@ -125,6 +125,8 @@
     "category": "REST",
     "query": "{\n  query(input: {\n    connection: {\n      driver: rest\n      database: \"https://musicbrainz.org/ws/2\"\n      headers: { Accept: \"application/json\", \"User-Agent\": \"Mozg/0.1.0 (https://github.com/Skitionek/Mozg)\" }\n    }\n    from: \"/artist\"\n    where: { query: \"The Beatles\", limit: \"5\" }\n    select: [\"id\", \"name\", \"sort-name\", \"type\", \"country\", \"score\"]\n  }) { count data }\n}"
   },
+  {
+    "name": "REST – Open Brewery DB: micro-breweries in the US",
     "description": "List 10 micro-breweries in the United States from the Open Brewery DB free public API.",
     "category": "REST",
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.openbrewerydb.org/v1\" }\n    from: \"/breweries\"\n    where: { by_type: \"micro\", by_country: \"united_states\", per_page: \"10\" }\n    select: [\"id\", \"name\", \"brewery_type\", \"city\", \"state_province\", \"website_url\"]\n  }) { count data }\n}"
@@ -155,14 +157,32 @@
   },
   {
     "name": "Catalog – list all available databases",
-    "description": "Return all pre-defined catalog entries with their entity names, columns, and relationships.",
+    "description": "Return all pre-defined catalog entries with their entity names, columns, and relationships. Shows the breadth of data sources queryable through one /graphql endpoint.",
     "category": "Catalog",
     "query": "{\n  catalog {\n    name\n    label\n    description\n    driver\n    entities {\n      name\n      columns\n      relations { entity type alias foreignKey }\n    }\n  }\n}"
   },
   {
+    "name": "MySQL – Rfam: top RNA families by species count",
+    "description": "Query the public Rfam MySQL database at EBI for the 10 RNA families annotated in the most species. Demonstrates the MySQL driver against a real bioinformatics database. Uses the publicly documented read-only credentials from https://rfam.org/help/database.",
+    "category": "MySQL",
+    "query": "{\n  query(input: {\n    connection: { driver: mysql, host: \"mysql-rfam-public.ebi.ac.uk\", port: 4497, database: \"Rfam\", user: \"rfamro\", password: \"\" }\n    from: \"family\"\n    select: [\"rfam_acc\", \"rfam_id\", \"description\", \"type\", \"number_of_species\"]\n    limit: 10\n    orderBy: \"number_of_species\"\n    orderDirection: desc\n  }) { count data }\n}"
+  },
+  {
+    "name": "MySQL – Rfam: families with sequence regions (2 levels)",
+    "description": "List 5 Rfam RNA families with their highest-scoring full-region sequence hits embedded. Demonstrates a hasMany join across the family and full_region tables in the Rfam MySQL database.",
+    "category": "MySQL",
+    "query": "{\n  query(input: {\n    connection: { driver: mysql, host: \"mysql-rfam-public.ebi.ac.uk\", port: 4497, database: \"Rfam\", user: \"rfamro\", password: \"\" }\n    from: \"family\"\n    select: [\"rfam_acc\", \"rfam_id\", \"description\", \"type\"]\n    limit: 5\n    orderBy: \"number_of_species\"\n    orderDirection: desc\n    relations: [{\n      entity: \"full_region\"\n      foreignKey: \"rfam_acc\"\n      localKey: \"rfam_acc\"\n      type: hasMany\n      select: [\"rfamseq_acc\", \"seq_start\", \"seq_end\", \"score\", \"is_significant\"]\n    }]\n  }) { count data }\n}"
+  },
+  {
     "name": "OWL ingestion – Blog ontology (Turtle)",
-    "description": "Parse the blog OWL ontology in Turtle format and extract classes, properties and triple count.",
+    "description": "Parse the blog OWL ontology in Turtle format and extract classes, object properties and data properties. Shows how Mozg maps an OWL TBox to a GraphQL type system.",
     "category": "OWL",
-    "query": "mutation {\n  ingestOntology(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/copilot/add-graphql-query-endpoint/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    classes { iri label subClassOf }\n    objectProperties { iri label domain range relationType }\n    dataProperties { iri label domain range }\n  }\n}"
+    "query": "mutation {\n  ingestOntology(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/main/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    classes { iri label subClassOf }\n    objectProperties { iri label domain range relationType }\n    dataProperties { iri label domain range graphqlType }\n    generatedTypeDefs\n  }\n}"
+  },
+  {
+    "name": "OWL – generate schema (read-only, no cache)",
+    "description": "Parse the blog ontology and preview the generated GraphQL SDL without caching. Useful for iterating on an ontology design before committing it. Uses generateSchema instead of ingestOntology.",
+    "category": "OWL",
+    "query": "{\n  generateSchema(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/main/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    generatedTypeDefs\n    generatedTypes { typeName fields relations }\n  }\n}"
   }
 ]
