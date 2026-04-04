@@ -307,4 +307,30 @@ describe('handleStreamRequest', () => {
       done();
     }, 50);
   });
+
+  test('rejects body missing connection with 400', (_, done) => {
+    const req = makeReq('POST', { from: 'users' });
+    const res = makeRes();
+    handleStreamRequest(req, res);
+
+    setTimeout(() => {
+      assert.equal(res.statusCode, 400);
+      const body = JSON.parse(res.body());
+      assert.ok(body.error);
+      done();
+    }, 50);
+  });
+
+  test('rejects body missing from with 400', (_, done) => {
+    const req = makeReq('POST', { connection: { driver: 'sqlite3', database: ':memory:' } });
+    const res = makeRes();
+    handleStreamRequest(req, res);
+
+    setTimeout(() => {
+      assert.equal(res.statusCode, 400);
+      const body = JSON.parse(res.body());
+      assert.ok(body.error);
+      done();
+    }, 50);
+  });
 });
