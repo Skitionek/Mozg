@@ -50,12 +50,11 @@ function makeResponse() {
  */
 function parseProgressiveJSON(body) {
   const lines = body.split('\n').filter((l) => l.trim() !== '');
-  let skeleton = null;
   const chunks = {};
 
   let i = 0;
   // First non-empty line is the skeleton
-  skeleton = JSON.parse(lines[i++]);
+  const skeleton = JSON.parse(lines[i++]);
 
   while (i < lines.length) {
     const header = lines[i++];
