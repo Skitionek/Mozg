@@ -207,6 +207,12 @@ function handleStreamRequest(req, res) {
       return;
     }
 
+    if (!input || typeof input !== 'object' || !input.connection || !input.from) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Request body must include connection and from fields' }));
+      return;
+    }
+
     streamQuery(input, res).catch((err) => {
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
