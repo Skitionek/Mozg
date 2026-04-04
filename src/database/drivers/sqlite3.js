@@ -134,4 +134,11 @@ async function introspect(connection) {
   return { tables };
 }
 
-module.exports = { executeQuery, introspect };
+async function destroyAll() {
+  for (const instance of connectionCache.values()) {
+    await instance.destroy();
+  }
+  connectionCache.clear();
+}
+
+module.exports = { executeQuery, introspect, destroyAll };
