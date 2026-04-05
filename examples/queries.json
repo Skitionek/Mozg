@@ -121,9 +121,9 @@
   },
   {
     "name": "REST – MusicBrainz: search for artists",
-    "description": "Search MusicBrainz for artists matching a query. Rate limit is 1 req/sec; the User-Agent header is required. Pass your search term via `where: { query: \"artist name\" }`.",
+    "description": "Search MusicBrainz for artists matching a query. Rate limit is 1 req/sec; the MusicBrainz API recommends including a User-Agent header (pass via GraphQL variables for headers with hyphens). Pass your search term via `where: { query: \"artist name\" }`.",
     "category": "REST",
-    "query": "{\n  query(input: {\n    connection: {\n      driver: rest\n      database: \"https://musicbrainz.org/ws/2\"\n      headers: { Accept: \"application/json\", \"User-Agent\": \"Mozg/0.1.0 (https://github.com/Skitionek/Mozg)\" }\n    }\n    from: \"/artist\"\n    where: { query: \"The Beatles\", limit: \"5\" }\n    select: [\"id\", \"name\", \"sort-name\", \"type\", \"country\", \"score\"]\n  }) { count data }\n}"
+    "query": "{\n  query(input: {\n    connection: {\n      driver: rest\n      database: \"https://musicbrainz.org/ws/2\"\n      headers: { Accept: \"application/json\" }\n    }\n    from: \"/artist\"\n    where: { query: \"The Beatles\", limit: \"5\" }\n    select: [\"id\", \"name\", \"sort-name\", \"type\", \"country\", \"score\"]\n  }) { count data }\n}"
   },
   {
     "name": "REST – Open Brewery DB: micro-breweries in the US",
@@ -183,6 +183,6 @@
     "name": "OWL – generate schema (read-only, no cache)",
     "description": "Parse the blog ontology and preview the generated GraphQL SDL without caching. Useful for iterating on an ontology design before committing it. Uses generateSchema instead of ingestOntology.",
     "category": "OWL",
-    "query": "{\n  generateSchema(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/main/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    generatedTypeDefs\n    generatedTypes { typeName fields relations }\n  }\n}"
+    "query": "{\n  generateSchema(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/main/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    generatedTypeDefs\n    generatedTypes { name fieldCount relationCount isAbstract }\n  }\n}"
   }
 ]
