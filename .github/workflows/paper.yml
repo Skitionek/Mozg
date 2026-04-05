@@ -1,0 +1,38 @@
+name: Build Paper PDF
+
+on:
+  push:
+    paths:
+      - 'paper/**'
+  pull_request:
+    paths:
+      - 'paper/**'
+  workflow_dispatch:
+
+jobs:
+  build-pdf:
+    name: Compile LaTeX to PDF
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: paper
+          root_file: mozg.tex
+          latexmk_use_xelatex: false
+          latexmk_shell_escape: false
+          extra_system_packages: ''
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mozg-paper
+          path: paper/mozg.pdf
+          retention-days: 90
+          if-no-files-found: error
