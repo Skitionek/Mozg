@@ -1,0 +1,56 @@
+name: Build Paper PDF
+
+on:
+  push:
+    paths:
+      - 'paper/**'
+      - '.github/workflows/paper.yml'
+  pull_request:
+    paths:
+      - 'paper/**'
+      - '.github/workflows/paper.yml'
+  workflow_dispatch:
+
+jobs:
+  build-pdf:
+    name: Compile LaTeX to PDF
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli@11
+
+      - name: Compile Mermaid diagrams
+        run: |
+          mmdc \
+            --puppeteerConfigFile paper/.puppeteerrc.json \
+            --input paper/mozg-architecture.mmd \
+            --output paper/mozg-architecture.png \
+            --width 2000 \
+            --backgroundColor white
+
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: paper
+          root_file: mozg.tex
+          latexmk_use_xelatex: false
+          latexmk_shell_escape: false
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mozg-paper
+          path: paper/mozg.pdf
+          retention-days: 90
+          if-no-files-found: error

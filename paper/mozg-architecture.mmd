@@ -1,0 +1,46 @@
+flowchart TD
+    Client["Client\n(Browser / API Consumer)"]
+
+    HTTP["HTTP Server\nsrc/index.js · graphql-yoga\n/graphql · / · /examples"]
+
+    Schema["GraphQL Schema\nsrc/schema.js\nquery | introspect | catalog | ingestOntology"]
+
+    Connector["Query Connector\nsrc/database/connector.js"]
+
+    Registry["Driver Registry\nsrc/database/registry.js"]
+
+    subgraph Drivers["Driver Layer · src/database/drivers/"]
+        direction TB
+        Mesh["GraphQL Mesh Adapter\npostgres · mysql · neo4j\nopenapi · soap · odata · thrift · mongodb"]
+        SQLite["SQLite3 Driver\n(Knex)"]
+        Arango["ArangoDB Driver"]
+        REST["REST Driver"]
+        BioCyc["BioCyc Driver"]
+    end
+
+    subgraph Sources["External Data Sources"]
+        direction TB
+        PG[("PostgreSQL")]
+        MY[("MySQL")]
+        NJ[("Neo4j")]
+        MDB[("MongoDB")]
+        APIs["REST · OpenAPI\nSOAP · OData · Thrift"]
+        SQ[("SQLite file")]
+        ADB[("ArangoDB")]
+        BC["BioCyc\nPathway DB"]
+    end
+
+    Client -->|"HTTP"| HTTP
+    HTTP --> Schema
+    Schema --> Connector
+    Connector --> Registry
+    Registry --> Mesh
+    Registry --> SQLite
+    Registry --> Arango
+    Registry --> REST
+    Registry --> BioCyc
+    Mesh --> PG & MY & NJ & MDB & APIs
+    SQLite --> SQ
+    Arango --> ADB
+    REST --> APIs
+    BioCyc --> BC

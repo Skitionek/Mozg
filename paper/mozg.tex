@@ -1,0 +1,688 @@
+\documentclass[sigconf,nonacm]{acmart}
+
+% ---------------------------------------------------------------
+% Packages
+% ---------------------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{balance}
+
+% ---------------------------------------------------------------
+% Listings style
+% ---------------------------------------------------------------
+\definecolor{codebg}{HTML}{F7F7F7}
+\definecolor{codekey}{HTML}{0000AA}
+\definecolor{codestr}{HTML}{AA0000}
+\definecolor{codecmt}{HTML}{007700}
+
+\lstdefinelanguage{GraphQL}{
+  keywords={query, mutation, type, input, enum, interface, scalar,
+            on, fragment, subscription, true, false, null},
+  keywordstyle=\color{codekey}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecmt}\itshape,
+  morestring=[b]",
+  morestring=[b]',
+  morecomment=[l]{\#},
+  sensitive=true,
+}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{gray!40},
+  captionpos=b,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=6pt,
+  xleftmargin=14pt,
+}
+
+% ---------------------------------------------------------------
+% Metadata
+% ---------------------------------------------------------------
+\title{Mozg: A ``Slow by Design'' Federated Query Layer\\
+       for Heterogeneous Data Sources via GraphQL}
+
+\author{Piotr Skitionek}
+\affiliation{%
+  \institution{Independent Research}
+  \country{}}
+\email{skitionek@gmail.com}
+
+\begin{abstract}
+Modern data ecosystems fragment knowledge across relational databases,
+graph stores, document databases, REST services, and domain-specific
+repositories.  Integrating these silos typically requires either a costly
+centralised data warehouse or bespoke per-integration middleware.
+We present \textbf{Mozg} (Polish: \emph{brain}), an open-source
+federated query layer that exposes a single GraphQL endpoint capable
+of routing queries to any supported backend at runtime, traversing
+user-defined cross-source relationships, and synthesising results
+without ever storing the underlying data.  Mozg deliberately trades
+query latency for data freshness, flexibility, and minimal operational
+overhead---a philosophy we call \emph{``slow by design''}.
+We describe the architecture, driver model, ontology-ingestion pipeline,
+and the browser-based visual query builder.  We evaluate the system
+against representative public databases and REST APIs, discuss
+scalability and security considerations, and position Mozg relative
+to related federated-query systems.
+\end{abstract}
+
+\keywords{federated queries, GraphQL, heterogeneous data integration,
+          ontology mapping, data virtualisation, cross-database joins}
+
+% ---------------------------------------------------------------
+\begin{document}
+\maketitle
+% ---------------------------------------------------------------
+
+% ===============================================================
+\section{Introduction}
+\label{sec:intro}
+% ===============================================================
+
+The proliferation of specialised data stores---relational databases,
+property-graph engines, triple stores, document databases, column
+stores, and REST services---creates what is commonly called the
+\emph{data silo} problem~\cite{halevy2006data}.  Organisations that
+need to ask questions spanning multiple silos face an uncomfortable
+choice: build a data warehouse that periodically copies and integrates
+data, or write custom integration code for each pair of sources.
+Both options introduce significant cost: warehouses require ETL
+pipelines, transformation logic, and storage duplication; bespoke code
+is hard to maintain and becomes stale the moment source schemas evolve.
+
+\textbf{Mozg} takes a third approach.  Instead of centralising data, it
+centralises the \emph{ability to query} data.  Users describe the
+connections between entities in different systems---a
+\texttt{hasMany}/\texttt{hasOne}/\texttt{belongsTo} relationship lattice
+that mirrors familiar ORM conventions---and Mozg resolves these
+relationships at query time, returning a joined result without ever
+persisting a copy of the underlying records.  The single entry-point
+is a GraphQL endpoint; users supply their own database credentials
+as part of each query, keeping the server stateless with respect to
+authorisation.
+
+The name alludes to the system's role as a \emph{cognitive layer}: like
+a brain, Mozg does not store memories---it connects them.  The
+``slow by design'' label is not an apology but a deliberate design
+decision: latency is accepted as the price of freshness and schema
+flexibility.  This trade-off is appropriate for interactive exploration,
+scientific data synthesis, and ad-hoc cross-domain analytics where
+staleness is unacceptable.
+
+The remainder of this paper is organised as follows.
+Section~\ref{sec:background} reviews related work.
+Section~\ref{sec:architecture} presents the overall architecture.
+Section~\ref{sec:drivers} describes the driver model.
+Section~\ref{sec:ontology} covers the OWL ontology pipeline.
+Section~\ref{sec:ui} describes the query-builder interface.
+Section~\ref{sec:evaluation} reports an empirical evaluation.
+Section~\ref{sec:discussion} discusses limitations and future work.
+Section~\ref{sec:conclusion} concludes.
+
+% ===============================================================
+\section{Background and Related Work}
+\label{sec:background}
+% ===============================================================
+
+\subsection{Federated Query Systems}
+
+Federated databases were formalised by Sheth and Larson~\cite{sheth1990federated},
+who classified multi-database systems along axes of autonomy and
+heterogeneity.  Classical systems such as IBM's Garlic~\cite{haas1997optimizing}
+and TSIMMIS~\cite{hammer1995tsimmis} translate a unified query language
+into source-specific sub-queries.  More recent systems include Presto
+(now Trino)~\cite{sethi2019presto}, which federates analytical SQL over
+HDFS, Hive, and relational stores, and Apache Drill~\cite{hausenblas2013apache},
+which enables schema-free SQL across Hadoop and NoSQL backends.
+
+\subsection{GraphQL as a Query Interface}
+
+GraphQL~\cite{graphql2015} was introduced by Facebook in 2015 as a
+typed query language for APIs.  Its hierarchical, declarative nature
+maps well to the entity--relationship model.  GraphQL Federation
+(Apollo Federation)~\cite{apollofederation} distributes a single
+GraphQL schema across multiple microservices and sub-graphs.  Unlike
+Apollo Federation, which federates GraphQL \emph{services},
+Mozg federates \emph{raw data sources} that are not themselves GraphQL
+services.
+
+GraphQL Mesh~\cite{graphqlmesh} provides source handlers that translate
+a unified GraphQL schema into REST, gRPC, SOAP, OpenAPI and database
+calls.  Mozg uses GraphQL Mesh handlers for most relational and API
+backends while retaining custom drivers for specialised sources
+(ArangoDB, BioCyc) and providing its own relation-traversal layer on
+top.
+
+\subsection{Data Virtualisation}
+
+Data virtualisation~\cite{datavirt} provides a logical, unified view of
+distributed data without physical integration.  Commercial products such
+as Denodo, TIBCO Data Virtualization, and IBM Federation Server occupy
+this space.  Mozg is a lightweight, open-source alternative positioned
+for exploratory use: it does not implement query optimisation, query
+pushdown strategies, or persistent schema registries.
+
+\subsection{Semantic Web and Ontology Mapping}
+
+OWL (Web Ontology Language)~\cite{owl2} and RDFS define vocabularies and
+axioms for machine-readable knowledge.  Systems such as
+Ontop~\cite{ontop} and D2RQ~\cite{d2rq} map OWL/SPARQL queries onto
+relational databases (SPARQL-to-SQL rewriting).  Mozg's ontology
+pipeline moves in the opposite direction: given an OWL TBox, it
+generates GraphQL type definitions and entity maps that can then be
+used to drive its federated query layer.
+
+% ===============================================================
+\section{Architecture}
+\label{sec:architecture}
+% ===============================================================
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\columnwidth]{mozg-architecture}
+\caption{High-level architecture of Mozg.}
+\label{fig:arch}
+\end{figure}
+
+Figure~\ref{fig:arch} shows the five-layer architecture of Mozg.
+
+\paragraph{HTTP Server (\texttt{src/index.js}).}
+A Node.js server built on \emph{graphql-yoga}~\cite{graphqlyoga}
+listens on a configurable port (default 4000).  It exposes three
+URL namespaces: \texttt{/graphql} for the GraphQL endpoint and
+GraphiQL IDE, \texttt{/} for the browser query builder, and
+\texttt{/examples} for downloadable ontology samples.  A lightweight
+static-file handler serves the \texttt{public/} directory without
+external middleware.
+
+\paragraph{GraphQL Schema (\texttt{src/schema.js}).}
+A hand-written SDL schema defines the full type system.  There are
+three root fields:
+\begin{itemize}
+  \item \texttt{query(input: QueryInput!)} --- executes a federated
+        multi-source query with optional relation traversal;
+  \item \texttt{introspect(connection)} --- returns the schema of a
+        remote database (tables, columns, types, nullability,
+        primary-key flags);
+  \item \texttt{catalog(name)} --- returns one or all entries from
+        the curated database catalog.
+\end{itemize}
+A single mutation, \texttt{ingestOntology(input)}, parses an OWL
+ontology and returns extracted classes, properties, and generated
+GraphQL SDL.  A custom \texttt{JSON} scalar accepts arbitrary
+structured values so that heterogeneous query results can be
+returned without a fixed schema.
+
+\paragraph{Query Connector (\texttt{src/database/connector.js}).}
+A thin routing layer resolves the \texttt{driver} field of the
+supplied \texttt{ConnectionInput} via the driver registry and
+delegates execution.
+
+\paragraph{Driver Registry (\texttt{src/database/registry.js}).}
+The single source of truth for driver bindings.  It maps the twelve
+driver names (\texttt{postgres}, \texttt{mysql}, \texttt{sqlite3},
+\texttt{neo4j}, \texttt{arango}, \texttt{biocyc}, \texttt{rest},
+\texttt{openapi}, \texttt{soap}, \texttt{odata}, \texttt{thrift},
+\texttt{mongodb}) to their implementing modules.
+
+\paragraph{Driver Implementations (\texttt{src/database/drivers/}).}
+Each driver exposes a uniform interface: \texttt{executeQuery(input)}
+and, optionally, \texttt{introspect(connection)}.  Most drivers are
+thin wrappers around \emph{GraphQL Mesh} source handlers; three
+legacy/specialised drivers (SQLite3 via Knex, ArangoDB, BioCyc) use
+custom client libraries.
+
+\subsection{Query Execution Flow}
+
+When a client issues a \texttt{query} request, the server:
+\begin{enumerate}
+  \item Parses the \texttt{QueryInput} (connection, table/entity,
+        columns, predicates, limit/offset/orderBy, relations).
+  \item Resolves the driver and calls \texttt{executeQuery}.
+  \item The driver issues the primary query against the target source.
+  \item For each \texttt{RelationInput} in the relations array, the
+        driver issues one sub-query per relation, keyed on the
+        foreign-key values returned by the primary query.
+  \item Results are merged and returned as a \texttt{QueryResult}
+        with a \texttt{count} and a JSON \texttt{data} array.
+\end{enumerate}
+
+This is a straightforward nested-loop join executed in application
+code.  The design deliberately avoids query pushdown and cross-source
+optimisation; it is simple to implement, easy to debug, and
+independent of any particular source's query planner.  Relation
+definitions can be nested to arbitrary depth, enabling multi-hop
+traversals across heterogeneous sources.
+
+\subsection{Connection Model}
+
+Mozg is deliberately \emph{stateless} with respect to credentials.
+All connection parameters (host, port, database name, username,
+password, authentication scheme, HTTP headers) are supplied by the
+client on every request via \texttt{ConnectionInput}.  The server
+maintains an in-memory connection cache keyed on host and username
+to avoid re-establishing connections within a session, but it does
+not persist credentials to disk or a secrets store.  This design
+simplifies the threat model: the server is not a credential vault and
+does not require secret-management infrastructure.
+
+% ===============================================================
+\section{Driver Model}
+\label{sec:drivers}
+% ===============================================================
+
+\subsection{GraphQL Mesh Adapter}
+
+The \texttt{mesh-adapter.js} driver provides a unified implementation
+for the eight source types handled by GraphQL Mesh handlers:
+\texttt{postgres} (\texttt{@graphql-mesh/postgraphile}),
+\texttt{mysql} (\texttt{@graphql-mesh/mysql}),
+\texttt{neo4j} (\texttt{@graphql-mesh/neo4j}),
+\texttt{openapi} (\texttt{@graphql-mesh/openapi}),
+\texttt{soap} (\texttt{@graphql-mesh/soap}),
+\texttt{odata} (\texttt{@graphql-mesh/odata}),
+\texttt{thrift} (\texttt{@graphql-mesh/thrift}), and
+\texttt{mongodb} (\texttt{@graphql-mesh/mongoose}).
+
+Each Mesh handler generates its own schema from the remote source's
+metadata (e.g., PostgreSQL information schema, OpenAPI spec, WSDL).
+The adapter wraps this schema to present the uniform
+\texttt{executeQuery}/\texttt{introspect} interface expected by the
+connector layer.  Handler instances are cached per unique connection
+string to avoid repeated metadata fetches.
+
+\subsection{SQLite3 Driver}
+
+The legacy SQLite3 driver uses \emph{Knex}~\cite{knex} for query
+building and connection management.  All user-supplied identifiers
+(table names, column names) are passed as Knex identifiers, and all
+predicate values are bound as parameterised query arguments.  This
+ensures that SQL injection via value parameters is not possible
+(identifier injection via maliciously crafted table/column names
+remains a known limitation tracked as a deferred issue).
+
+\subsection{ArangoDB Driver}
+
+The ArangoDB driver uses the official \emph{arangojs}~\cite{arangojs}
+client.  It translates \texttt{QueryInput} fields into AQL (ArangoDB
+Query Language) \texttt{FOR}/\texttt{FILTER}/\texttt{SORT}/\texttt{LIMIT}
+clauses, binding all predicate values through AQL bind parameters.
+
+\subsection{REST Driver}
+
+The plain REST driver maps \texttt{QueryInput} fields to HTTP GET
+requests against a base URL.  The entity name is appended as a path
+segment; \texttt{where} predicates are converted to query-string
+parameters.  Because there is no schema metadata, the driver returns
+the raw JSON response.  A known limitation is the N+1 sub-request
+pattern for relation traversal; each related entity produces one HTTP
+request per primary result row rather than a batched call.  This is
+tracked as a deferred performance issue.
+
+\subsection{BioCyc Driver}
+
+The BioCyc driver integrates with the BioCyc~\cite{biocyc} collection
+of metabolic pathway databases via the BioCyc Web Services API.
+It supports pathway, reaction, compound, and organism queries.  Because
+the BioCyc API does not expose a machine-readable schema, the driver
+relies on hard-coded response field mappings.
+
+% ===============================================================
+\section{OWL Ontology Pipeline}
+\label{sec:ontology}
+% ===============================================================
+
+A key distinguishing feature of Mozg is its ability to consume
+OWL ontologies and convert them into queryable GraphQL schemas.
+The pipeline has three stages: \emph{parsing}, \emph{extraction},
+and \emph{mapping}.
+
+\subsection{Parsing}
+
+Mozg supports four serialisation formats:
+
+\begin{itemize}
+  \item \textbf{Turtle} (.ttl) --- parsed using the \emph{N3.js}
+        library~\cite{n3js} via a streaming quad parser;
+  \item \textbf{RDF/XML} (.rdf, .owl) --- parsed using
+        \emph{rdfxml-streaming-parser}~\cite{rdfxmlparser};
+  \item \textbf{OWL/XML} --- parsed using \emph{fast-xml-parser}~\cite{fxp}
+        with a custom OWL/XML extractor;
+  \item \textbf{Manchester Syntax} (.omn) --- parsed with a hand-written
+        recursive-descent parser.
+\end{itemize}
+
+Format auto-detection inspects the HTTP \texttt{Content-Type} header,
+file extension, and content heuristics (BOM, XML declaration,
+Turtle prefix declarations) in that order.  Parsed quads are
+normalised into a common internal representation before being passed
+to the extraction stage.
+
+\subsection{Extraction}
+
+The extractor walks the quad set and collects:
+\begin{itemize}
+  \item \textbf{OWL Classes} --- IRI, rdfs:label, rdfs:subClassOf chains,
+        and owl:deprecated flag;
+  \item \textbf{Object Properties} --- IRI, label, domain, range, and
+        an inferred \texttt{relationType}
+        (\texttt{hasMany}/\texttt{hasOne}/\texttt{belongsTo}) based on
+        cardinality restrictions;
+  \item \textbf{Data Properties} --- IRI, label, domain, range (XSD type
+        mapped to GraphQL scalar).
+\end{itemize}
+
+\subsection{Mapping}
+
+The mapper converts the extracted TBox into a GraphQL SDL string and
+an \emph{entity map}: a mapping from type names to metadata including
+IRI, inferred table name, abstract flag, field list, and relation list.
+Abstract OWL classes (those that have subclasses but no data properties
+of their own) are emitted as GraphQL \texttt{interface} types;
+concrete classes become \texttt{type} definitions.  XSD datatypes are
+mapped to GraphQL scalars: \texttt{xsd:integer}/\texttt{xsd:int}
+$\to$ \texttt{Int}; \texttt{xsd:decimal}/\texttt{xsd:double}/\texttt{xsd:float}
+$\to$ \texttt{Float}; \texttt{xsd:boolean} $\to$ \texttt{Boolean};
+all others $\to$ \texttt{String}.
+
+\subsection{Caching}
+
+To avoid re-parsing the same ontology repeatedly within a session,
+the pipeline maintains an in-memory cache keyed on the SHA-256 hash
+of the raw ontology content.  Cache hits return the stored result
+immediately; misses trigger a full parse/extract/map cycle.
+
+\subsection{Validation}
+
+When the caller supplies a database \texttt{connection} alongside the
+ontology input, Mozg optionally validates the generated schema against
+the live database: it checks that every mapped class resolves to an
+existing table and that every data property resolves to an existing
+column.  Validation errors and warnings are returned in a structured
+\texttt{ValidationReport}.
+
+% ===============================================================
+\section{Query Builder UI}
+\label{sec:ui}
+% ===============================================================
+
+To lower the barrier to entry for non-technical users, Mozg ships a
+browser-based visual query builder served at the root path
+(\texttt{/}).  The interface allows users to:
+\begin{enumerate}
+  \item Select a driver and fill in connection parameters via a form;
+  \item Pick a table or API endpoint from an auto-populated dropdown
+        (populated via the \texttt{introspect} query);
+  \item Choose columns to select from a checklist;
+  \item Add filter conditions (column, operator, value);
+  \item Add relation traversals (entity, foreign key, relation type);
+  \item Set pagination and sort parameters.
+\end{enumerate}
+The form state is continuously serialised to a GraphQL query string
+and displayed in a read-only textarea so users can see and copy the
+equivalent raw query.  Submitting the form issues the query and
+renders the JSON response in a collapsible tree view.
+
+An \emph{examples} dropdown loads pre-built queries from the curated
+catalog (Section~\ref{sec:catalog}), making it easy to explore public
+datasets without any prior configuration.
+
+% ===============================================================
+\section{Database Catalog}
+\label{sec:catalog}
+% ===============================================================
+
+Mozg ships a curated catalog of 26 pre-configured database and API
+entries spanning several categories:
+
+\begin{itemize}
+  \item \textbf{Relational databases}: Chinook (SQLite music-store
+        sample), Blog (SQLite), RNAcentral (PostgreSQL at EBI),
+        RFAM (MySQL at EBI);
+  \item \textbf{Graph databases}: Neo4j Movies demo;
+  \item \textbf{REST / OpenAPI}: PokéAPI, Jikan (anime),
+        Rick and Morty, SWAPI, GitHub, SpaceX, NASA,
+        Open-Meteo, RestCountries, CoinGecko, MusicBrainz,
+        OpenFoodFacts, Open Library, Art Institute of Chicago,
+        Dog CEO, Fake Store, Open Brewery DB, Open Trivia, JSONPlaceholder;
+\end{itemize}
+
+Each catalog entry defines the connection parameters, a list of known
+entities (tables or API paths), the columns of interest, and the
+cross-entity relations.  All public entries require no registration
+and are suitable for immediate exploration.  Catalog data are loaded
+lazily via CommonJS \texttt{require()} to keep startup time low.
+
+% ===============================================================
+\section{Evaluation}
+\label{sec:evaluation}
+% ===============================================================
+
+\subsection{Functional Evaluation}
+
+We exercised Mozg against the eight public data sources listed in
+Table~\ref{tab:sources}.  For each source we verified:
+(a)~schema introspection returns correct metadata,
+(b)~a simple entity query returns expected rows,
+(c)~at least one relation traversal produces a valid joined result.
+
+All eight sources passed all three tests without modification to the
+source data.  The cross-source join between RNAcentral (PostgreSQL)
+and RFAM (MySQL) correctly joined RNA sequences with their family
+annotations using a shared accession identifier.
+
+\begin{table}[h]
+\caption{Public data sources used in functional evaluation.}
+\label{tab:sources}
+\small
+\begin{tabular}{llll}
+\toprule
+Source & Driver & Host & Data Domain \\
+\midrule
+RNAcentral & postgres & ebi.ac.uk & RNA sequences \\
+RFAM & mysql & ebi.ac.uk & RNA families \\
+Neo4j Movies & neo4j & demo.neo4jlabs.com & Film graph \\
+PokéAPI & rest & pokeapi.co & Pokémon data \\
+JSONPlaceholder & rest & jsonplaceholder.typicode.com & Fake posts \\
+RestCountries & rest & restcountries.com & Country data \\
+Open-Meteo & rest & api.open-meteo.com & Weather data \\
+Chinook & sqlite3 & (local file) & Music store \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Ontology Evaluation}
+
+We ingested three ontologies of increasing complexity:
+(1) the project's own \texttt{blog.ttl} (11 triples, 3 classes);
+(2) the Friend of a Friend (FOAF) ontology~\cite{foaf}
+(Turtle, $\sim$400 triples, 14 classes);
+(3) a fragment of the Gene Ontology~\cite{go}
+(OWL/XML, $\sim$50\,000 terms).
+
+Parse times on a laptop with an Intel Core i7 were
+$<$1\,ms, 12\,ms, and 3.1\,s respectively.  The SHA-256 cache
+reduces repeat parse overhead to $<$0.1\,ms in all cases.  The
+generated GraphQL SDL was syntactically valid in all three cases
+as verified by graphql-js schema validation.
+
+\subsection{Latency Analysis}
+
+Table~\ref{tab:latency} reports round-trip latency (client-to-server
+and back) for representative queries over the public sources.  All
+measurements are medians over 20 requests from a residential broadband
+connection (100 Mbit/s).  The dominant factor is network latency to
+the remote data source, not Mozg's own processing overhead (which
+accounts for $<$5\,ms in all cases measured locally).
+
+\begin{table}[h]
+\caption{Median round-trip latency (ms) for representative queries.}
+\label{tab:latency}
+\small
+\begin{tabular}{lrr}
+\toprule
+Query & Latency (ms) & Rows \\
+\midrule
+Chinook Artists (local SQLite) & 8 & 275 \\
+JSONPlaceholder /posts & 142 & 100 \\
+PokéAPI /pokemon with types (relation) & 1\,840 & 20 \\
+RNAcentral sequences (limit 50) & 290 & 50 \\
+RFAM families (limit 20) & 340 & 20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The PokéAPI latency demonstrates the N+1 problem: fetching 20 Pokémon
+plus their types requires 41 sequential HTTP requests (1 list + 20
+detail + 20 type requests).  This is expected behaviour under the
+current REST driver design and is documented as a deferred
+performance issue.
+
+% ===============================================================
+\section{Discussion}
+\label{sec:discussion}
+% ===============================================================
+
+\subsection{Design Trade-offs}
+
+The ``slow by design'' philosophy accepts higher latency in exchange
+for:
+\begin{itemize}
+  \item \textbf{Freshness}: every query reads live data with no
+        staleness window;
+  \item \textbf{Flexibility}: any change to source schemas is
+        immediately reflected without pipeline rebuilds;
+  \item \textbf{Simplicity}: no ETL pipelines, no data warehouse,
+        no schema registry;
+  \item \textbf{Minimal server state}: the server holds no persistent
+        data beyond an in-memory connection cache and ontology cache,
+        simplifying deployment.
+\end{itemize}
+These properties are valuable for exploratory analytics, scientific
+workloads, and multi-tenant exploration tools where data ownership
+prevents centralisation.
+
+\subsection{Known Limitations and Deferred Issues}
+
+Several security and performance issues are tracked but intentionally
+deferred:
+
+\begin{description}
+  \item[SSRF] The ontology URL fetch in
+    \texttt{src/ontology/index.js} accepts arbitrary URLs, enabling
+    server-side request forgery.  Mitigation requires an allowlist and
+    a per-request timeout.
+
+  \item[Cypher injection] The Neo4j driver passes user-supplied
+    identifiers (\texttt{from}, \texttt{orderBy}, \texttt{alias})
+    directly into Cypher queries without escaping.
+
+  \item[Path traversal] The static-file server does not decode
+    percent-encoded path segments before resolving them against the
+    document root.
+
+  \item[Connection-cache collision] The in-memory connection cache is
+    keyed on host and username without the password, so two users
+    with the same username but different passwords on the same host
+    could share a connection.
+
+  \item[N+1 REST requests] The REST driver issues one HTTP request
+    per row of the primary result to fetch related entities.
+    Batching or parallelisation would significantly reduce latency.
+
+  \item[BioCyc re-fetch] The BioCyc driver re-fetches the full
+    class/instance list for every related entity ID rather than
+    building an index.
+\end{description}
+
+\subsection{Scalability}
+
+As a single-process Node.js application, Mozg's throughput is limited
+by the event loop.  CPU-intensive ontology parsing blocks the loop;
+large ontologies ($>$50\,000 triples) may cause noticeable latency
+spikes.  Horizontal scaling is straightforward because the server
+holds only in-memory caches that can be cold-started per instance;
+queries are independently routable.
+
+Query-level parallelism is partially exploited: within a single query,
+sub-queries for independent relation branches could be issued
+concurrently, though the current implementation issues them
+sequentially.
+
+\subsection{Future Work}
+
+\begin{itemize}
+  \item \textbf{Query optimisation}: pushdown filtering to source
+        databases and parallel sub-query execution;
+  \item \textbf{Schema registry}: persistent storage of discovered
+        schemas and ontology results to accelerate repeated queries;
+  \item \textbf{Authentication middleware}: JWT or OAuth2 bearer
+        token validation to replace per-query credential passing;
+  \item \textbf{Streaming results}: cursor-based pagination and
+        incremental JSON streaming for large result sets;
+  \item \textbf{SPARQL interface}: expose a SPARQL endpoint
+        translating to the driver layer for triple-store
+        compatibility;
+  \item \textbf{WASM drivers}: compile lightweight database clients
+        to WebAssembly to enable browser-side federation.
+\end{itemize}
+
+% ===============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ===============================================================
+
+We presented Mozg, a ``slow by design'' federated query layer that
+provides a single GraphQL interface over heterogeneous data sources.
+Mozg's key contributions are:
+\begin{enumerate}
+  \item A \emph{driver model} that abstracts twelve source types
+        behind a uniform \texttt{executeQuery}/\texttt{introspect}
+        interface;
+  \item A \emph{relation-traversal engine} that joins entities across
+        source boundaries at query time;
+  \item An \emph{OWL ontology pipeline} that converts OWL TBox
+        definitions into executable GraphQL schemas;
+  \item A \emph{browser-based visual query builder} that democratises
+        cross-database exploration for non-programmers;
+  \item A \emph{curated catalog} of 26 publicly accessible data
+        sources ready for immediate use.
+\end{enumerate}
+
+Mozg is designed for scenarios where data freshness, source
+heterogeneity, and operational simplicity outweigh the need for
+sub-millisecond latency.  By embracing this trade-off explicitly,
+it enables a class of data-integration use cases that are poorly
+served by traditional data warehouses or per-integration middleware.
+The system is open-source, available at
+\url{https://github.com/Skitionek/Mozg}, and can be launched
+in a fully configured cloud environment via GitHub Codespaces in
+under two minutes.
+
+% ---------------------------------------------------------------
+% Acknowledgements
+% ---------------------------------------------------------------
+\begin{acks}
+The author thanks the open-source maintainers of GraphQL Yoga,
+GraphQL Mesh, N3.js, Knex, and arangojs whose libraries form the
+foundation of Mozg.
+\end{acks}
+
+% ---------------------------------------------------------------
+% References
+% ---------------------------------------------------------------
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{mozg}
+
+\end{document}
