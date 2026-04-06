@@ -5,6 +5,7 @@ const sqlite3 = require('./drivers/sqlite3');
 const arango  = require('./drivers/arango');
 const biocyc  = require('./drivers/biocyc');
 const rest    = require('./drivers/rest');
+const kegg    = require('./drivers/kegg');
 
 /**
  * Resolve a driver module by its name.
@@ -52,6 +53,10 @@ function getDriver(driverName) {
     // Plain REST without an OpenAPI spec (use `openapi` for spec-backed REST)
     case 'rest':
       return rest;
+
+    // KEGG (rest.kegg.jp) – text/plain adapter with TSV + flat-file parsing
+    case 'kegg':
+      return kegg;
 
     default:
       throw new Error(`Unknown driver: ${driverName}`);
