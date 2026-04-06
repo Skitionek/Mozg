@@ -45,7 +45,9 @@ module.exports = {
     {
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
-      relations: [],
+      relations: [
+        { entity: '/uniprotkb/search', foreignKey: 'uid', type: 'hasMany', alias: 'relatedProteins', catalog: 'uniprot' },
+      ],
     },
     {
       name: '/elink.fcgi',

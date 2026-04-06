@@ -40,19 +40,26 @@ module.exports = {
       columns: ['accession', 'id', 'proteinDescription', 'genes', 'organism', 'sequence', 'reviewed', 'annotationScore', 'features', 'keywords'],
       relations: [
         { entity: '/taxonomy', foreignKey: 'taxonId', type: 'belongsTo', alias: 'taxonomy' },
+        { entity: '/entry', foreignKey: 'accession', type: 'hasMany', alias: 'pdbStructures', catalog: 'pdb' },
+        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'interproEntries', catalog: 'interpro' },
+        { entity: '/get_string_ids', foreignKey: 'accession', type: 'hasOne', alias: 'stringInteractions', catalog: 'string-db' },
       ],
     },
     {
       // Use where: { query: "…", format: "json", size: "25" }
       name: '/uniref/search',
       columns: ['id', 'name', 'commonTaxon', 'commonTaxonId', 'memberCount', 'updated', 'entryType', 'representativeMember'],
-      relations: [],
+      relations: [
+        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'hasMany', alias: 'members' },
+      ],
     },
     {
       // Use where: { query: "…", format: "json", size: "25" }
       name: '/uniparc/search',
       columns: ['uniParcId', 'crossReferenceCount', 'sequenceLength', 'oldestCrossRefCreated', 'mostRecentCrossRefUpdated', 'sequence'],
-      relations: [],
+      relations: [
+        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' },
+      ],
     },
     {
       // Use where: { query: "…", format: "json", size: "25" }

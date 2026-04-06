@@ -65,7 +65,10 @@ module.exports = {
       // Orthologues: /api/v1.0/gene/orthologs?gene_id=FBgn0000490
       name: '/api/v1.0/gene/orthologs',
       columns: ['gene_id', 'gene_symbol', 'ortholog_id', 'ortholog_symbol', 'ortholog_organism', 'ortholog_source', 'diopt_score'],
-      relations: [],
+      relations: [
+        { entity: '/rest/widget/gene', foreignKey: 'gene_id', type: 'hasMany', alias: 'wormbaseOrthologs', catalog: 'wormbase' },
+        { entity: '/gene', foreignKey: 'gene_id', type: 'hasMany', alias: 'zfinOrthologs', catalog: 'zfin' },
+      ],
     },
   ],
 };

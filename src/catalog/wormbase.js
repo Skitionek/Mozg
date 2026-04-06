@@ -46,6 +46,8 @@ module.exports = {
       relations: [
         { entity: '/rest/widget/gene/phenotype', foreignKey: 'name', type: 'hasMany', alias: 'phenotypes' },
         { entity: '/rest/widget/gene/expression', foreignKey: 'name', type: 'hasMany', alias: 'expression' },
+        { entity: '/api/v1.0/chado/gene', foreignKey: 'name', type: 'hasMany', alias: 'flybaseOrthologs', catalog: 'flybase' },
+        { entity: '/gene', foreignKey: 'name', type: 'hasMany', alias: 'zfinOrthologs', catalog: 'zfin' },
       ],
     },
     {

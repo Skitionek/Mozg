@@ -362,6 +362,7 @@ const typeDefs = /* GraphQL */ `
     foreignKey: String!
     localKey: String
     alias: String
+    catalog: String
     type: RelationType!
   }
 `;

@@ -36,6 +36,8 @@ module.exports = {
       columns: ['entry_id', 'struct', 'exptl', 'cell', 'symmetry', 'diffrn', 'reflns', 'refine', 'pdbx_vrpt_summary', 'rcsb_entry_info', 'rcsb_accession_info'],
       relations: [
         { entity: '/polymer_entity', foreignKey: 'entry_id', type: 'hasMany', alias: 'polymerEntities' },
+        { entity: '/uniprotkb/search', foreignKey: 'entry_id', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' },
+        { entity: '/structure/PDB', foreignKey: 'entry_id', type: 'hasMany', alias: 'interproAnnotations', catalog: 'interpro' },
       ],
     },
     {
@@ -56,7 +58,9 @@ module.exports = {
       // Fetch by PDB ID: /assembly/1TUP/1
       name: '/assembly',
       columns: ['entry_id', 'assembly_id', 'rcsb_assembly_info', 'rcsb_struct_symmetry', 'pdbx_struct_assembly'],
-      relations: [],
+      relations: [
+        { entity: '/entry', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' },
+      ],
     },
   ],
 };

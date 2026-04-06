@@ -39,6 +39,7 @@ module.exports = {
       relations: [
         { entity: '/interaction_partners', foreignKey: 'stringId', type: 'hasMany', alias: 'interactionPartners' },
         { entity: '/enrichment', foreignKey: 'stringId', type: 'hasMany', alias: 'enrichment' },
+        { entity: '/uniprotkb/search', foreignKey: 'identifier', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' },
       ],
     },
     {

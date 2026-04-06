@@ -47,6 +47,7 @@ module.exports = {
       columns: ['entry_id', 'name'],
       relations: [
         { entity: '/get', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' },
+        { entity: '/data/pathways/top/Homo sapiens', foreignKey: 'entry_id', type: 'hasOne', alias: 'reactomePathway', catalog: 'reactome' },
       ],
     },
     {
@@ -54,17 +55,23 @@ module.exports = {
       columns: ['entry_id', 'name'],
       relations: [
         { entity: '/link/pathway', foreignKey: 'entry_id', type: 'hasMany', alias: 'pathways' },
+        { entity: '/metabolites.json', foreignKey: 'entry_id', type: 'hasOne', alias: 'hmdbMetabolite', catalog: 'hmdb' },
       ],
     },
     {
       name: '/list/reaction',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: [
+        { entity: '/list/compound', foreignKey: 'entry_id', type: 'hasMany', alias: 'compounds' },
+      ],
     },
     {
       name: '/list/enzyme',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: [
+        { entity: '/list/reaction', foreignKey: 'entry_id', type: 'hasMany', alias: 'reactions' },
+        { entity: '/uniprotkb/search', foreignKey: 'entry_id', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' },
+      ],
     },
     {
       name: '/list/drug',

@@ -38,7 +38,11 @@ module.exports = {
       // Paginated list: /metabolites.json?page=1
       name: '/metabolites.json',
       columns: ['accession', 'name', 'description', 'chemical_formula', 'average_molecular_weight', 'monisotopic_molecular_weight', 'iupac_name', 'traditional_iupac', 'smiles', 'inchi', 'inchikey', 'state', 'super_class', 'class', 'sub_class', 'status'],
-      relations: [],
+      relations: [
+        { entity: '/proteins.json', foreignKey: 'protein_accessions', type: 'hasMany', alias: 'proteins' },
+        { entity: '/diseases.json', foreignKey: 'disease_names', type: 'hasMany', alias: 'diseases' },
+        { entity: '/find/compound', foreignKey: 'kegg_id', type: 'hasOne', alias: 'keggCompound', catalog: 'kegg' },
+      ],
     },
     {
       // Search: /metabolites/search.json?query=glucose
@@ -50,7 +54,9 @@ module.exports = {
       // Paginated list: /proteins.json?page=1
       name: '/proteins.json',
       columns: ['accession', 'name', 'uniprot_id', 'gene_name', 'protein_type', 'general_function', 'pathways'],
-      relations: [],
+      relations: [
+        { entity: '/uniprotkb/search', foreignKey: 'uniprot_id', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' },
+      ],
     },
     {
       // Paginated list: /diseases.json?page=1

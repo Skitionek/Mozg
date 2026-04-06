@@ -42,7 +42,9 @@ module.exports = {
       // Use where: { db: "gds", id: "<uid>", retmode: "json" }
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
-      relations: [],
+      relations: [
+        { entity: '/esearch.fcgi', foreignKey: 'pubmed_id', type: 'hasOne', alias: 'pubmedArticle', catalog: 'pubmed' },
+      ],
     },
     {
       // Use where: { dbfrom: "gds", db: "sra", id: "<uid>", retmode: "json" }

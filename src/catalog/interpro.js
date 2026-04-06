@@ -46,7 +46,9 @@ module.exports = {
       // Entries from a specific member database: /entry/pfam
       name: '/entry/pfam',
       columns: ['accession', 'name', 'type', 'integrated', 'short_name', 'source_database'],
-      relations: [],
+      relations: [
+        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' },
+      ],
     },
     {
       // Proteins with InterPro annotations: /protein/UniProt/
@@ -55,19 +57,24 @@ module.exports = {
       relations: [
         { entity: '/entry/all', foreignKey: 'accession', type: 'hasMany', alias: 'entries' },
         { entity: '/structure/PDB', foreignKey: 'accession', type: 'hasMany', alias: 'structures' },
+        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' },
       ],
     },
     {
       // Structures with InterPro annotations: /structure/PDB/
       name: '/structure/PDB',
       columns: ['accession', 'name', 'experiment_type', 'release_date', 'chains'],
-      relations: [],
+      relations: [
+        { entity: '/entry', foreignKey: 'accession', type: 'belongsTo', alias: 'pdbEntry', catalog: 'pdb' },
+      ],
     },
     {
       // Taxonomy nodes with InterPro annotations: /taxonomy/uniprot/
       name: '/taxonomy/uniprot',
       columns: ['accession', 'name', 'rank', 'lineage', 'children', 'proteins', 'entries'],
-      relations: [],
+      relations: [
+        { entity: '/protein/UniProt', foreignKey: 'taxId', type: 'hasMany', alias: 'proteins' },
+      ],
     },
   ],
 };

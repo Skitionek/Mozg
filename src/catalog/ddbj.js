@@ -44,6 +44,8 @@ module.exports = {
       columns: ['accession', 'title', 'organism', 'taxon_id', 'sequence_length', 'mol_type', 'division', 'bioproject_accession', 'biosample_accession', 'submission_date', 'last_modified_date'],
       relations: [
         { entity: '/search/bioproject', foreignKey: 'bioproject_accession', type: 'belongsTo', alias: 'bioproject' },
+        { entity: '/esearch.fcgi', foreignKey: 'accession', type: 'hasOne', alias: 'genbankEntry', catalog: 'genbank' },
+        { entity: '/search', foreignKey: 'accession', type: 'hasOne', alias: 'emblEntry', catalog: 'embl-ebi' },
       ],
     },
     {
