@@ -81,6 +81,12 @@ describe('registry.getDriver', () => {
     assert.equal(typeof d.introspect, 'function');
   });
 
+  test('resolves kegg driver', () => {
+    const d = getDriver('kegg');
+    assert.equal(typeof d.executeQuery, 'function');
+    assert.equal(typeof d.introspect, 'function');
+  });
+
   test('throws on unknown driver', () => {
     assert.throws(
       () => getDriver('unknowndb'),
