@@ -61,6 +61,8 @@ The Codespace will automatically:
 
 The following free, public endpoints can be used directly — no sign-up required.
 
+### General
+
 | Name | Driver | Host | Database | User | Password | Notes |
 |------|--------|------|----------|------|----------|-------|
 | RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | *(public read-only — see [RNAcentral docs](https://rnacentral.org/help/public-database))* | RNA sequences |
@@ -71,6 +73,33 @@ The following free, public endpoints can be used directly — no sign-up require
 | Open-Meteo | `rest` | – | `https://api.open-meteo.com/v1` | – | – | Weather (no key) |
 | PokéAPI | `rest` | – | `https://pokeapi.co/api/v2` | – | – | Pokémon |
 | Jikan | `rest` | – | `https://api.jikan.moe/v4` | – | – | Anime (MyAnimeList) |
+
+### Bioinformatics
+
+All entries below are freely accessible without registration unless noted.
+Pass connection parameters as shown; entity names and `where` filters follow each catalog entry's documentation.
+
+| Name | Driver | Catalog key | Base URL | Notes |
+|------|--------|-------------|----------|-------|
+| NCBI E-utilities | `rest` | `ncbi` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | General access to all NCBI databases; pass `db=` in `where` |
+| GenBank | `rest` | `genbank` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | Nucleotide sequences; use `where: { db: "nuccore" }` |
+| PubMed | `rest` | `pubmed` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | Biomedical literature; use `where: { db: "pubmed" }` |
+| RefSeq | `rest` | `refseq` | `https://api.ncbi.nlm.nih.gov/datasets/v2` | Reference sequences via NCBI Datasets v2 API |
+| GEO | `rest` | `geo` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | Gene expression; use `where: { db: "gds" }` |
+| UniProt | `rest` | `uniprot` | `https://rest.uniprot.org` | Protein knowledgebase (Swiss-Prot + TrEMBL) |
+| PDB | `rest` | `pdb` | `https://data.rcsb.org/rest/v1/core` | 3-D macromolecular structures |
+| InterPro | `rest` | `interpro` | `https://www.ebi.ac.uk/interpro/api` | Protein families and domains |
+| HMDB | `rest` | `hmdb` | `https://hmdb.ca` | Human metabolome; 200 000+ metabolites |
+| STRING | `rest` | `string-db` | `https://string-db.org/api/json` | Protein–protein interaction networks |
+| Ensembl | `rest` | `ensembl` | `https://rest.ensembl.org` | Vertebrate genome browser |
+| Reactome | `rest` | `reactome` | `https://reactome.org/ContentService` | Biological pathway knowledgebase |
+| KEGG | `kegg` | `kegg` | `https://rest.kegg.jp` | Pathway/compound/reaction; academic use; pass `where: { _pathSuffix: "…" }` for `/find`, `/get`, `/link` |
+| EMBL-EBI (ENA) | `rest` | `embl-ebi` | `https://www.ebi.ac.uk/ena/portal/api` | European Nucleotide Archive |
+| DDBJ | `rest` | `ddbj` | `https://ddbj.nig.ac.jp/search/api/v1` | DNA Data Bank of Japan |
+| FlyBase | `rest` | `flybase` | `https://api.flybase.org` | Drosophila genetics and genomics |
+| WormBase | `rest` | `wormbase` | `https://wormbase.org` | *C. elegans* biology |
+| ZFIN | `rest` | `zfin` | `https://zfin.org/action/api` | Zebrafish genetics and genomics |
+| BRENDA | `rest` | `brenda` | `https://www.brenda-enzymes.org/rest` | Enzyme database; **free registration required** |
 
 ---
 
