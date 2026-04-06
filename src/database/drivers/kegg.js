@@ -102,9 +102,9 @@ function parseFlatFile(text) {
 
       const existing = result[currentKey];
       if (Array.isArray(existing)) {
-        existing[existing.length - 1] += '; ' + cont;
+        existing[existing.length - 1] += CONTINUATION_SEP + cont;
       } else {
-        result[currentKey] = existing + '; ' + cont;
+        result[currentKey] = existing + CONTINUATION_SEP + cont;
       }
     }
   }

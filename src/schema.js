@@ -138,6 +138,8 @@ const typeDefs = /* GraphQL */ `
     biocyc
     """Plain REST API without an OpenAPI specification (legacy custom driver)"""
     rest
+    """KEGG REST API (rest.kegg.jp); converts text/plain TSV and flat-file responses to JSON"""
+    kegg
     """REST API with an OpenAPI / Swagger specification (via @graphql-mesh/openapi);
        set database to the spec URL/path and host to the API base URL"""
     openapi

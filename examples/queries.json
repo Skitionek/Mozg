@@ -184,5 +184,29 @@
     "description": "Parse the blog ontology and preview the generated GraphQL SDL without caching. Useful for iterating on an ontology design before committing it. Uses generateSchema instead of ingestOntology.",
     "category": "OWL",
     "query": "{\n  generateSchema(input: {\n    url: \"https://raw.githubusercontent.com/Skitionek/Mozg/main/examples/blog.ttl\"\n    format: turtle\n  }) {\n    tripleCount\n    generatedTypeDefs\n    generatedTypes { name fieldCount relationCount isAbstract }\n  }\n}"
+  },
+  {
+    "name": "KEGG – list reference pathways",
+    "description": "List all KEGG reference pathways. Returns tab-delimited data automatically converted to JSON by the kegg driver.",
+    "category": "KEGG",
+    "query": "{\n  query(input: {\n    connection: { driver: kegg, database: \"https://rest.kegg.jp\" }\n    from: \"/list/pathway\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "KEGG – search compound by keyword",
+    "description": "Search the KEGG compound database for entries matching 'glucose'. Pass the keyword as _pathSuffix so the driver appends it as a URL path segment.",
+    "category": "KEGG",
+    "query": "{\n  query(input: {\n    connection: { driver: kegg, database: \"https://rest.kegg.jp\" }\n    from: \"/find/compound\"\n    where: { _pathSuffix: \"glucose\" }\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "KEGG – get full entry record",
+    "description": "Fetch the full KEGG flat-file record for compound C00031 (D-Glucose). The kegg driver parses the flat-file into a structured JSON object.",
+    "category": "KEGG",
+    "query": "{\n  query(input: {\n    connection: { driver: kegg, database: \"https://rest.kegg.jp\" }\n    from: \"/get\"\n    where: { _pathSuffix: \"C00031\" }\n  }) { count data }\n}"
+  },
+  {
+    "name": "KEGG – link gene to pathways",
+    "description": "Find all KEGG pathways associated with the human TP53 gene (hsa:7157) via the /link endpoint.",
+    "category": "KEGG",
+    "query": "{\n  query(input: {\n    connection: { driver: kegg, database: \"https://rest.kegg.jp\" }\n    from: \"/link/pathway\"\n    where: { _pathSuffix: \"hsa:7157\" }\n  }) { count data }\n}"
   }
 ]
