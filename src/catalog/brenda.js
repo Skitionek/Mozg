@@ -33,9 +33,9 @@ module.exports = {
   driver: 'rest',
   connection: {
     database: 'https://www.brenda-enzymes.org/rest',
-    // Set user to your registered email; password to SHA256(password + email)
-    // user: 'your@email.com',
-    // password: '<sha256_hash>',
+    // Credentials are user-supplied at query time (not stored in the catalog).
+    // Pass user (registered email) and password (SHA-256 of password + email)
+    // via the GraphQL query's connection argument.
   },
   entities: [
     {
