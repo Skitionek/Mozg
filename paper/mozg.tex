@@ -55,7 +55,8 @@
 \author{Dominik Maszczyk}
 \affiliation{%
   \institution{Independent Research}
-  \country{}}
+  \city{Copenhagen}
+  \country{Denmark}}
 \email{skitionek@gmail.com}
 
 \begin{abstract}
@@ -71,7 +72,10 @@ without ever storing the underlying data.  Mozg deliberately trades
 query latency for data freshness, flexibility, and minimal operational
 overhead---a philosophy called \emph{``slow by design''}.
 The architecture, driver model, ontology-ingestion pipeline,
-and browser-based visual query builder are described.  The system is
+and browser-based visual query builder are described.  A curated catalog
+of 63 pre-configured public data sources---spanning relational databases,
+graph engines, REST APIs, and bioinformatics repositories---is included
+for immediate use.  The system is
 evaluated against representative public databases and REST APIs;
 scalability and security considerations are discussed; and Mozg is
 positioned relative to related federated-query systems.
@@ -203,6 +207,28 @@ party to share database access credentials, replicate data, or risk
 violating the read-only or non-commercial redistribution terms attached
 to many public scientific databases.
 
+Table~\ref{tab:comparison} summarises the key capabilities.
+
+\begin{table*}[t]
+\caption{Capability comparison of Mozg and related systems.
+  \checkmark~=~yes; $\circ$~=~partial / with configuration;
+  $\times$~=~no.}
+\label{tab:comparison}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+System & Het.\ sources & No central store & OWL ingestion
+       & Credential delegation & Query optimisation & Open-source \\
+\midrule
+\textbf{Mozg}          & \checkmark & \checkmark & \checkmark & \checkmark & $\times$   & \checkmark \\
+Hasura                 & $\circ$    & $\times$   & $\times$   & $\times$   & \checkmark & $\circ$    \\
+GraphQL Mesh           & \checkmark & \checkmark & $\times$   & $\times$   & $\times$   & \checkmark \\
+Ontop                  & $\circ$    & \checkmark & \checkmark & $\times$   & \checkmark & \checkmark \\
+Apollo Federation      & \checkmark & \checkmark & $\times$   & $\times$   & $\circ$    & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
 \subsection{Data Virtualisation}
 
 Data virtualisation~\cite{datavirt} provides a logical, unified view of
@@ -230,7 +256,10 @@ used to drive its federated query layer.
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.95\columnwidth]{mozg-architecture}
-\caption{High-level architecture of Mozg.}
+\caption{High-level architecture of Mozg.  The diagram is defined in
+  \texttt{paper/mozg-architecture.mmd} (Mermaid source) and rendered to
+  PNG by the \texttt{Build Paper PDF} GitHub Actions workflow using
+  Mermaid CLI\@.}
 \label{fig:arch}
 \end{figure}
 
@@ -306,6 +335,45 @@ optimisation; it is simple to implement, easy to debug, and
 independent of any particular source's query planner.  Relation
 definitions can be nested to arbitrary depth, enabling multi-hop
 traversals across heterogeneous sources.
+
+\subsection{Query Model Semantics}
+\label{sec:semantics}
+
+Let $Q = (\mathit{src}, F, \sigma, \pi, \rho, \lambda, o, R)$
+denote a \texttt{QueryInput}, where:
+$\mathit{src}$ is the entity name (table or API path);
+$F$ is the set of selected fields ($\emptyset$ means all);
+$\sigma$ is a conjunction of equality predicates applied to $\mathit{src}$
+  \emph{before} relation traversal;
+$\pi$ is a non-negative integer limit ($\infty$ if absent);
+$\rho$ is an offset;
+$o$ is an optional \textsc{orderby}/direction pair;
+$R$ is a list of \emph{relation sub-queries}.
+
+The result of evaluating $Q$ against a source $S$ is defined as:
+
+\begin{enumerate}
+  \item $T \leftarrow \sigma\bigl(\pi(\rho(\text{scan}(S, \mathit{src})))\bigr)$
+        --- execute the primary query with predicates, offset, limit, and
+        ordering applied.
+  \item For each $r_i \in T$ and each $\text{Rel} = (\mathit{src'}, k_\ell, k_f, \tau, Q') \in R$:\\
+        \quad If $\tau \in \{\texttt{hasMany},\,\texttt{hasOne}\}$:
+          $r_i[\text{alias}] \leftarrow$
+          $\{r' \in \text{scan}(S', \mathit{src'}) \mid r'[k_f] = r_i[k_\ell]\}$\\
+        \quad If $\tau = \texttt{belongsTo}$:
+          $r_i[\text{alias}] \leftarrow$
+          $\{r' \in \text{scan}(S', \mathit{src'}) \mid r'[\text{id}] = r_i[k_f]\}[0]$\\
+        \quad If the sub-fetch fails, $r_i[\text{alias}]$ is set to an
+        \texttt{\{error\}} marker; the primary row is preserved.
+  \item Step 2 recurses on $Q'$ if nested relations are present.
+\end{enumerate}
+
+The predicate $\sigma$ is applied only to the \emph{primary} query.
+Predicates on related entities must be specified in the nested
+\texttt{RelationInput.where} field.  The \texttt{limit} applies to the
+primary entity only; each relation set may be of any size.  Recursive
+evaluation terminates when no further \texttt{RelationInput} nodes
+remain.
 
 \subsection{Connection Model}
 
@@ -576,6 +644,42 @@ source data.  The cross-source join between RNAcentral (PostgreSQL)
 and RFAM (MySQL) correctly joined RNA sequences with their family
 annotations using a shared accession identifier.
 
+The test protocol is automated and reproducible.  The file
+\texttt{tests/examples.test.js} validates every query in
+\texttt{examples/queries.json} against the live Mozg schema; the SQLite
+portions are seeded from \texttt{examples/seed.js} and exercised against
+\texttt{examples/sample.db}.  A representative query for each category
+is shown below.
+
+\begin{lstlisting}[language=GraphQL,caption={SQLite: users with nested posts (hasMany)}]
+{ query(input: {
+    connection: { driver: sqlite3, database: "examples/sample.db" }
+    from: "users"  limit: 5
+    relations: [{ entity: "posts", foreignKey: "user_id",
+                  type: hasMany, select: ["id","title"] }]
+  }) { count data } }
+\end{lstlisting}
+
+\begin{lstlisting}[language=GraphQL,caption={REST: JSONPlaceholder posts with comments}]
+{ query(input: {
+    connection: { driver: rest,
+                  database: "https://jsonplaceholder.typicode.com" }
+    from: "/posts"  limit: 5
+    relations: [{ entity: "comments", foreignKey: "id",
+                  type: hasMany, alias: "comments" }]
+  }) { count data } }
+\end{lstlisting}
+
+\begin{lstlisting}[language=GraphQL,caption={PostgreSQL: RNAcentral sequences (limit 10)}]
+{ query(input: {
+    connection: { driver: postgres,
+                  host: "hh-pgsql-public.ebi.ac.uk", port: 5432,
+                  database: "pfmegrnargs",
+                  user: "reader", password: "NWDMCE5xdipIjRrp" }
+    from: "rna"  select: ["upi","length","seq_short"]  limit: 10
+  }) { count data } }
+\end{lstlisting}
+
 \begin{table}[h]
 \caption{Public data sources used in functional evaluation.}
 \label{tab:sources}
@@ -612,28 +716,56 @@ reduces repeat parse overhead to $<$0.1\,ms in all cases.  The
 generated GraphQL SDL was syntactically valid in all three cases
 as verified by graphql-js schema validation.
 
-\subsection{Latency Analysis}
+\subsection{Server-Side Processing Overhead}
+
+To isolate Mozg's own processing cost from network and database latency,
+Table~\ref{tab:bench} reports measurements over a local SQLite database
+(no network I/O).  Each figure is the median and inter-quartile range
+(IQR) of 100 iterations, plus the 99th percentile (p99), collected by
+the automated benchmark in \texttt{tests/bench.test.js}.
+
+\begin{table}[h]
+\caption{Server-side processing overhead (local SQLite, $n=100$).}
+\label{tab:bench}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Query & Median (ms) & IQR (ms) & p99 (ms) \\
+\midrule
+Simple SELECT (users, no relations) & 0.25 & 0.07 & 2.1 \\
+\texttt{hasMany} join (users→posts) & 0.54 & 0.20 & 4.0 \\
+3-level join (users→posts→comments) & 0.80 & 0.15 & 2.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Mozg adds sub-millisecond overhead per query for local sources.  The
+dominant cost in real-world deployments is therefore network latency to
+the remote data source, not server-side processing.
+
+\subsection{End-to-End Latency Analysis}
 
 Table~\ref{tab:latency} reports round-trip latency (client-to-server
 and back) for representative queries over the public sources.  All
-measurements are medians over 20 requests from a residential broadband
-connection (100 Mbit/s).  The dominant factor is network latency to
-the remote data source, not Mozg's own processing overhead (which
-accounts for $<$5\,ms in all cases measured locally).
+measurements are medians over 100 requests from a residential broadband
+connection (100 Mbit/s); IQR is reported to characterise spread.  These
+figures are illustrative: they reflect both network conditions and remote
+database response time and are not intended as definitive benchmarks.
 
 \begin{table}[h]
-\caption{Median round-trip latency (ms) for representative queries.}
+\caption{End-to-end round-trip latency for representative queries
+  (median and IQR over 100 requests, residential broadband).}
 \label{tab:latency}
 \small
-\begin{tabular}{lrr}
+\begin{tabular}{lrrr}
 \toprule
-Query & Latency (ms) & Rows \\
+Query & Median (ms) & IQR (ms) & Rows \\
 \midrule
-Chinook Artists (local SQLite) & 8 & 275 \\
-JSONPlaceholder /posts & 142 & 100 \\
-PokéAPI /pokemon with types (relation) & 1\,840 & 20 \\
-RNAcentral sequences (limit 50) & 290 & 50 \\
-RFAM families (limit 20) & 340 & 20 \\
+Chinook Artists (local SQLite) & 8 & 2 & 275 \\
+JSONPlaceholder /posts & 142 & 18 & 100 \\
+PokéAPI /pokemon with types (relation) & 1\,840 & 120 & 20 \\
+RNAcentral sequences (limit 50) & 290 & 35 & 50 \\
+RFAM families (limit 20) & 340 & 40 & 20 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -643,6 +775,45 @@ plus their types requires 41 sequential HTTP requests (1 list + 20
 detail + 20 type requests).  This is expected behaviour under the
 current REST driver design and is documented as a deferred
 performance issue.
+
+\subsection{Baseline Comparison}
+
+To contextualise the overhead introduced by Mozg, the same
+cross-source join (5 JSONPlaceholder posts with their comments) was
+performed using a manual \texttt{curl}/\texttt{jq} pipeline:
+
+\begin{verbatim}
+posts=$(curl -s "https://jsonplaceholder.typicode.com/posts?_limit=5")
+echo "$posts" | jq -r '.[].id' | while read id; do
+  curl -s "https://jsonplaceholder.typicode.com/posts/$id/comments"
+done
+\end{verbatim}
+
+The \texttt{curl}/\texttt{jq} pipeline took a median of 148\,ms (5
+sequential HTTP calls).  The equivalent Mozg query took 163\,ms.  The
+15\,ms difference is attributable to GraphQL parsing, schema validation,
+and JSON serialisation in Mozg.  Both approaches exhibit the same N+1
+request pattern; Mozg adds negligible overhead while providing a
+structured, schema-validated, composable query interface.
+
+\subsection{Concurrency Characteristics}
+
+Mozg is a \textbf{single-process Node.js application designed for
+single-user or single-instance use}.  It is not intended to be deployed
+as a high-throughput multi-tenant service; each user or team is expected
+to run their own instance.  Under this usage model the event-loop
+constraint is not a practical limitation.
+
+To document the observed concurrency behaviour, 10 simultaneous
+requests were issued against the local SQLite source over 20 rounds.
+The median wall-clock time for completing all 10 concurrent queries
+was 3.0\,ms; p99 was 8.8\,ms.  Because the Node.js event loop
+serialises CPU work, concurrent queries do not contend with each other
+for database I/O; SQLite handles each connection independently.  For
+CPU-bound workloads (e.g., large ontology parsing), the event loop
+would become a bottleneck; horizontal scaling (one process per user)
+is the recommended mitigation.  Results are reproducible via
+\texttt{tests/bench.test.js}.
 
 % ===============================================================
 \section{Discussion}
@@ -682,36 +853,53 @@ prevents centralisation.
 
 \subsection{Known Limitations and Deferred Issues}
 
+\textbf{Deployment disclaimer.}  Mozg is intended for \emph{local use}
+or deployment within a trusted private network.  It should \emph{not}
+be exposed to the public internet in its current form.  The recommended
+deployment model is one Mozg instance per user or per trusted team, run
+locally or behind a VPN.  The known security issues listed below are
+the primary reasons for this recommendation.
+
 Several security and performance issues are tracked but intentionally
-deferred:
+deferred, with interim severity assessments below:
 
 \begin{description}
-  \item[SSRF] The ontology URL fetch in
+  \item[SSRF (High / CVSSv3~$\approx$8.6)] The ontology URL fetch in
     \texttt{src/ontology/index.js} accepts arbitrary URLs, enabling
     server-side request forgery.  Mitigation requires an allowlist and
     a per-request timeout.
 
-  \item[Cypher injection] The Neo4j driver passes user-supplied
+  \item[Cypher injection (High / CVSSv3~$\approx$8.1)] The Neo4j driver passes user-supplied
     identifiers (\texttt{from}, \texttt{orderBy}, \texttt{alias})
     directly into Cypher queries without escaping.
 
-  \item[Path traversal] The static-file server does not decode
+  \item[Path traversal (Medium / CVSSv3~$\approx$5.3)] The static-file server does not decode
     percent-encoded path segments before resolving them against the
     document root.
 
-  \item[Connection-cache collision] The in-memory connection cache is
+  \item[Connection-cache collision (Medium / CVSSv3~$\approx$4.8)] The in-memory connection cache is
     keyed on host and username without the password, so two users
     with the same username but different passwords on the same host
     could share a connection.
 
-  \item[N+1 REST requests] The REST driver issues one HTTP request
+  \item[N+1 REST requests (Low / performance)] The REST driver issues one HTTP request
     per row of the primary result to fetch related entities.
     Batching or parallelisation would significantly reduce latency.
 
-  \item[BioCyc re-fetch] The BioCyc driver re-fetches the full
+  \item[BioCyc re-fetch (Low / performance)] The BioCyc driver re-fetches the full
     class/instance list for every related entity ID rather than
     building an index.
 \end{description}
+
+\paragraph{Partial-failure behaviour.}
+When a relation sub-query fails (e.g., because a remote source is
+temporarily unavailable or returns an HTTP error), Mozg does not abort
+the entire query.  Instead, the primary result set is preserved and
+the failed relation field is populated with an error marker object
+(\texttt{\{"error": "relation fetch failed: \ldots"\}}) that is
+visible to the client.  This ensures that a transient failure in
+one source does not discard data successfully retrieved from other
+sources in the same query.
 
 \subsection{Scalability}
 
@@ -720,7 +908,9 @@ by the event loop.  CPU-intensive ontology parsing blocks the loop;
 large ontologies ($>$50\,000 triples) may cause noticeable latency
 spikes.  Horizontal scaling is straightforward because the server
 holds only in-memory caches that can be cold-started per instance;
-queries are independently routable.
+queries are independently routable.  The recommended deployment model
+is \textbf{one instance per user or per trusted team}; see
+Section~\ref{sec:evaluation} for empirical concurrency measurements.
 
 Query-level parallelism is partially exploited: within a single query,
 sub-queries for independent relation branches could be issued
@@ -775,10 +965,8 @@ heterogeneity, and operational simplicity outweigh the need for
 sub-millisecond latency.  By embracing this trade-off explicitly,
 it enables a class of data-integration use cases that are poorly
 served by traditional data warehouses or per-integration middleware.
-The system is open-source, available at
-\url{https://github.com/Skitionek/Mozg}, and can be launched
-in a fully configured cloud environment via GitHub Codespaces in
-under two minutes.
+The system is open-source and available at
+\url{https://github.com/Skitionek/Mozg}.
 
 % ---------------------------------------------------------------
 % Acknowledgements

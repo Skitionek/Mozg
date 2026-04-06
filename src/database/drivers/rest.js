@@ -162,8 +162,10 @@ async function loadRelations(base, headers, rows, relations) {
 
         row[resultKey] = type === 'hasMany' ? filtered : (filtered[0] ?? null);
       } catch (err) {
-        // Surface the error so callers can see what went wrong (e.g. auth/404)
-        throw new Error(`REST relation fetch failed for ${entity}/${pathVal}: ${err.message}`, { cause: err });
+        // Return a partial result: primary row is preserved; the failed relation
+        // is represented as an error object so the client can see what went wrong
+        // without losing the rest of the query result.
+        row[resultKey] = { error: `relation fetch failed: ${err.message}` };
       }
     }
   }
