@@ -20,6 +20,30 @@ const REGISTRY = {
   // ── REST – science & space ───────────────────────────────────────────────
   nasa:             () => require('./nasa'),
   spacex:           () => require('./spacex'),
+  // ── Bioinformatics – NCBI family ─────────────────────────────────────────
+  ncbi:             () => require('./ncbi'),
+  genbank:          () => require('./genbank'),
+  pubmed:           () => require('./pubmed'),
+  refseq:           () => require('./refseq'),
+  geo:              () => require('./geo'),
+  // ── Bioinformatics – protein & structure ─────────────────────────────────
+  uniprot:          () => require('./uniprot'),
+  pdb:              () => require('./pdb'),
+  interpro:         () => require('./interpro'),
+  brenda:           () => require('./brenda'),
+  hmdb:             () => require('./hmdb'),
+  'string-db':      () => require('./string-db'),
+  // ── Bioinformatics – genome browsers & annotation ────────────────────────
+  ensembl:          () => require('./ensembl'),
+  reactome:         () => require('./reactome'),
+  kegg:             () => require('./kegg'),
+  // ── Bioinformatics – nucleotide archives ─────────────────────────────────
+  'embl-ebi':       () => require('./embl-ebi'),
+  ddbj:             () => require('./ddbj'),
+  // ── Bioinformatics – model organism databases ─────────────────────────────
+  flybase:          () => require('./flybase'),
+  wormbase:         () => require('./wormbase'),
+  zfin:             () => require('./zfin'),
   // ── BioCyc – free databases ──────────────────────────────────────────────
   'biocyc-metacyc':     () => require('./biocyc-metacyc'),
   'biocyc-ecocyc':      () => require('./biocyc-ecocyc'),
