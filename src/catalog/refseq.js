@@ -43,6 +43,7 @@ module.exports = {
       columns: ['gene_id', 'symbol', 'description', 'tax_id', 'taxname', 'type', 'chromosomes', 'location', 'orientation', 'exon_count', 'omim_ids', 'swiss_prot_accessions', 'ensembl_gene_ids', 'refseq_accessions', 'genomic_ranges'],
       relations: [
         { entity: '/genome/accession', foreignKey: 'chromosomes', type: 'belongsTo', alias: 'genome' },
+        { entity: '/lookup/id', foreignKey: 'gene_id', type: 'hasOne', alias: 'ensemblGene', catalog: 'ensembl' },
       ],
     },
     {

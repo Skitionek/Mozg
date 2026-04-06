@@ -53,13 +53,18 @@ module.exports = {
       columns: ['id', 'display_name', 'species', 'object_type', 'biotype', 'description', 'start', 'end', 'strand', 'seq_region_name', 'assembly_name', 'Transcript'],
       relations: [
         { entity: '/xrefs/id', foreignKey: 'id', type: 'hasMany', alias: 'xrefs' },
+        { entity: '/uniprotkb/search', foreignKey: 'id', type: 'hasOne', alias: 'uniprotEntry', catalog: 'uniprot' },
+        { entity: '/data/query', foreignKey: 'id', type: 'hasMany', alias: 'reactomePathways', catalog: 'reactome' },
+        { entity: '/find/ko', foreignKey: 'id', type: 'hasMany', alias: 'keggOrthology', catalog: 'kegg' },
       ],
     },
     {
       // Fetch sequence by stable ID: /sequence/id/ENSG00000139618
       name: '/sequence/id',
       columns: ['id', 'seq', 'molecule', 'query', 'version', 'desc'],
-      relations: [],
+      relations: [
+        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'gene' },
+      ],
     },
     {
       // Cross-database references: /xrefs/id/ENSG00000139618
@@ -71,7 +76,9 @@ module.exports = {
       // Variant annotation: /variation/homo_sapiens/rs699
       name: '/variation/homo_sapiens',
       columns: ['name', 'mappings', 'ambiguity', 'var_class', 'synonyms', 'source', 'minor_allele', 'minor_allele_freq', 'minor_allele_count', 'clinical_significance'],
-      relations: [],
+      relations: [
+        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'gene' },
+      ],
     },
   ],
 };

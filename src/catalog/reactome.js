@@ -38,7 +38,9 @@ module.exports = {
     {
       name: '/data/diseases',
       columns: ['stableId', 'displayName', 'className', 'identifier', 'url', 'name'],
-      relations: [],
+      relations: [
+        { entity: '/data/pathways/top/Homo sapiens', foreignKey: 'dbId', type: 'hasMany', alias: 'pathways' },
+      ],
     },
     {
       // Use path segment for species: /data/pathways/top/Homo sapiens
@@ -46,6 +48,7 @@ module.exports = {
       columns: ['stableId', 'displayName', 'speciesName', 'isInferred', 'isInDisease', 'className', 'schemaClass'],
       relations: [
         { entity: '/data/pathway', foreignKey: 'stableId', type: 'hasMany', alias: 'containedEvents' },
+        { entity: '/list/pathway', foreignKey: 'stableId', type: 'hasOne', alias: 'keggPathway', catalog: 'kegg' },
       ],
     },
     {

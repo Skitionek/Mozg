@@ -70,7 +70,10 @@ module.exports = {
       // Orthologues: /gene/ZDB-GENE-000112-37/orthologs
       name: '/gene/orthologs',
       columns: ['zebrafishGeneId', 'zebrafishGeneSymbol', 'orthologGeneId', 'orthologSymbol', 'orthologOrg', 'supportedBy'],
-      relations: [],
+      relations: [
+        { entity: '/api/v1.0/chado/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'flybaseOrthologs', catalog: 'flybase' },
+        { entity: '/rest/widget/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'wormbaseOrthologs', catalog: 'wormbase' },
+      ],
     },
     {
       // Anatomy terms: /anatomy/ZDB-ANAT-010921-100

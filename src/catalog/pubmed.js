@@ -36,7 +36,9 @@ module.exports = {
       // Use where: { db: "pubmed", id: "<pmid>", retmode: "json" }
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
-      relations: [],
+      relations: [
+        { entity: '/uniprotkb/search', foreignKey: 'uid', type: 'hasMany', alias: 'relatedProteins', catalog: 'uniprot' },
+      ],
     },
     {
       // Use where: { dbfrom: "pubmed", db: "pmc", id: "<pmid>", retmode: "json" }

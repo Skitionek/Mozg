@@ -41,7 +41,9 @@ module.exports = {
       // Use where: { result: "sequence", query: "…", format: "json" }
       name: '/search',
       columns: ['accession', 'description', 'scientific_name', 'tax_id', 'sequence_length', 'base_count', 'study_accession', 'experiment_accession', 'run_accession', 'first_public', 'last_updated'],
-      relations: [],
+      relations: [
+        { entity: '/esearch.fcgi', foreignKey: 'accession', type: 'hasOne', alias: 'ncbiEntry', catalog: 'genbank' },
+      ],
     },
     {
       name: '/count',

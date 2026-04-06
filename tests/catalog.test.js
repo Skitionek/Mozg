@@ -148,4 +148,55 @@ describe('catalog', () => {
     assert.equal(entry.driver, 'neo4j');
     assert.ok(entry.connection.scheme, 'connection.scheme should be set');
   });
+
+  // Cross-catalog relation spot-checks
+  test('uniprot /uniprotkb/search has cross-catalog relation to pdb', () => {
+    const [entry] = getCatalog('uniprot');
+    const entity = entry.entities.find(e => e.name === '/uniprotkb/search');
+    const rel = entity.relations.find(r => r.catalog === 'pdb');
+    assert.ok(rel, 'uniprot /uniprotkb/search should have a cross-catalog relation to pdb');
+    assert.equal(rel.entity, '/entry');
+  });
+
+  test('ensembl /lookup/id has cross-catalog relations to uniprot and reactome', () => {
+    const [entry] = getCatalog('ensembl');
+    const entity = entry.entities.find(e => e.name === '/lookup/id');
+    const uniprotRel = entity.relations.find(r => r.catalog === 'uniprot');
+    const reactomeRel = entity.relations.find(r => r.catalog === 'reactome');
+    assert.ok(uniprotRel, 'ensembl /lookup/id should link to uniprot');
+    assert.ok(reactomeRel, 'ensembl /lookup/id should link to reactome');
+  });
+
+  test('flybase /api/v1.0/gene/orthologs has cross-catalog relations to wormbase and zfin', () => {
+    const [entry] = getCatalog('flybase');
+    const entity = entry.entities.find(e => e.name === '/api/v1.0/gene/orthologs');
+    const wbRel = entity.relations.find(r => r.catalog === 'wormbase');
+    const zfinRel = entity.relations.find(r => r.catalog === 'zfin');
+    assert.ok(wbRel, 'flybase orthologs should link to wormbase');
+    assert.ok(zfinRel, 'flybase orthologs should link to zfin');
+  });
+
+  test('kegg /list/enzyme has cross-catalog relation to uniprot', () => {
+    const [entry] = getCatalog('kegg');
+    const entity = entry.entities.find(e => e.name === '/list/enzyme');
+    const rel = entity.relations.find(r => r.catalog === 'uniprot');
+    assert.ok(rel, 'kegg /list/enzyme should cross-link to uniprot');
+  });
+
+  test('every cross-catalog relation references a valid catalog name', () => {
+    const allNames = new Set(listCatalog());
+    const entries = getCatalog();
+    for (const entry of entries) {
+      for (const entity of entry.entities) {
+        for (const rel of entity.relations) {
+          if (rel.catalog) {
+            assert.ok(
+              allNames.has(rel.catalog),
+              `${entry.name}/${entity.name}: cross-catalog relation references unknown catalog "${rel.catalog}"`,
+            );
+          }
+        }
+      }
+    }
+  });
 });

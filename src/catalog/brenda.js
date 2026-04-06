@@ -45,6 +45,8 @@ module.exports = {
       relations: [
         { entity: '/km_value', foreignKey: 'ecNumber', type: 'hasMany', alias: 'kmValues' },
         { entity: '/turnover_number', foreignKey: 'ecNumber', type: 'hasMany', alias: 'turnoverNumbers' },
+        { entity: '/temperature_optimum', foreignKey: 'ecNumber', type: 'hasMany', alias: 'temperatureOptima' },
+        { entity: '/list/enzyme', foreignKey: 'ecNumber', type: 'hasOne', alias: 'keggEnzyme', catalog: 'kegg' },
       ],
     },
     {

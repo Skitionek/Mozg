@@ -208,5 +208,95 @@
     "description": "Find all KEGG pathways associated with the human TP53 gene (hsa:7157) via the /link endpoint.",
     "category": "KEGG",
     "query": "{\n  query(input: {\n    connection: { driver: kegg, database: \"https://rest.kegg.jp\" }\n    from: \"/link/pathway\"\n    where: { _pathSuffix: \"hsa:7157\" }\n  }) { count data }\n}"
+  },
+  {
+    "name": "UniProt – search human insulin protein",
+    "description": "Search UniProtKB for the human insulin protein (INS_HUMAN). Returns accession, name, and organism.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://rest.uniprot.org\" }\n    from: \"/uniprotkb/search\"\n    where: { query: \"insulin AND organism_id:9606 AND reviewed:true\" }\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "PDB – list polymer entities for a structure entry",
+    "description": "Fetch polymer entities for PDB entry 1TUP (p53 DNA-binding domain). Each entity is a unique protein chain.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://data.rcsb.org/rest/v1/core\" }\n    from: \"/polymer_entity\"\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "InterPro – list Pfam protein families",
+    "description": "List Pfam protein family entries from InterPro. Covers conserved protein domains and families.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.ebi.ac.uk/interpro/api\" }\n    from: \"/entry/pfam\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "HMDB – search metabolites",
+    "description": "Search the Human Metabolome Database for metabolite entries. Returns metabolite IDs and names.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://hmdb.ca\" }\n    from: \"/metabolites.json\"\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "STRING-DB – protein interaction network for TP53",
+    "description": "Find interaction partners for human TP53 protein in STRING-DB using the network endpoint.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://string-db.org/api/json\" }\n    from: \"/get_string_ids\"\n    where: { identifiers: \"TP53\", species: \"9606\" }\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "Ensembl – list available species",
+    "description": "List all species available in Ensembl. Returns taxonomy IDs and common names for all supported organisms.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://rest.ensembl.org\" }\n    from: \"/info/species\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "Reactome – top-level human pathways",
+    "description": "Retrieve the top-level biological pathways for Homo sapiens from the Reactome database.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://reactome.org/ContentService\" }\n    from: \"/data/pathways/top/Homo sapiens\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "EMBL-EBI – search nucleotide sequences",
+    "description": "Search the ENA Portal API for nucleotide sequences in the INSDC archive. Returns accessions and metadata.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.ebi.ac.uk/ena/portal/api\" }\n    from: \"/search\"\n    where: { result: \"sequence\", query: \"tax_eq(9606)\" }\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "DDBJ – search nucleotide sequences",
+    "description": "Search the DDBJ sequence archive for nucleotide entries. Returns INSDC accession numbers and descriptions.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://ddbj.nig.ac.jp/search/api/v1\" }\n    from: \"/search/sequence\"\n    where: { query: \"organism:Homo sapiens\" }\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "FlyBase – search Drosophila genes",
+    "description": "Search the FlyBase Drosophila melanogaster gene database. Returns gene symbols, names, and IDs.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.flybase.org\" }\n    from: \"/api/v1.0/chado/gene\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "WormBase – C. elegans gene data",
+    "description": "Retrieve C. elegans gene information from WormBase REST API. Returns gene summaries and identifiers.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://wormbase.org\" }\n    from: \"/rest/widget/gene\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "ZFIN – zebrafish gene search",
+    "description": "Search the Zebrafish Information Network (ZFIN) for zebrafish gene markers. Returns ZFIN IDs and gene symbols.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://zfin.org/action/api\" }\n    from: \"/marker/search\"\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "PubMed – search biomedical literature",
+    "description": "Search PubMed for biomedical literature using E-utilities esearch. Returns PMIDs matching the query.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://eutils.ncbi.nlm.nih.gov/entrez/eutils\" }\n    from: \"/esearch.fcgi\"\n    where: { db: \"pubmed\", term: \"CRISPR gene editing\", retmode: \"json\" }\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "GenBank – search nucleotide sequences",
+    "description": "Search GenBank (NCBI nucleotide database) for DNA sequences using E-utilities. Returns accession IDs.",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://eutils.ncbi.nlm.nih.gov/entrez/eutils\" }\n    from: \"/esearch.fcgi\"\n    where: { db: \"nuccore\", term: \"insulin[Gene] AND Homo sapiens[Organism]\", retmode: \"json\" }\n    limit: 10\n  }) { count data }\n}"
+  },
+  {
+    "name": "BRENDA – enzyme kinetics data",
+    "description": "Query the BRENDA enzyme database for enzyme kinetics data. Requires BRENDA credentials (email + password).",
+    "category": "Bioinformatics",
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.brenda-enzymes.org/rest\" }\n    from: \"/enzyme\"\n    limit: 5\n  }) { count data }\n}"
   }
 ]
