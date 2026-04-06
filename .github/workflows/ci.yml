@@ -35,3 +35,12 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Test with coverage (Node 22+)
+        if: ${{ matrix.node-version == '22' }}
+        run: |
+          node --experimental-test-coverage \
+               --test-coverage-lines=80 \
+               --test-coverage-branches=90 \
+               --test-coverage-functions=70 \
+               --test tests/*.test.js
