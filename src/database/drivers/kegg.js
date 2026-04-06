@@ -33,7 +33,8 @@
  * provided so callers still get expected behaviour.
  */
 
-// ── Parsers ─────────────────────────────────────────────────────────────────
+// Separator used when appending continuation lines to the current field value
+const CONTINUATION_SEP = '; ';
 
 /**
  * Parse a tab-delimited KEGG response into an array of row objects.
