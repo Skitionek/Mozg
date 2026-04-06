@@ -20,6 +20,27 @@ const REGISTRY = {
   // ── REST – science & space ───────────────────────────────────────────────
   nasa:             () => require('./nasa'),
   spacex:           () => require('./spacex'),
+  // ── BioCyc – free databases ──────────────────────────────────────────────
+  'biocyc-metacyc':     () => require('./biocyc-metacyc'),
+  'biocyc-ecocyc':      () => require('./biocyc-ecocyc'),
+  // ── BioCyc – Tier 1 (extensively curated) ────────────────────────────────
+  'biocyc-humancyc':    () => require('./biocyc-humancyc'),
+  'biocyc-yeastcyc':    () => require('./biocyc-yeastcyc'),
+  'biocyc-aracyc':      () => require('./biocyc-aracyc'),
+  'biocyc-leishcyc':    () => require('./biocyc-leishcyc'),
+  'biocyc-trypanocyc':  () => require('./biocyc-trypanocyc'),
+  // ── BioCyc – Tier 2 (computationally predicted + manual curation) ────────
+  'biocyc-bsubcyc':     () => require('./biocyc-bsubcyc'),
+  'biocyc-mtbcyc':      () => require('./biocyc-mtbcyc'),
+  'biocyc-pseudocyc':   () => require('./biocyc-pseudocyc'),
+  'biocyc-vibriocyc':   () => require('./biocyc-vibriocyc'),
+  'biocyc-salentcyc':   () => require('./biocyc-salentcyc'),
+  'biocyc-listcyc':     () => require('./biocyc-listcyc'),
+  'biocyc-caulocyc':    () => require('./biocyc-caulocyc'),
+  'biocyc-celeganscyc': () => require('./biocyc-celeganscyc'),
+  'biocyc-drosocyc':    () => require('./biocyc-drosocyc'),
+  'biocyc-borrcyc':     () => require('./biocyc-borrcyc'),
+  'biocyc-campycyc':    () => require('./biocyc-campycyc'),
   // ── REST – commerce & finance ────────────────────────────────────────────
   coingecko:        () => require('./coingecko'),
   fakestore:        () => require('./fakestore'),
