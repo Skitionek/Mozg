@@ -63,18 +63,18 @@ Modern data ecosystems fragment knowledge across relational databases,
 graph stores, document databases, REST services, and domain-specific
 repositories.  Integrating these silos typically requires either a costly
 centralised data warehouse or bespoke per-integration middleware.
-We present \textbf{Mozg} (Polish: \emph{brain}), an open-source
+This paper presents \textbf{Mozg} (Polish: \emph{brain}), an open-source
 federated query layer that exposes a single GraphQL endpoint capable
 of routing queries to any supported backend at runtime, traversing
 user-defined cross-source relationships, and synthesising results
 without ever storing the underlying data.  Mozg deliberately trades
 query latency for data freshness, flexibility, and minimal operational
-overhead---a philosophy we call \emph{``slow by design''}.
-We describe the architecture, driver model, ontology-ingestion pipeline,
-and the browser-based visual query builder.  We evaluate the system
-against representative public databases and REST APIs, discuss
-scalability and security considerations, and position Mozg relative
-to related federated-query systems.
+overhead---a philosophy called \emph{``slow by design''}.
+The architecture, driver model, ontology-ingestion pipeline,
+and browser-based visual query builder are described.  The system is
+evaluated against representative public databases and REST APIs;
+scalability and security considerations are discussed; and Mozg is
+positioned relative to related federated-query systems.
 \end{abstract}
 
 \keywords{federated queries, GraphQL, heterogeneous data integration,
@@ -163,6 +163,17 @@ calls.  Mozg uses GraphQL Mesh handlers for most relational and API
 backends while retaining custom drivers for specialised sources
 (ArangoDB, BioCyc) and providing its own relation-traversal layer on
 top.
+
+Hasura~\cite{hasura} generates a GraphQL API automatically from
+PostgreSQL, MySQL, and a growing set of other relational sources and
+federates them via \emph{Remote Schemas}.  Prisma~\cite{prisma} is an
+ORM and data-access layer that offers GraphQL-compatible typed queries
+over SQL and MongoDB backends.  Dgraph~\cite{dgraph} is a natively
+graph-oriented database that exposes a GraphQL interface.  All three
+systems require the user to operate or connect to specific supported
+backends; none supports the same breadth of heterogeneous
+sources---including domain-specific APIs such as BioCyc, KEGG, or
+OWL-described databases---that Mozg targets.
 
 \subsection{Data Virtualisation}
 
@@ -259,7 +270,10 @@ When a client issues a \texttt{query} request, the server:
 \end{enumerate}
 
 This is a straightforward nested-loop join executed in application
-code.  The design deliberately avoids query pushdown and cross-source
+code.  Semantically, relation resolution is a \emph{left outer join}:
+the primary result set is always returned in full; each relation field
+is populated with a (possibly empty) array of matched sub-records.
+The design deliberately avoids query pushdown and cross-source
 optimisation; it is simple to implement, easy to debug, and
 independent of any particular source's query planner.  Relation
 definitions can be nested to arbitrary depth, enabling multi-hop
@@ -275,7 +289,10 @@ maintains an in-memory connection cache keyed on host and username
 to avoid re-establishing connections within a session, but it does
 not persist credentials to disk or a secrets store.  This design
 simplifies the threat model: the server is not a credential vault and
-does not require secret-management infrastructure.
+does not require secret-management infrastructure.  \textbf{Deployments
+must enforce HTTPS} to prevent credential interception in transit;
+running Mozg over plain HTTP should be restricted to loopback or
+private-network contexts only.
 
 % ===============================================================
 \section{Driver Model}
@@ -498,7 +515,7 @@ entries spanning several categories:
         (Drosophila), WormBase (C.~elegans), ZFIN (zebrafish);
   \item \textbf{BioCyc metabolic pathway databases (18 organisms)}:
         MetaCyc, EcoCyc, HumanCyc, YeastCyc, AraCyc, LeishCyc,
-        TrypanocyC, plus eleven Tier~2 databases covering
+        TrypanoCyc, plus eleven Tier~2 databases covering
         \textit{B.~subtilis}, \textit{M.~tuberculosis},
         \textit{P.~aeruginosa}, \textit{V.~cholerae},
         \textit{S.~enterica}, \textit{L.~monocytogenes},
@@ -520,8 +537,8 @@ lazily via CommonJS \texttt{require()} to keep startup time low.
 
 \subsection{Functional Evaluation}
 
-We exercised Mozg against the eight public data sources listed in
-Table~\ref{tab:sources}.  For each source we verified:
+Mozg was exercised against the eight public data sources listed in
+Table~\ref{tab:sources}.  For each source, the following properties were verified:
 (a)~schema introspection returns correct metadata,
 (b)~a simple entity query returns expected rows,
 (c)~at least one relation traversal produces a valid joined result.
@@ -553,14 +570,15 @@ Chinook & sqlite3 & (local file) & Music store \\
 
 \subsection{Ontology Evaluation}
 
-We ingested three ontologies of increasing complexity:
+Three ontologies of increasing complexity were ingested:
 (1) the project's own \texttt{blog.ttl} (11 triples, 3 classes);
 (2) the Friend of a Friend (FOAF) ontology~\cite{foaf}
 (Turtle, $\sim$400 triples, 14 classes);
 (3) a fragment of the Gene Ontology~\cite{go}
-(OWL/XML, $\sim$50\,000 terms).
+(OWL/XML, $\sim$50\,000 triples).
 
-Parse times on a laptop with an Intel Core i7 were
+Parse times on a mid-range laptop (Intel Core i7-8750H, 2.2\,GHz base,
+16\,GB RAM) were
 $<$1\,ms, 12\,ms, and 3.1\,s respectively.  The SHA-256 cache
 reduces repeat parse overhead to $<$0.1\,ms in all cases.  The
 generated GraphQL SDL was syntactically valid in all three cases
@@ -692,7 +710,7 @@ sequentially.
 \label{sec:conclusion}
 % ===============================================================
 
-We presented Mozg, a ``slow by design'' federated query layer that
+This paper presented Mozg, a ``slow by design'' federated query layer that
 provides a single GraphQL interface over heterogeneous data sources.
 Mozg's key contributions are:
 \begin{enumerate}
