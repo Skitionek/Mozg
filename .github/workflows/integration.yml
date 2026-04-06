@@ -1,0 +1,73 @@
+name: Integration Tests (Weekly)
+
+# Runs weekly to validate that the 63 public catalog endpoints are still
+# reachable and returning expected response shapes.  Results are uploaded
+# as an artifact so catalog staleness can be tracked over time.
+#
+# Also runs on manual trigger so maintainers can run it on demand.
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  catalog-health:
+    name: Catalog endpoint health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run catalog smoke tests
+        # Each catalog entry is probed with a single-entity introspect-or-list call.
+        # Failures are recorded but do not fail the job; a summary is uploaded.
+        run: node scripts/catalog-health.js --output catalog-health.json
+        continue-on-error: true
+
+      - name: Upload health report
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-health-${{ github.run_id }}
+          path: catalog-health.json
+          retention-days: 90
+          if-no-files-found: warn
+
+  bench:
+    name: Latency benchmarks (local SQLite)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed sample database
+        run: node examples/seed.js
+
+      - name: Run latency benchmarks
+        run: node --test tests/bench.test.js
