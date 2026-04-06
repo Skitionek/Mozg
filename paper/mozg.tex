@@ -230,11 +230,11 @@ supplied \texttt{ConnectionInput} via the driver registry and
 delegates execution.
 
 \paragraph{Driver Registry (\texttt{src/database/registry.js}).}
-The single source of truth for driver bindings.  It maps the twelve
+The single source of truth for driver bindings.  It maps the thirteen
 driver names (\texttt{postgres}, \texttt{mysql}, \texttt{sqlite3},
 \texttt{neo4j}, \texttt{arango}, \texttt{biocyc}, \texttt{rest},
-\texttt{openapi}, \texttt{soap}, \texttt{odata}, \texttt{thrift},
-\texttt{mongodb}) to their implementing modules.
+\texttt{kegg}, \texttt{openapi}, \texttt{soap}, \texttt{odata},
+\texttt{thrift}, \texttt{mongodb}) to their implementing modules.
 
 \paragraph{Driver Implementations (\texttt{src/database/drivers/}).}
 Each driver exposes a uniform interface: \texttt{executeQuery(input)}
@@ -337,6 +337,34 @@ of metabolic pathway databases via the BioCyc Web Services API.
 It supports pathway, reaction, compound, and organism queries.  Because
 the BioCyc API does not expose a machine-readable schema, the driver
 relies on hard-coded response field mappings.
+
+\subsection{KEGG Driver}
+
+KEGG~\cite{kegg} (Kyoto Encyclopedia of Genes and Genomes) exposes its
+REST API (\texttt{rest.kegg.jp}) as \texttt{text/plain} responses rather
+than JSON.  The dedicated \texttt{kegg} driver transparently converts
+these responses before they reach the query layer:
+
+\begin{itemize}
+  \item \textbf{Tab-delimited format} (used by \texttt{/list},
+        \texttt{/find}, and \texttt{/link}) is parsed into row objects
+        with fields \texttt{entry\_id}/\texttt{name} or
+        \texttt{source\_id}/\texttt{target\_id} depending on the
+        endpoint family.
+  \item \textbf{KEGG flat-file format} (used by \texttt{/get}) is parsed
+        into a single record object whose keys correspond to KEGG
+        field names (e.g.\ \texttt{entry}, \texttt{formula},
+        \texttt{pathway}) with repeated fields accumulated into arrays.
+\end{itemize}
+
+Because KEGG encodes query terms as URL \emph{path} segments rather
+than query-string parameters (e.g.\ \texttt{/find/compound/glucose}),
+the driver introduces a special \texttt{where.\_pathSuffix} convention:
+any value supplied under that key is appended to the entity path
+before the HTTP request is issued.  This allows callers to use
+\texttt{/find/compound} as the entity name and pass
+\texttt{where: \{\ \_pathSuffix: "glucose"\ \}} without hard-coding
+the search term in the catalog.
 
 % ===============================================================
 \section{OWL Ontology Pipeline}
@@ -443,7 +471,7 @@ datasets without any prior configuration.
 \label{sec:catalog}
 % ===============================================================
 
-Mozg ships a curated catalog of 26 pre-configured database and API
+Mozg ships a curated catalog of 63 pre-configured database and API
 entries spanning several categories:
 
 \begin{itemize}
@@ -456,6 +484,27 @@ entries spanning several categories:
         Open-Meteo, RestCountries, CoinGecko, MusicBrainz,
         OpenFoodFacts, Open Library, Art Institute of Chicago,
         Dog CEO, Fake Store, Open Brewery DB, Open Trivia, JSONPlaceholder;
+  \item \textbf{Bioinformatics (NCBI family)}: NCBI E-utilities,
+        GenBank, PubMed, RefSeq (NCBI Datasets v2), GEO;
+  \item \textbf{Bioinformatics (protein \& structure)}: UniProt,
+        PDB (Protein Data Bank), InterPro, BRENDA, HMDB,
+        STRING protein interactions;
+  \item \textbf{Bioinformatics (genome browsers \& pathways)}:
+        Ensembl, Reactome, KEGG (via the dedicated \texttt{kegg} driver
+        that converts KEGG's \texttt{text/plain} responses to JSON);
+  \item \textbf{Bioinformatics (nucleotide archives)}: EMBL-EBI/ENA,
+        DDBJ;
+  \item \textbf{Bioinformatics (model organism databases)}: FlyBase
+        (Drosophila), WormBase (C.~elegans), ZFIN (zebrafish);
+  \item \textbf{BioCyc metabolic pathway databases (18 organisms)}:
+        MetaCyc, EcoCyc, HumanCyc, YeastCyc, AraCyc, LeishCyc,
+        TrypanocyC, plus eleven Tier~2 databases covering
+        \textit{B.~subtilis}, \textit{M.~tuberculosis},
+        \textit{P.~aeruginosa}, \textit{V.~cholerae},
+        \textit{S.~enterica}, \textit{L.~monocytogenes},
+        \textit{C.~crescentus}, \textit{C.~elegans},
+        \textit{D.~melanogaster}, \textit{B.~burgdorferi}, and
+        \textit{C.~jejuni}.
 \end{itemize}
 
 Each catalog entry defines the connection parameters, a list of known
@@ -647,17 +696,20 @@ We presented Mozg, a ``slow by design'' federated query layer that
 provides a single GraphQL interface over heterogeneous data sources.
 Mozg's key contributions are:
 \begin{enumerate}
-  \item A \emph{driver model} that abstracts twelve source types
+  \item A \emph{driver model} that abstracts thirteen source types
         behind a uniform \texttt{executeQuery}/\texttt{introspect}
-        interface;
+        interface, including a dedicated KEGG driver that converts
+        \texttt{text/plain} responses to JSON;
   \item A \emph{relation-traversal engine} that joins entities across
         source boundaries at query time;
   \item An \emph{OWL ontology pipeline} that converts OWL TBox
         definitions into executable GraphQL schemas;
   \item A \emph{browser-based visual query builder} that democratises
         cross-database exploration for non-programmers;
-  \item A \emph{curated catalog} of 26 publicly accessible data
-        sources ready for immediate use.
+  \item A \emph{curated catalog} of 63 publicly accessible data
+        sources — including 19 major bioinformatics repositories
+        and 18 BioCyc metabolic pathway databases — ready for
+        immediate use.
 \end{enumerate}
 
 Mozg is designed for scenarios where data freshness, source
