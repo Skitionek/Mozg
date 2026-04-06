@@ -112,6 +112,18 @@ is a GraphQL endpoint; users supply their own database credentials
 as part of each query, keeping the server stateless with respect to
 authorisation.
 
+This non-aggregating design has two important practical consequences
+that are absent from most existing solutions.  First, it substantially
+lowers the barrier to collaborative development: multiple teams can
+share a single Mozg endpoint configuration that spans \emph{their own,
+separately-held} databases without granting one another direct access
+to any underlying store.  Second, and critically for scientific and
+open-data ecosystems, it respects the \emph{read-only access policies}
+of many public databases.  Copying and redistributing data from sources
+licensed for read-only or non-commercial access---as a conventional
+data warehouse would---may violate those terms; Mozg avoids this
+entirely because data never leaves its origin server.
+
 The name alludes to the system's role as a \emph{cognitive layer}: like
 a brain, Mozg does not store memories---it connects them.  The
 ``slow by design'' label is not an apology but a deliberate design
@@ -168,12 +180,28 @@ Hasura~\cite{hasura} generates a GraphQL API automatically from
 PostgreSQL, MySQL, and a growing set of other relational sources and
 federates them via \emph{Remote Schemas}.  Prisma~\cite{prisma} is an
 ORM and data-access layer that offers GraphQL-compatible typed queries
-over SQL and MongoDB backends.  Dgraph~\cite{dgraph} is a natively
-graph-oriented database that exposes a GraphQL interface.  All three
-systems require the user to operate or connect to specific supported
-backends; none supports the same breadth of heterogeneous
-sources---including domain-specific APIs such as BioCyc, KEGG, or
-OWL-described databases---that Mozg targets.
+over SQL and MongoDB backends.  PostGraphile~\cite{postgraphile} generates
+a full GraphQL schema by introspecting a single PostgreSQL database.
+Dgraph~\cite{dgraph} is a natively graph-oriented database that exposes
+a GraphQL interface.
+
+A crucial distinction separates all of these systems from Mozg:
+\textbf{each of them targets a single database (or a homogeneous cluster
+of the same database technology) as its primary backend}.  They are
+GraphQL \emph{wrappers} around one data store, not abstraction layers
+over many independently-operated, heterogeneous sources.  Hasura's
+Remote Schemas feature and Prisma's multi-provider support edge towards
+federation, but both still require the operator to own and configure
+every connected backend.  Mozg, by contrast, queries sources that the
+server operator does not own or control---public REST APIs, third-party
+relational databases, domain-specific repositories---using credentials
+supplied at query time by the client.  This architecture is
+fundamentally different: \textbf{Mozg never aggregates data into a
+central store}.  As a result, it is the only system in this class that
+enables collaborative cross-organisation queries without requiring any
+party to share database access credentials, replicate data, or risk
+violating the read-only or non-commercial redistribution terms attached
+to many public scientific databases.
 
 \subsection{Data Virtualisation}
 
@@ -634,7 +662,19 @@ for:
         no schema registry;
   \item \textbf{Minimal server state}: the server holds no persistent
         data beyond an in-memory connection cache and ontology cache,
-        simplifying deployment.
+        simplifying deployment;
+  \item \textbf{License compliance}: because data never leaves its
+        origin server, queries against databases governed by read-only
+        or non-commercial redistribution terms are handled without
+        violating those terms---a property that centralised
+        data-warehouse approaches cannot offer;
+  \item \textbf{Collaborative access without data sharing}: multiple
+        organisations or research groups can expose their own databases
+        through a shared Mozg configuration.  Cross-institutional
+        queries become possible without any party surrendering direct
+        database credentials or agreeing to data-transfer agreements,
+        because each source answers only queries presented with the
+        credentials its owner chooses to share.
 \end{itemize}
 These properties are valuable for exploratory analytics, scientific
 workloads, and multi-tenant exploration tools where data ownership
