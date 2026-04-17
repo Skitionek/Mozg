@@ -2,18 +2,14 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-
-let Kind, resolvers;
-try {
-  ({ Kind } = require('graphql'));
-  ({ resolvers } = require('../src/schema'));
-} catch { /* graphql not installed — tests will be skipped */ }
-const SKIP = !Kind ? 'graphql not installed' : false;
+const { Kind } = require('graphql');
 
 // Access the private parseLiteralJSON via the exported resolver map
-const parseLiteral = resolvers && resolvers.JSON && resolvers.JSON.parseLiteral;
+const { resolvers } = require('../src/schema');
 
-describe('parseLiteralJSON', { skip: SKIP }, () => {
+const parseLiteral = resolvers.JSON.parseLiteral;
+
+describe('parseLiteralJSON', () => {
   test('parses STRING', () => {
     assert.equal(parseLiteral({ kind: Kind.STRING, value: 'hello' }), 'hello');
   });

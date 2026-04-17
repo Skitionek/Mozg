@@ -21,14 +21,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-let sqlite3Driver;
-try {
-  sqlite3Driver = require('../src/database/drivers/sqlite3');
-} catch {
-  // knex is an optional dependency; skip all bench tests when it is absent
-}
-const { executeQuery, destroyAll } = sqlite3Driver || {};
-const SKIP = !sqlite3Driver ? 'knex not installed — sqlite3 driver unavailable' : false;
+const { executeQuery, destroyAll } = require('../src/database/drivers/sqlite3');
 
 const DB = path.join(__dirname, '..', 'examples', 'sample.db');
 
@@ -76,7 +69,7 @@ function ensureSampleDb() {
 
 // ── test suite ─────────────────────────────────────────────────────────────
 
-describe('latency benchmarks (local SQLite – no network)', { skip: SKIP }, () => {
+describe('latency benchmarks (local SQLite – no network)', () => {
   const N = 100; // sample size — sufficient for stable median/IQR/p99
 
   before(() => {

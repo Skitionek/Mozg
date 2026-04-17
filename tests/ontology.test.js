@@ -2,14 +2,9 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-
-let parseTurtle, extractOntology, parseOntology;
-try {
-  ({ parseTurtle } = require('../src/ontology/formats/turtle'));
-  ({ extractOntology } = require('../src/ontology/extractor'));
-  ({ parseOntology } = require('../src/ontology/index'));
-} catch { /* n3 not installed — tests will be skipped */ }
-const SKIP = !parseTurtle ? 'n3 not installed — ontology parser unavailable' : false;
+const { parseTurtle } = require('../src/ontology/formats/turtle');
+const { extractOntology } = require('../src/ontology/extractor');
+const { parseOntology } = require('../src/ontology/index');
 
 const BLOG_TURTLE = `
 @prefix : <http://mozg.example.org/blog#> .
@@ -44,14 +39,14 @@ const BLOG_TURTLE = `
 ] .
 `;
 
-describe('Turtle parser', { skip: SKIP }, () => {
+describe('Turtle parser', () => {
   test('parses triples from Turtle content', async () => {
     const quads = await parseTurtle(BLOG_TURTLE);
     assert.ok(quads.length > 0, 'should produce at least one quad');
   });
 });
 
-describe('OWL extractor', { skip: SKIP }, () => {
+describe('OWL extractor', () => {
   test('extracts classes from Turtle quads', async () => {
     const quads = await parseTurtle(BLOG_TURTLE);
     const result = extractOntology(quads);
@@ -105,7 +100,7 @@ describe('OWL extractor', { skip: SKIP }, () => {
   });
 });
 
-describe('parseOntology (integration)', { skip: SKIP }, () => {
+describe('parseOntology (integration)', () => {
   test('auto-detects Turtle format from content', async () => {
     const result = await parseOntology({ content: BLOG_TURTLE });
     assert.ok(result.classes.length >= 3);
