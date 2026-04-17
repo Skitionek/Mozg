@@ -161,7 +161,7 @@ async function introspect(connection) {
       ? indices.map(idx => ({ name: idx.index || idx['index'], columns: [] }))
       : [];
     return { tables };
-  } catch (_err) {
+  } catch {
     return { tables: [] };
   }
 }
