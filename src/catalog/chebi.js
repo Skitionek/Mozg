@@ -21,7 +21,7 @@
  * Relationship map:
  *  - /terms  →  /terms/{id}  (iri → iri, belongsTo full record)
  *  - /terms  →  /uniprotkb/search  (label → query, hasMany proteins, catalog: uniprot)
- *  - /terms  →  /list/compound  (label → _pathSuffix, hasMany KEGG compounds, catalog: kegg)
+ *  - /terms  →  /find/compound  (label → _pathSuffix keyword search, hasMany KEGG compounds, catalog: kegg)
  */
 module.exports = {
   name: 'chebi',
