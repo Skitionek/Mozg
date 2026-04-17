@@ -1,11 +1,12 @@
 'use strict';
 
-const mesh    = require('./drivers/mesh-adapter');
-const sqlite3 = require('./drivers/sqlite3');
-const arango  = require('./drivers/arango');
-const biocyc  = require('./drivers/biocyc');
-const rest    = require('./drivers/rest');
-const kegg    = require('./drivers/kegg');
+const mesh          = require('./drivers/mesh-adapter');
+const sqlite3       = require('./drivers/sqlite3');
+const arango        = require('./drivers/arango');
+const biocyc        = require('./drivers/biocyc');
+const rest          = require('./drivers/rest');
+const kegg          = require('./drivers/kegg');
+const elasticsearch = require('./drivers/elasticsearch');
 
 /**
  * Resolve a driver module by its name.
@@ -57,6 +58,10 @@ function getDriver(driverName) {
     // KEGG (rest.kegg.jp) – text/plain adapter with TSV + flat-file parsing
     case 'kegg':
       return kegg;
+
+    // Elasticsearch – REST adapter supporting GET and POST /_search queries
+    case 'elasticsearch':
+      return elasticsearch;
 
     default:
       throw new Error(`Unknown driver: ${driverName}`);
