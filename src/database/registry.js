@@ -1,16 +1,12 @@
 'use strict';
 
-const mesh          = require('./drivers/mesh-adapter');
-const sqlite3       = require('./drivers/sqlite3');
-const arango        = require('./drivers/arango');
-const biocyc        = require('./drivers/biocyc');
-const rest          = require('./drivers/rest');
-const kegg          = require('./drivers/kegg');
-const elasticsearch = require('./drivers/elasticsearch');
-
 /**
  * Resolve a driver module by its name.
  * Centralised here so connector.js and introspect.js stay in sync.
+ *
+ * Drivers are loaded lazily (inside the switch) so that heavy optional
+ * dependencies (graphql-mesh, knex, …) only fail at the point a query
+ * actually uses them — not at server startup or test-file load time.
  *
  * SQL databases (postgres, mysql), Neo4j, and all new source types are
  * accessed through graphql-mesh handlers in mesh-adapter.js.
@@ -36,32 +32,32 @@ function getDriver(driverName) {
     case 'odata':
     case 'thrift':
     case 'mongodb':
-      return mesh;
+      return require('./drivers/mesh-adapter');
 
     // ── SQLite3 (legacy knex driver – tuql has critical vulnerability) ─────
     case 'sqlite3':
-      return sqlite3;
+      return require('./drivers/sqlite3');
 
     // ── Legacy custom drivers ──────────────────────────────────────────────
     // ArangoDB: no graphql-mesh handler available
     case 'arango':
-      return arango;
+      return require('./drivers/arango');
 
     // BioCyc: no graphql-mesh handler available
     case 'biocyc':
-      return biocyc;
+      return require('./drivers/biocyc');
 
     // Plain REST without an OpenAPI spec (use `openapi` for spec-backed REST)
     case 'rest':
-      return rest;
+      return require('./drivers/rest');
 
     // KEGG (rest.kegg.jp) – text/plain adapter with TSV + flat-file parsing
     case 'kegg':
-      return kegg;
+      return require('./drivers/kegg');
 
     // Elasticsearch – REST adapter supporting GET and POST /_search queries
     case 'elasticsearch':
-      return elasticsearch;
+      return require('./drivers/elasticsearch');
 
     default:
       throw new Error(`Unknown driver: ${driverName}`);

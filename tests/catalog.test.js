@@ -199,4 +199,65 @@ describe('catalog', () => {
       }
     }
   });
+
+  // ── New lifelike-integration entries ───────────────────────────────────
+
+  test('chebi has rest driver and OLS4 connection', () => {
+    const [entry] = getCatalog('chebi');
+    assert.equal(entry.driver, 'rest');
+    assert.ok(entry.connection.database.includes('ols4'), 'connection.database should reference ols4');
+    const terms = entry.entities.find(e => e.name === '/terms');
+    assert.ok(terms, '/terms entity should exist');
+    assert.ok(terms.columns.includes('iri'), '/terms should have iri column');
+  });
+
+  test('geneontology has rest driver and GOC API connection', () => {
+    const [entry] = getCatalog('geneontology');
+    assert.equal(entry.driver, 'rest');
+    assert.ok(entry.connection.database.includes('geneontology.org'), 'connection.database should point to geneontology.org');
+    const term = entry.entities.find(e => e.name === '/ontology/term');
+    assert.ok(term, '/ontology/term entity should exist');
+    assert.ok(term.columns.includes('id'), '/ontology/term should have id column');
+  });
+
+  test('mesh has rest driver and NLM connection', () => {
+    const [entry] = getCatalog('mesh');
+    assert.equal(entry.driver, 'rest');
+    assert.ok(entry.connection.database.includes('nlm.nih.gov'), 'connection.database should point to nlm.nih.gov');
+    const descriptor = entry.entities.find(e => e.name === '/lookup/descriptor');
+    assert.ok(descriptor, '/lookup/descriptor entity should exist');
+    assert.ok(descriptor.columns.includes('ui'), '/lookup/descriptor should have ui column');
+  });
+
+  test('regulondb has rest driver and CCUS connection', () => {
+    const [entry] = getCatalog('regulondb');
+    assert.equal(entry.driver, 'rest');
+    assert.ok(entry.connection.database.includes('regulondb'), 'connection.database should point to regulondb');
+    const genes = entry.entities.find(e => e.name === '/genes');
+    assert.ok(genes, '/genes entity should exist');
+    assert.ok(genes.columns.includes('gene_id'), '/genes should have gene_id column');
+  });
+
+  test('lifelike has neo4j driver with cross-catalog relations to chebi and geneontology', () => {
+    const [entry] = getCatalog('lifelike');
+    assert.equal(entry.driver, 'neo4j');
+    assert.ok(entry.connection.host, 'connection.host should be set');
+    const chemical = entry.entities.find(e => e.name === 'Chemical');
+    assert.ok(chemical, 'Chemical entity should exist');
+    const chebiRel = chemical.relations.find(r => r.catalog === 'chebi');
+    assert.ok(chebiRel, 'Chemical should have a cross-catalog relation to chebi');
+    const gene = entry.entities.find(e => e.name === 'Gene');
+    assert.ok(gene, 'Gene entity should exist');
+    const ncbiRel = gene.relations.find(r => r.catalog === 'ncbi');
+    assert.ok(ncbiRel, 'Gene should have a cross-catalog relation to ncbi');
+  });
+
+  test('lifelike-elasticsearch has elasticsearch driver', () => {
+    const [entry] = getCatalog('lifelike-elasticsearch');
+    assert.equal(entry.driver, 'elasticsearch');
+    assert.ok(entry.connection.database, 'connection.database should be set');
+    const index = entry.entities.find(e => e.name === 'lifelike');
+    assert.ok(index, 'lifelike index entity should exist');
+    assert.ok(index.columns.includes('_id'), 'lifelike index should have _id column');
+  });
 });
