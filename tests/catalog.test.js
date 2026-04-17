@@ -237,27 +237,4 @@ describe('catalog', () => {
     assert.ok(genes, '/genes entity should exist');
     assert.ok(genes.columns.includes('gene_id'), '/genes should have gene_id column');
   });
-
-  test('lifelike has neo4j driver with cross-catalog relations to chebi and geneontology', () => {
-    const [entry] = getCatalog('lifelike');
-    assert.equal(entry.driver, 'neo4j');
-    assert.ok(entry.connection.host, 'connection.host should be set');
-    const chemical = entry.entities.find(e => e.name === 'Chemical');
-    assert.ok(chemical, 'Chemical entity should exist');
-    const chebiRel = chemical.relations.find(r => r.catalog === 'chebi');
-    assert.ok(chebiRel, 'Chemical should have a cross-catalog relation to chebi');
-    const gene = entry.entities.find(e => e.name === 'Gene');
-    assert.ok(gene, 'Gene entity should exist');
-    const ncbiRel = gene.relations.find(r => r.catalog === 'ncbi');
-    assert.ok(ncbiRel, 'Gene should have a cross-catalog relation to ncbi');
-  });
-
-  test('lifelike-elasticsearch has elasticsearch driver', () => {
-    const [entry] = getCatalog('lifelike-elasticsearch');
-    assert.equal(entry.driver, 'elasticsearch');
-    assert.ok(entry.connection.database, 'connection.database should be set');
-    const index = entry.entities.find(e => e.name === 'lifelike');
-    assert.ok(index, 'lifelike index entity should exist');
-    assert.ok(index.columns.includes('_id'), 'lifelike index should have _id column');
-  });
 });

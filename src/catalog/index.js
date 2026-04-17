@@ -65,13 +65,10 @@ const REGISTRY = {
   'biocyc-drosocyc':    () => require('./biocyc-drosocyc'),
   'biocyc-borrcyc':     () => require('./biocyc-borrcyc'),
   'biocyc-campycyc':    () => require('./biocyc-campycyc'),
-  // ── Lifelike knowledge graph (Neo4j + Elasticsearch) ─────────────────────
-  lifelike:             () => require('./lifelike'),
-  'lifelike-elasticsearch': () => require('./lifelike-elasticsearch'),
-  // ── Lifelike data sources – chemical ontologies ──────────────────────────
+  // ── Bioinformatics – chemical ontologies ─────────────────────────────────
   chebi:                () => require('./chebi'),
   geneontology:         () => require('./geneontology'),
-  // ── Lifelike data sources – biomedical vocabularies ──────────────────────
+  // ── Bioinformatics – biomedical vocabularies ──────────────────────────────
   mesh:                 () => require('./mesh'),
   regulondb:            () => require('./regulondb'),
   // ── REST – commerce & finance ────────────────────────────────────────────
