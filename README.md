@@ -1,5 +1,7 @@
 # Mozg
 
+> ⚠️ **Work in Progress** — This project is experimental and under active development. APIs, schema, and behaviour may change without notice. Not recommended for production use.
+
 > A **"slow by design"** cross-database query layer with a single GraphQL endpoint.
 
 **Mozg** (Polish for "brain") is an experiment in thinking differently about data: instead of centralizing knowledge, it teaches systems how to connect it.

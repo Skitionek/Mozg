@@ -30,6 +30,17 @@
       flex-direction: column;
     }
 
+    /* ── WIP Banner ──────────────────────────────────────────── */
+    .wip-banner {
+      background: #7c3a00;
+      color: #ffe4b2;
+      font-size: .8rem;
+      text-align: center;
+      padding: .35rem 1rem;
+      flex-shrink: 0;
+    }
+    .wip-banner a { color: #ffc97a; }
+
     /* ── Header ─────────────────────────────────────────────── */
     header {
       background: var(--surface);
@@ -494,6 +505,8 @@
   to execute queries, or copy the generated GraphQL and paste it into your local instance.
 </div>
 
+<div class="wip-banner">⚠️ <strong>Work in Progress</strong> — This project is experimental. APIs and behaviour may change without notice.</div>
+
 <header>
   <h1><span>Mozg</span> – Cross-Database Query Interface</h1>
   <nav>
@@ -710,6 +723,7 @@
             <div class="wlogo">🧠</div>
             <h2>Welcome to <span>Mozg</span></h2>
             <p class="tagline">A federated GraphQL query layer — one endpoint for every data source</p>
+            <p style="font-size:.78rem;color:#ffc97a;background:#7c3a00;border-radius:6px;padding:.4rem .8rem;margin-top:.6rem">⚠️ Experimental &amp; work in progress — not recommended for production use</p>
             <div class="feature-grid">
               <div class="feature-card">
                 <span class="fi">⚡</span>
