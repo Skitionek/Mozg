@@ -1,0 +1,10 @@
+# MegaLinter configuration — https://megalinter.io/8.8.0/configuration/
+
+# Disable linters that produce only false positives on this codebase
+DISABLE_LINTERS:
+  - COPYPASTE_JSCPD # similar patterns in database driver and test files are intentional
+  - REPOSITORY_DEVSKIM # false positives: http ontology URIs, setTimeout, TODO markers, localhost defaults, md5 column name
+
+# Make non-blocking (findings still uploaded as SARIF for review):
+REPOSITORY_GITLEAKS_DISABLE_ERRORS: true # rnacentral.js uses public read-only EBI credentials; paper/mozg.tex is example LaTeX code
+REPOSITORY_TRIVY_DISABLE_ERRORS: true # MEDIUM CVE in fast-xml-parser tracked in a dedicated issue

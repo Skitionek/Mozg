@@ -11,6 +11,8 @@ on:
       - '.github/workflows/paper.yml'
   workflow_dispatch:
 
+permissions: read-all
+
 jobs:
   build-pdf:
     name: Compile LaTeX to PDF
@@ -40,7 +42,7 @@ jobs:
             --backgroundColor white
 
       - name: Compile LaTeX
-        uses: xu-cheng/latex-action@v3
+        uses: xu-cheng/latex-action@e2f99d4b3685b0da93f97e1b86ad8fab81105098 # v3
         with:
           working_directory: paper
           root_file: mozg.tex
