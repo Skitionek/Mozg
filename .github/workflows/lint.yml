@@ -124,8 +124,8 @@ jobs:
           # workflow runs by default to avoid infinite loops.
           # Add a repository secret named PAT with a token that has `repo` scope.
           token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
-          commit-message: "[MegaLinter] Apply linters automatic fixes"
-          title: "[MegaLinter] Apply linters automatic fixes"
+          commit-message: "style(lint): apply megalinter automatic fixes"
+          title: "style(lint): apply megalinter automatic fixes"
           labels: bot
           branch: megalinter-fixes-pr-${{ github.event.pull_request.number }}
           body: |
