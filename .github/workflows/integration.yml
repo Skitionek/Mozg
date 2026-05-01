@@ -12,6 +12,8 @@ on:
     - cron: '0 6 * * 1'
   workflow_dispatch:
 
+permissions: read-all
+
 jobs:
   catalog-health:
     name: Catalog endpoint health check

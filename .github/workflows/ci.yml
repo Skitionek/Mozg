@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: ['**']
 
+permissions: read-all
+
 jobs:
   lint-and-test:
     name: Lint & Test (Node ${{ matrix.node-version }})
