@@ -31,6 +31,8 @@
     "latexmk",
     "xelatex",
     "DEVSKIM",
-    "rnacentral"
+    "rnacentral",
+    "postgraphile",
+    "rdfxml"
   ]
 }
