@@ -25,6 +25,12 @@
     "skitionek",
     "Skitionek",
     "hmarr",
-    "CODEOWNERS"
+    "CODEOWNERS",
+    "mmdc",
+    "puppeteerrc",
+    "latexmk",
+    "xelatex",
+    "DEVSKIM",
+    "rnacentral"
   ]
 }
