@@ -3,12 +3,12 @@ name: Build Paper PDF
 on:
   push:
     paths:
-      - 'paper/**'
-      - '.github/workflows/paper.yml'
+      - "paper/**"
+      - ".github/workflows/paper.yml"
   pull_request:
     paths:
-      - 'paper/**'
-      - '.github/workflows/paper.yml'
+      - "paper/**"
+      - ".github/workflows/paper.yml"
   workflow_dispatch:
 
 permissions: read-all
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Mermaid CLI
         run: npm install -g @mermaid-js/mermaid-cli@11
