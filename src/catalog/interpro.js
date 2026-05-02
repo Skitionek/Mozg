@@ -65,7 +65,7 @@ module.exports = {
       name: '/structure/PDB',
       columns: ['accession', 'name', 'experiment_type', 'release_date', 'chains'],
       relations: [
-        { entity: '/entry', foreignKey: 'accession', type: 'belongsTo', alias: 'pdbEntry', catalog: 'pdb' },
+        { entity: '/entry/{id}', foreignKey: 'accession', type: 'belongsTo', alias: 'pdbEntry', catalog: 'pdb' },
       ],
     },
     {

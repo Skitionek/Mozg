@@ -157,9 +157,9 @@
   },
   {
     "name": "Catalog – list all available databases",
-    "description": "Return all pre-defined catalog entries with their entity names, columns, and relationships. Shows the breadth of data sources queryable through one /graphql endpoint.",
+    "description": "Return all pre-defined catalog entries together with each raw entity name and its GraphQL-safe `graphqlName`, which can then be used for object-style `entities { ... }` catalog queries.",
     "category": "Catalog",
-    "query": "{\n  catalog {\n    name\n    label\n    description\n    driver\n    entities {\n      name\n      columns\n      relations { entity type alias foreignKey }\n    }\n  }\n}"
+    "query": "query MyQuery {\n  catalog {\n    name\n    label\n    description\n    driver\n    entitiesList {\n      name\n      graphqlName\n      columns\n      relations { entity type alias foreignKey }\n    }\n  }\n}"
   },
   {
     "name": "MySQL – Rfam: top RNA families by species count",
@@ -217,9 +217,9 @@
   },
   {
     "name": "PDB – list polymer entities for a structure entry",
-    "description": "Fetch polymer entities for PDB entry 1TUP (p53 DNA-binding domain). Each entity is a unique protein chain.",
+    "description": "Fetch PDB entry 1TUP and expand its polymer entities (DNA and protein chains) through the record-based RCSB core API.",
     "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://data.rcsb.org/rest/v1/core\" }\n    from: \"/polymer_entity\"\n    limit: 5\n  }) { count data }\n}"
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://data.rcsb.org/rest/v1/core\" }\n    from: \"/entry/{id}\"\n    where: { id: \"1TUP\" }\n    relations: [\n      {\n        entity: \"/polymer_entity/{entry_id}/{entity_id}\"\n        localKey: \"rcsb_entry_container_identifiers.polymer_entity_ids\"\n        foreignKey: \"entity_id\"\n        type: hasMany\n        alias: \"polymerEntities\"\n      }\n    ]\n  }) { count data }\n}"
   },
   {
     "name": "InterPro – list Pfam protein families",
@@ -276,10 +276,10 @@
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://wormbase.org\" }\n    from: \"/rest/widget/gene\"\n    limit: 10\n  }) { count data }\n}"
   },
   {
-    "name": "ZFIN – zebrafish gene search",
-    "description": "Search the Zebrafish Information Network (ZFIN) for zebrafish gene markers. Returns ZFIN IDs and gene symbols.",
+    "name": "ZFIN – zebrafish gene lookup",
+    "description": "Look up zebrafish TP53 gene identifiers through the maintained Ensembl REST endpoint that Mozg now uses as a compatibility replacement for ZFIN's retired /action/api service.",
     "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://zfin.org/action/api\" }\n    from: \"/marker/search\"\n    limit: 10\n  }) { count data }\n}"
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://rest.ensembl.org\" }\n    from: \"/xrefs/symbol/danio_rerio/tp53\"\n    limit: 10\n  }) { count data }\n}"
   },
   {
     "name": "PubMed – search biomedical literature",
@@ -294,9 +294,9 @@
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://eutils.ncbi.nlm.nih.gov/entrez/eutils\" }\n    from: \"/esearch.fcgi\"\n    where: { db: \"nuccore\", term: \"insulin[Gene] AND Homo sapiens[Organism]\", retmode: \"json\" }\n    limit: 10\n  }) { count data }\n}"
   },
   {
-    "name": "BRENDA – enzyme kinetics data",
-    "description": "Query the BRENDA enzyme database for enzyme kinetics data. Requires BRENDA credentials (email + password).",
+    "name": "BRENDA – public enzyme page lookup",
+    "description": "Fetch the public BRENDA enzyme page for a specific EC number. Returns the page URL and content type; full authenticated API access is SOAP-based.",
     "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.brenda-enzymes.org/rest\" }\n    from: \"/enzyme\"\n    limit: 5\n  }) { count data }\n}"
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.brenda-enzymes.org\" }\n    from: \"/enzyme.php\"\n    where: { ecno: \"1.1.1.1\" }\n    select: [\"url\", \"contentType\"]\n  }) { count data }\n}"
   }
 ]

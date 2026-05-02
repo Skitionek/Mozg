@@ -1,5 +1,24 @@
 'use strict';
 
+const CATALOGS_REQUIRING_CREDENTIALS = new Set([
+  'biocyc-humancyc',
+  'biocyc-yeastcyc',
+  'biocyc-aracyc',
+  'biocyc-leishcyc',
+  'biocyc-trypanocyc',
+  'biocyc-bsubcyc',
+  'biocyc-mtbcyc',
+  'biocyc-pseudocyc',
+  'biocyc-vibriocyc',
+  'biocyc-salentcyc',
+  'biocyc-listcyc',
+  'biocyc-caulocyc',
+  'biocyc-celeganscyc',
+  'biocyc-drosocyc',
+  'biocyc-borrcyc',
+  'biocyc-campycyc',
+]);
+
 // Registry maps catalog names to loader functions.
 // Each loader is called lazily — the catalog file is require()'d only when
 // getCatalog() is invoked for that entry, not at server startup.
@@ -89,13 +108,21 @@ const REGISTRY = {
  *   single-element array).  When omitted, returns all entries.
  * @returns {Array<object>}
  */
+function decorateEntry(entry) {
+  return {
+    ...entry,
+    requiresCredentials:
+      entry.requiresCredentials ?? CATALOGS_REQUIRING_CREDENTIALS.has(entry.name),
+  };
+}
+
 function getCatalog(name) {
   if (name) {
     const loader = REGISTRY[name];
     if (!loader) throw new Error(`Unknown catalog: ${name}`);
-    return [loader()];
+    return [decorateEntry(loader())];
   }
-  return Object.values(REGISTRY).map(load => load());
+  return Object.values(REGISTRY).map((load) => decorateEntry(load()));
 }
 
 /**

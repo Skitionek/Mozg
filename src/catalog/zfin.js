@@ -2,83 +2,53 @@
 
 /**
  * ZFIN – Zebrafish Information Network.
- * Reference: https://zfin.org/
- * API docs:  https://zfin.org/action/api
  *
- * No credentials required. All data freely available under CC BY 4.0.
+ * ZFIN retired its legacy public JSON endpoints under https://zfin.org/action/api
+ * and the current HTML search flow is CAPTCHA-protected. To keep a working
+ * zebrafish catalog available, Mozg now exposes a compatibility catalog backed
+ * by the maintained Ensembl REST API for Danio rerio.
  *
- * ZFIN ID format: ZDB-GENE-000112-37 (gene), ZDB-ALT-000009-1 (allele),
- *  ZDB-ANAT-010921-100 (anatomy), ZDB-EXP-041102-1 (experiment)
+ * Reference: https://rest.ensembl.org/documentation
  *
- * Key endpoints:
- *  - /marker/search?name={name}           – search gene/marker by name
- *  - /gene/{zdbId}                        – gene detail by ZFIN ID
- *  - /gene/{zdbId}/expression             – expression data
- *  - /gene/{zdbId}/phenotype              – phenotype data
- *  - /gene/{zdbId}/diseases               – human disease models
- *  - /gene/{zdbId}/orthologs              – orthologues
- *  - /anatomy/{zdbId}                     – anatomy term detail
- *
- * Relationship map:
- *  - /gene/{id}             →  /gene/{id}/expression  (ZFIN gene ID, hasMany)
- *  - /gene/{id}             →  /gene/{id}/phenotype   (ZFIN gene ID, hasMany)
- *  - /gene/{id}             →  /gene/{id}/orthologs   (ZFIN gene ID, hasMany)
+ * Notes:
+ *  - Replace the final path segment in /xrefs/symbol/danio_rerio/tp53 with a
+ *    different zebrafish gene symbol to search another marker.
+ *  - /lookup/id/{id} accepts Ensembl stable IDs such as ENSDARG00000035559.
  */
 module.exports = {
   name: 'zfin',
-  label: 'ZFIN – Zebrafish Information Network (REST)',
-  description: 'Zebrafish Information Network — curated zebrafish (Danio rerio) genetic and genomic data including genes, alleles, expression patterns, phenotypes, anatomy and human disease models. IDs follow ZDB-GENE/ZDB-ALT/ZDB-ANAT prefixes.',
+  label: 'ZFIN – zebrafish genes (compatibility via Ensembl REST)',
+  description: 'Zebrafish gene lookup compatibility catalog. ZFIN retired its legacy /action/api JSON endpoints, so Mozg now uses Ensembl REST for Danio rerio gene identifiers, details and cross-references.',
   driver: 'rest',
   connection: {
-    database: 'https://zfin.org/action/api',
+    database: 'https://rest.ensembl.org',
     headers: {
       'Accept': 'application/json',
+      'Content-Type': 'application/json',
     },
   },
   entities: [
     {
-      // Search: /marker/search?name=tp53
-      name: '/marker/search',
-      columns: ['zdbId', 'abbreviation', 'name', 'markerType', 'organism', 'chromosome', 'startPosition', 'endPosition'],
+      // Example zebrafish lookup: /xrefs/symbol/danio_rerio/tp53
+      name: '/xrefs/symbol/danio_rerio/tp53',
+      columns: ['id', 'type'],
       relations: [
-        { entity: '/gene', foreignKey: 'zdbId', type: 'belongsTo', alias: 'geneDetail' },
+        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'geneDetail' },
+        { entity: '/xrefs/id', foreignKey: 'id', type: 'hasMany', alias: 'crossReferences' },
       ],
     },
     {
-      // Gene detail: /gene/ZDB-GENE-000112-37
-      name: '/gene',
-      columns: ['zdbId', 'symbol', 'name', 'markerType', 'chromosome', 'genomeAssembly', 'ncbiGene', 'uniprotId', 'function', 'references'],
+      // Stable ID lookup: /lookup/id/ENSDARG00000035559
+      name: '/lookup/id',
+      columns: ['id', 'display_name', 'species', 'object_type', 'biotype', 'description', 'start', 'end', 'strand', 'seq_region_name', 'assembly_name', 'canonical_transcript'],
       relations: [
-        { entity: '/gene/expression', foreignKey: 'zdbId', type: 'hasMany', alias: 'expression' },
-        { entity: '/gene/phenotype', foreignKey: 'zdbId', type: 'hasMany', alias: 'phenotype' },
-        { entity: '/gene/orthologs', foreignKey: 'zdbId', type: 'hasMany', alias: 'orthologs' },
+        { entity: '/xrefs/id', foreignKey: 'id', type: 'hasMany', alias: 'crossReferences' },
       ],
     },
     {
-      // Expression: /gene/ZDB-GENE-000112-37/expression
-      name: '/gene/expression',
-      columns: ['gene', 'start', 'end', 'anatomyTerms', 'expressionPattern', 'assay', 'publication'],
-      relations: [],
-    },
-    {
-      // Phenotype: /gene/ZDB-GENE-000112-37/phenotype
-      name: '/gene/phenotype',
-      columns: ['gene', 'allele', 'zygosity', 'anatomyTerms', 'qualityTerms', 'phenotypeStatement', 'publication'],
-      relations: [],
-    },
-    {
-      // Orthologues: /gene/ZDB-GENE-000112-37/orthologs
-      name: '/gene/orthologs',
-      columns: ['zebrafishGeneId', 'zebrafishGeneSymbol', 'orthologGeneId', 'orthologSymbol', 'orthologOrg', 'supportedBy'],
-      relations: [
-        { entity: '/api/v1.0/chado/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'flybaseOrthologs', catalog: 'flybase' },
-        { entity: '/rest/widget/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'wormbaseOrthologs', catalog: 'wormbase' },
-      ],
-    },
-    {
-      // Anatomy terms: /anatomy/ZDB-ANAT-010921-100
-      name: '/anatomy',
-      columns: ['zdbId', 'name', 'abbreviation', 'start', 'end', 'parent', 'children', 'aliases'],
+      // Cross-database references: /xrefs/id/ENSDARG00000035559
+      name: '/xrefs/id',
+      columns: ['primary_id', 'display_id', 'dbname', 'db_display_name', 'description', 'info_type', 'info_text', 'synonyms'],
       relations: [],
     },
   ],

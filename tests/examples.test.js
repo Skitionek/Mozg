@@ -86,6 +86,24 @@ describe('examples/queries.json – schema validation', () => {
       );
     });
   }
+
+  test('PDB example uses a record lookup instead of the invalid collection endpoint', () => {
+    const example = exampleQueries.find(
+      (q) => q.name === 'PDB – list polymer entities for a structure entry',
+    );
+
+    assert.ok(example, 'PDB example should exist');
+    assert.match(
+      example.query,
+      /\/entry\/\{id\}|\/polymer_entity\/\{id\}\/\{entity_id\}/,
+      'PDB example should target a valid record endpoint',
+    );
+    assert.doesNotMatch(
+      example.query,
+      /from:\s*"\/polymer_entity"\s*\n\s*limit:/,
+      'PDB example should not use the invalid collection endpoint',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

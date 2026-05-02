@@ -2,13 +2,15 @@
 
 ## Project overview
 
-Mozg is a **"slow by design"** cross-database query layer.  
+Mozg is a **"slow by design"** cross-database query layer.
 It is **not** a database itself – it provides an expressive GraphQL language for
 describing relations between entities that live in existing databases (PostgreSQL,
-MySQL, SQLite).  A single `/graphql` endpoint accepts user-supplied credentials and
+MySQL, SQLite). A single `/graphql` endpoint accepts user-supplied credentials and
 executes federated queries that traverse those relations at query time.
 
 Key files:
+
+- `AGENTS.md` – fast startup map for Copilot/contributors, with architecture and verification guidance
 - `src/index.js` – HTTP server (graphql-yoga)
 - `src/schema.js` – GraphQL type definitions and resolvers
 - `src/database/registry.js` – driver resolution (single source of truth)
@@ -32,13 +34,13 @@ Key files:
 The following security and performance concerns are tracked in separate issues
 and should **not** be fixed inline — add a `// TODO(#issue)` comment instead:
 
-| Category | Area | Description |
-|----------|------|-------------|
-| Security | `src/ontology/index.js` | SSRF: arbitrary server-side URL fetch; needs allowlist + timeout |
-| Security | `src/database/drivers/neo4j.js` | Cypher injection via unescaped identifiers (`from`, `orderBy`, `alias`) |
-| Security | `src/index.js` | Path traversal in static file server; needs `decodeURIComponent` + root-check |
-| Security | `src/database/drivers/sql.js` | Connection cache keyed without password; same-user different-password reuse |
-| Performance | `src/database/drivers/rest.js` | N+1 sub-requests per relation row; should be batched/parallelised |
+| Category    | Area                             | Description                                                                    |
+| ----------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| Security    | `src/ontology/index.js`          | SSRF: arbitrary server-side URL fetch; needs allowlist + timeout               |
+| Security    | `src/database/drivers/neo4j.js`  | Cypher injection via unescaped identifiers (`from`, `orderBy`, `alias`)        |
+| Security    | `src/index.js`                   | Path traversal in static file server; needs `decodeURIComponent` + root-check  |
+| Security    | `src/database/drivers/sql.js`    | Connection cache keyed without password; same-user different-password reuse    |
+| Performance | `src/database/drivers/rest.js`   | N+1 sub-requests per relation row; should be batched/parallelised              |
 | Performance | `src/database/drivers/biocyc.js` | Refetches full class-instance list per related ID instead of building an index |
 
 ## Commit messages
@@ -57,19 +59,19 @@ and should **not** be fixed inline — add a `// TODO(#issue)` comment instead:
 
 ### Allowed types
 
-| Type       | When to use                                        |
-|------------|----------------------------------------------------|
-| `feat`     | A new feature visible to users or consumers        |
-| `fix`      | A bug fix                                          |
-| `docs`     | Documentation changes only                         |
-| `style`    | Formatting, whitespace – no logic change           |
-| `refactor` | Code restructuring without feature/fix             |
-| `perf`     | Performance improvement                            |
-| `test`     | Adding or correcting tests                         |
-| `build`    | Build system or external dependency changes        |
-| `ci`       | CI/CD pipeline configuration changes               |
-| `chore`    | Maintenance tasks that don't fit other types       |
-| `revert`   | Reverting a previous commit                        |
+| Type       | When to use                                  |
+| ---------- | -------------------------------------------- |
+| `feat`     | A new feature visible to users or consumers  |
+| `fix`      | A bug fix                                    |
+| `docs`     | Documentation changes only                   |
+| `style`    | Formatting, whitespace – no logic change     |
+| `refactor` | Code restructuring without feature/fix       |
+| `perf`     | Performance improvement                      |
+| `test`     | Adding or correcting tests                   |
+| `build`    | Build system or external dependency changes  |
+| `ci`       | CI/CD pipeline configuration changes         |
+| `chore`    | Maintenance tasks that don't fit other types |
+| `revert`   | Reverting a previous commit                  |
 
 ### Scopes (examples for this repo)
 
