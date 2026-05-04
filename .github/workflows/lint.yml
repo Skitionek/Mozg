@@ -91,6 +91,7 @@ jobs:
 
       # Derive has_updated_sources from git status so downstream steps work.
       - name: Collect MegaLinter result
+        if: always()
         id: ml
         run: |
           if git diff --quiet; then
@@ -101,6 +102,7 @@ jobs:
 
       # ── Auto-fix pull request (PR only) ───────────────────────────────────
       - name: Set fix-PR flag
+        if: always()
         id: fix_check
         env:
           HAS_UPDATES: ${{ steps.ml.outputs.has_updated_sources }}
@@ -116,6 +118,7 @@ jobs:
 
       - name: Create Pull Request with applied fixes
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        if: always()
         id: cpr
         if: steps.fix_check.outputs.enabled == 'true'
         with:
