@@ -8,6 +8,7 @@ const { parseManchesterSyntax } = require('./formats/manchester');
 const { extractOntology, xsdToGraphqlType } = require('./extractor');
 const { mapOntology }          = require('./mapper');
 const { validateOntologyAgainstDb } = require('./validator');
+const { secureFetch }          = require('./url-validator');
 
 // ---------------------------------------------------------------------------
 // In-memory cache: SHA-256 (first 16 hex chars) of raw content → result
@@ -115,16 +116,14 @@ async function parseOntology(input) {
   let { content, url, format, validate, connection } = input || {};
 
   // ── Fetch from URL if content not provided ─────────────────────────────
+  // TODO(#2) SSRF protection: URL validation, timeout, and size limits added
   if (url && !content) {
-    const res = await globalThis.fetch(url);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch ontology from ${url}: ${res.status} ${res.statusText}`);
-    }
-    content = await res.text();
+    const { text, contentType } = await secureFetch(url);
+    content = text;
 
     // Try to detect format from Content-Type
     if (!format || format === 'auto') {
-      format = formatFromContentType(res.headers.get('content-type')) ||
+      format = formatFromContentType(contentType) ||
                formatFromExtension(url) ||
                null;
     }
