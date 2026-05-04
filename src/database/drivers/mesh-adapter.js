@@ -13,6 +13,8 @@ const {
 const { MeshStore, InMemoryStoreStorageAdapter } = require('@graphql-mesh/store');
 const { PubSub, DefaultLogger } = require('@graphql-mesh/utils');
 
+const { assertSafeCypherIdentifier } = require('./neo4j-identifiers');
+
 // Cache: connection key → { schema, executor }
 // TODO: add LRU eviction to prevent unbounded growth in long-running processes
 const meshSourceCache = new Map();
@@ -292,6 +294,20 @@ async function executeQuery(input) {
     orderBy,
     orderDirection,
   } = input;
+
+  if (connection?.driver === 'neo4j') {
+    // The Neo4j mesh handler builds Cypher queries internally and interpolates
+    // some user-provided identifiers (e.g. labels and aliases). Reject unsafe
+    // values early to prevent Cypher injection and malformed queries.
+    assertSafeCypherIdentifier(from);
+    if (relations && relations.length > 0) {
+      for (const rel of relations) {
+        assertSafeCypherIdentifier(rel.entity);
+        assertSafeCypherIdentifier(rel.foreignKey);
+        if (rel.alias != null) assertSafeCypherIdentifier(rel.alias);
+      }
+    }
+  }
 
   const source = await getOrCreateMeshSource(connection);
   const { schema } = source;
