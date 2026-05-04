@@ -82,6 +82,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_COMMENT_REPORTER: false
           SARIF_REPORTER: true
+          APPLY_FIXES: all
 
       # Remove the ephemeral action before create-pull-request runs so it
       # is never committed to the repository.
