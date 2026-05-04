@@ -1,21 +1,21 @@
-'use strict';
+'use strict'
 
-const { URL } = require('node:url');
+const { URL } = require('node:url')
 
 /**
  * Default timeout for ontology fetch requests (10 seconds)
  */
-const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_TIMEOUT_MS = 10000
 
 /**
  * Maximum allowed response size (10 MB)
  */
-const MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+const MAX_RESPONSE_SIZE = 10 * 1024 * 1024
 
 /**
  * Allowed protocols for ontology URLs
  */
-const ALLOWED_PROTOCOLS = ['http:', 'https:'];
+const ALLOWED_PROTOCOLS = ['http:', 'https:']
 
 /**
  * Private IP ranges (IPv4) that should be blocked to prevent SSRF
@@ -32,39 +32,39 @@ const PRIVATE_IP_RANGES = [
   // Link-local
   { start: [169, 254, 0, 0], end: [169, 254, 255, 255] },
   // Carrier-grade NAT
-  { start: [100, 64, 0, 0], end: [100, 127, 255, 255] },
-];
+  { start: [100, 64, 0, 0], end: [100, 127, 255, 255] }
+]
 
 /**
  * Convert IP address string to array of numbers
  */
-function parseIPv4(ip) {
-  const parts = ip.split('.');
-  if (parts.length !== 4) return null;
-  const nums = parts.map((p) => parseInt(p, 10));
-  if (nums.some((n) => isNaN(n) || n < 0 || n > 255)) return null;
-  return nums;
+function parseIPv4 (ip) {
+  const parts = ip.split('.')
+  if (parts.length !== 4) return null
+  const nums = parts.map((p) => parseInt(p, 10))
+  if (nums.some((n) => isNaN(n) || n < 0 || n > 255)) return null
+  return nums
 }
 
 /**
  * Check if an IP address is within a given range
  */
-function isInRange(ip, range) {
+function isInRange (ip, range) {
   for (let i = 0; i < 4; i++) {
-    if (ip[i] < range.start[i]) return false;
-    if (ip[i] > range.end[i]) return false;
-    if (ip[i] > range.start[i] && ip[i] < range.end[i]) return true;
+    if (ip[i] < range.start[i]) return false
+    if (ip[i] > range.end[i]) return false
+    if (ip[i] > range.start[i] && ip[i] < range.end[i]) return true
   }
-  return true;
+  return true
 }
 
 /**
  * Check if a hostname is a private IP address
  */
-function isPrivateIP(hostname) {
-  const ip = parseIPv4(hostname);
-  if (!ip) return false;
-  return PRIVATE_IP_RANGES.some((range) => isInRange(ip, range));
+function isPrivateIP (hostname) {
+  const ip = parseIPv4(hostname)
+  if (!ip) return false
+  return PRIVATE_IP_RANGES.some((range) => isInRange(ip, range))
 }
 
 /**
@@ -73,39 +73,39 @@ function isPrivateIP(hostname) {
  * @param {string} urlString - The URL to validate
  * @throws {Error} If the URL is invalid or not allowed
  */
-function validateOntologyUrl(urlString) {
-  let parsed;
+function validateOntologyUrl (urlString) {
+  let parsed
 
   try {
-    parsed = new URL(urlString);
+    parsed = new URL(urlString)
   } catch (err) {
-    throw new Error(`Invalid URL: ${err.message}`, { cause: err });
+    throw new Error(`Invalid URL: ${err.message}`, { cause: err })
   }
 
   // Check protocol
   if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) {
     throw new Error(
       `Protocol '${parsed.protocol}' is not allowed. Only ${ALLOWED_PROTOCOLS.join(', ')} are permitted.`
-    );
+    )
   }
 
   // Check for private IPs
   if (isPrivateIP(parsed.hostname)) {
-    throw new Error(`Access to private IP addresses is not allowed: ${parsed.hostname}`);
+    throw new Error(`Access to private IP addresses is not allowed: ${parsed.hostname}`)
   }
 
   // Check for localhost variations
-  const hostname = parsed.hostname.toLowerCase();
+  const hostname = parsed.hostname.toLowerCase()
   if (
     hostname === 'localhost' ||
     hostname === '0.0.0.0' ||
     hostname === '[::]' ||
     hostname === '[::1]'
   ) {
-    throw new Error(`Access to localhost is not allowed: ${parsed.hostname}`);
+    throw new Error(`Access to localhost is not allowed: ${parsed.hostname}`)
   }
 
-  return parsed;
+  return parsed
 }
 
 /**
@@ -117,71 +117,71 @@ function validateOntologyUrl(urlString) {
  * @param {number} options.maxSize - Maximum response size in bytes (default: 10MB)
  * @returns {Promise<{ text: string, contentType: string }>}
  */
-async function secureFetch(url, options = {}) {
+async function secureFetch (url, options = {}) {
   // Validate the URL first
-  validateOntologyUrl(url);
+  validateOntologyUrl(url)
 
-  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
-  const maxSize = options.maxSize ?? MAX_RESPONSE_SIZE;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS
+  const maxSize = options.maxSize ?? MAX_RESPONSE_SIZE
 
   // Create abort controller for timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
     const response = await globalThis.fetch(url, {
       signal: controller.signal,
       redirect: 'follow',
       // Limit redirects to prevent redirect loops
-      ...(options.redirect !== undefined ? { redirect: options.redirect } : {}),
-    });
+      ...(options.redirect !== undefined ? { redirect: options.redirect } : {})
+    })
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch ontology from ${url}: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch ontology from ${url}: ${response.status} ${response.statusText}`)
     }
 
     // Check content length if available
-    const contentLength = response.headers.get('content-length');
+    const contentLength = response.headers.get('content-length')
     if (contentLength && parseInt(contentLength, 10) > maxSize) {
-      throw new Error(`Response size (${contentLength} bytes) exceeds maximum allowed size (${maxSize} bytes)`);
+      throw new Error(`Response size (${contentLength} bytes) exceeds maximum allowed size (${maxSize} bytes)`)
     }
 
     // Read response in chunks to enforce size limit
-    const reader = response.body.getReader();
-    const chunks = [];
-    let totalSize = 0;
+    const reader = response.body.getReader()
+    const chunks = []
+    let totalSize = 0
 
     try {
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done, value } = await reader.read()
+        if (done) break
 
-        totalSize += value.length;
+        totalSize += value.length
         if (totalSize > maxSize) {
-          throw new Error(`Response size exceeds maximum allowed size (${maxSize} bytes)`);
+          throw new Error(`Response size exceeds maximum allowed size (${maxSize} bytes)`)
         }
 
-        chunks.push(value);
+        chunks.push(value)
       }
     } finally {
-      reader.releaseLock();
+      reader.releaseLock()
     }
 
     // Combine chunks into text
-    const decoder = new TextDecoder('utf-8');
-    const text = decoder.decode(Buffer.concat(chunks));
+    const decoder = new TextDecoder('utf-8')
+    const text = decoder.decode(Buffer.concat(chunks))
 
     return {
       text,
-      contentType: response.headers.get('content-type'),
-    };
+      contentType: response.headers.get('content-type')
+    }
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeout}ms`, { cause: err });
+      throw new Error(`Request timeout after ${timeout}ms`, { cause: err })
     }
-    throw err;
+    throw err
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timeoutId)
   }
 }
 
@@ -189,5 +189,5 @@ module.exports = {
   validateOntologyUrl,
   secureFetch,
   DEFAULT_TIMEOUT_MS,
-  MAX_RESPONSE_SIZE,
-};
+  MAX_RESPONSE_SIZE
+}
