@@ -10,7 +10,7 @@
     "lint": "eslint src tests"
   },
   "dependencies": {
-    "@graphql-mesh/mongoose": "^0.104.34",
+    "@graphql-mesh/mongoose": "^0.104.37",
     "@graphql-mesh/mysql": "^0.105.37",
     "@graphql-mesh/neo4j": "^0.107.36",
     "@graphql-mesh/odata": "^0.106.45",
