@@ -1,8 +1,8 @@
-'use strict';
+'use strict'
 
-function assertSafeCypherIdentifier(value) {
+function assertSafeCypherIdentifier (value) {
   if (typeof value !== 'string' || value.length === 0) {
-    throw new Error('Invalid Cypher identifier: expected non-empty string');
+    throw new Error('Invalid Cypher identifier: expected non-empty string')
   }
 
   // Strict identifier validation to prevent Cypher injection via `alias` and
@@ -14,21 +14,20 @@ function assertSafeCypherIdentifier(value) {
   // structure manipulation (e.g. `AS foo) RETURN ...`). We therefore only allow
   // unescaped, conventional identifiers.
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
-    throw new Error(`Invalid Cypher identifier: ${value}`);
+    throw new Error(`Invalid Cypher identifier: ${value}`)
   }
 
-  return value;
+  return value
 }
 
-function escapeCypherLabel(label) {
+function escapeCypherLabel (label) {
   if (typeof label !== 'string') {
-    throw new Error('Invalid Cypher label');
+    throw new Error('Invalid Cypher label')
   }
-  return `\`${label.replace(/`/g, '``')}\``;
+  return `\`${label.replace(/`/g, '``')}\``
 }
 
 module.exports = {
   assertSafeCypherIdentifier,
-  escapeCypherLabel,
-};
-
+  escapeCypherLabel
+}
