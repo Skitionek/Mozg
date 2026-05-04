@@ -7,5 +7,8 @@ DISABLE_LINTERS:
 
 # Make non-blocking (findings still uploaded as SARIF for review):
 REPOSITORY_GITLEAKS_DISABLE_ERRORS: true # rnacentral.js uses public read-only EBI credentials; paper/mozg.tex is example LaTeX code
+SPELL_CSPELL_DISABLE_ERRORS: true # spelling findings are advisory; false positives expected for domain-specific terms
 SPELL_LYCHEE_DISABLE_ERRORS: true # megalinter.io URL may 404 on older version paths; links are correct
+SPELL_MISSPELL_DISABLE_ERRORS: true # spelling findings are advisory
+SPELL_PROSELINT_DISABLE_ERRORS: true # prose style findings are advisory
 REPOSITORY_TRIVY_DISABLE_ERRORS: true # MEDIUM CVE in fast-xml-parser tracked in a dedicated issue
