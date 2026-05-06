@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Open Food Facts – free, open database of food products worldwide.
@@ -21,13 +21,13 @@ module.exports = {
   description: 'Free, open database of food products worldwide with ingredients, nutrition facts, labels and more.',
   driver: 'rest',
   connection: {
-    database: 'https://world.openfoodfacts.org/api/v2',
+    database: 'https://world.openfoodfacts.org/api/v2'
   },
   entities: [
     {
       name: '/product',
       columns: ['code', 'product_name', 'brands', 'categories', 'labels', 'origins', 'countries', 'ingredients_text', 'nutriments', 'nutriscore_grade', 'nova_group', 'ecoscore_grade', 'image_url'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

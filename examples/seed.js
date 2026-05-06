@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Seed script – creates examples/sample.db (SQLite) with:
@@ -7,40 +7,40 @@
  * Usage: node examples/seed.js
  */
 
-const path = require('node:path');
-const sqlite3 = require('sqlite3').verbose();
+const path = require('node:path')
+const sqlite3 = require('sqlite3').verbose()
 
-const DB_PATH = path.join(__dirname, 'sample.db');
-const db = new sqlite3.Database(DB_PATH);
+const DB_PATH = path.join(__dirname, 'sample.db')
+const db = new sqlite3.Database(DB_PATH)
 
-function run(sql, params = []) {
+function run (sql, params = []) {
   return new Promise((resolve, reject) => {
     db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
+      if (err) reject(err)
+      else resolve(this)
+    })
+  })
 }
 
-function all(sql, params = []) {
+function all (sql, params = []) {
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+      if (err) reject(err)
+      else resolve(rows)
+    })
+  })
 }
 
-async function seed() {
+async function seed () {
   // ── Schema ───────────────────────────────────────────────────────────────
-  await run('PRAGMA journal_mode=WAL');
+  await run('PRAGMA journal_mode=WAL')
 
   await run(`CREATE TABLE IF NOT EXISTS users (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT    NOT NULL,
     email      TEXT    NOT NULL UNIQUE,
     created_at TEXT    NOT NULL
-  )`);
+  )`)
 
   await run(`CREATE TABLE IF NOT EXISTS posts (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +48,7 @@ async function seed() {
     title      TEXT    NOT NULL,
     body       TEXT    NOT NULL,
     created_at TEXT    NOT NULL
-  )`);
+  )`)
 
   await run(`CREATE TABLE IF NOT EXISTS comments (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,22 +56,22 @@ async function seed() {
     user_id    INTEGER NOT NULL REFERENCES users(id),
     body       TEXT    NOT NULL,
     created_at TEXT    NOT NULL
-  )`);
+  )`)
 
   // ── Users ────────────────────────────────────────────────────────────────
-  const now = new Date().toISOString();
-  const userNames = ['Alice Müller', 'Bob Smith', 'Carol Jones', 'Dave Brown', 'Eve Davis'];
+  const now = new Date().toISOString()
+  const userNames = ['Alice Müller', 'Bob Smith', 'Carol Jones', 'Dave Brown', 'Eve Davis']
 
   for (let i = 0; i < userNames.length; i++) {
-    const name = userNames[i];
-    const email = name.toLowerCase().replace(/[^a-z]+/g, '.') + '@example.com';
+    const name = userNames[i]
+    const email = name.toLowerCase().replace(/[^a-z]+/g, '.') + '@example.com'
     await run(
       'INSERT OR IGNORE INTO users (name, email, created_at) VALUES (?, ?, ?)',
       [name, email, now]
-    );
+    )
   }
 
-  const users = await all('SELECT id FROM users ORDER BY id');
+  const users = await all('SELECT id FROM users ORDER BY id')
 
   // ── Posts ────────────────────────────────────────────────────────────────
   for (const user of users) {
@@ -82,46 +82,46 @@ async function seed() {
           user.id,
           `Post ${p} by user ${user.id}`,
           `This is the body of post ${p} written by user ${user.id}. Lorem ipsum dolor sit amet.`,
-          now,
+          now
         ]
-      );
+      )
     }
   }
 
-  const posts = await all('SELECT id, user_id FROM posts ORDER BY id');
+  const posts = await all('SELECT id, user_id FROM posts ORDER BY id')
 
   // ── Comments ─────────────────────────────────────────────────────────────
   for (const post of posts) {
     for (let c = 1; c <= 3; c++) {
       // Cycle through users as commenters
-      const commenter = users[(post.id + c) % users.length];
+      const commenter = users[(post.id + c) % users.length]
       await run(
         'INSERT OR IGNORE INTO comments (post_id, user_id, body, created_at) VALUES (?, ?, ?, ?)',
         [
           post.id,
           commenter.id,
           `Comment ${c} on post ${post.id} by user ${commenter.id}.`,
-          now,
+          now
         ]
-      );
+      )
     }
   }
 
   // ── Summary ──────────────────────────────────────────────────────────────
-  const [{ n: userCount }]    = await all('SELECT COUNT(*) AS n FROM users');
-  const [{ n: postCount }]    = await all('SELECT COUNT(*) AS n FROM posts');
-  const [{ n: commentCount }] = await all('SELECT COUNT(*) AS n FROM comments');
+  const [{ n: userCount }] = await all('SELECT COUNT(*) AS n FROM users')
+  const [{ n: postCount }] = await all('SELECT COUNT(*) AS n FROM posts')
+  const [{ n: commentCount }] = await all('SELECT COUNT(*) AS n FROM comments')
 
-  console.log(`Seeded ${DB_PATH}`);
-  console.log(`  users:    ${userCount}`);
-  console.log(`  posts:    ${postCount}`);
-  console.log(`  comments: ${commentCount}`);
+  console.log(`Seeded ${DB_PATH}`)
+  console.log(`  users:    ${userCount}`)
+  console.log(`  posts:    ${postCount}`)
+  console.log(`  comments: ${commentCount}`)
 
-  db.close();
+  db.close()
 }
 
 seed().catch((err) => {
-  console.error('Seed failed:', err);
-  db.close();
-  process.exit(1);
-});
+  console.error('Seed failed:', err)
+  db.close()
+  process.exit(1)
+})

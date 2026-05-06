@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * KEGG – Kyoto Encyclopedia of Genes and Genomes.
@@ -39,7 +39,7 @@ module.exports = {
   description: 'Kyoto Encyclopedia of Genes and Genomes — biological systems database with pathway maps, BRITE hierarchies, modules and cross-organism gene/compound data. Pass where._pathSuffix for /find, /get and /link queries.',
   driver: 'kegg',
   connection: {
-    database: 'https://rest.kegg.jp',
+    database: 'https://rest.kegg.jp'
   },
   entities: [
     {
@@ -47,84 +47,83 @@ module.exports = {
       columns: ['entry_id', 'name'],
       relations: [
         { entity: '/get', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' },
-        { entity: '/data/pathways/top/Homo sapiens', foreignKey: 'entry_id', type: 'hasOne', alias: 'reactomePathway', catalog: 'reactome' },
-      ],
+        { entity: '/data/pathways/top/Homo sapiens', foreignKey: 'entry_id', type: 'hasOne', alias: 'reactomePathway', catalog: 'reactome' }
+      ]
     },
     {
       name: '/list/compound',
       columns: ['entry_id', 'name'],
       relations: [
         { entity: '/link/pathway', foreignKey: 'entry_id', type: 'hasMany', alias: 'pathways' },
-        { entity: '/metabolites.json', foreignKey: 'entry_id', type: 'hasOne', alias: 'hmdbMetabolite', catalog: 'hmdb' },
-      ],
+        { entity: '/metabolites.json', foreignKey: 'entry_id', type: 'hasOne', alias: 'hmdbMetabolite', catalog: 'hmdb' }
+      ]
     },
     {
       name: '/list/reaction',
       columns: ['entry_id', 'name'],
       relations: [
-        { entity: '/list/compound', foreignKey: 'entry_id', type: 'hasMany', alias: 'compounds' },
-      ],
+        { entity: '/list/compound', foreignKey: 'entry_id', type: 'hasMany', alias: 'compounds' }
+      ]
     },
     {
       name: '/list/enzyme',
       columns: ['entry_id', 'name'],
       relations: [
         { entity: '/list/reaction', foreignKey: 'entry_id', type: 'hasMany', alias: 'reactions' },
-        { entity: '/uniprotkb/search', foreignKey: 'entry_id', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'entry_id', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' }
+      ]
     },
     {
       name: '/list/drug',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: []
     },
     {
       name: '/list/glycan',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: []
     },
     {
       // Use where: { _pathSuffix: "glucose" } to search compound by keyword
       name: '/find/compound',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: []
     },
     {
       // Use where: { _pathSuffix: "acetyl" } to search reaction by keyword
       name: '/find/reaction',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: []
     },
     {
       // Use where: { _pathSuffix: "K00001" } to search KO entries by keyword
       name: '/find/ko',
       columns: ['entry_id', 'name'],
-      relations: [],
+      relations: []
     },
     {
       // Fetch full flat-file record: where: { _pathSuffix: "C00031" }
       name: '/get',
       columns: ['entry', 'name', 'formula', 'mass', 'mol_weight', 'pathway', 'enzyme', 'dblinks', 'atom', 'bond'],
-      relations: [],
+      relations: []
     },
     {
       // Cross-links: where: { _pathSuffix: "hsa:7157" } → pathways for TP53
       name: '/link/pathway',
       columns: ['source_id', 'target_id'],
-      relations: [],
+      relations: []
     },
     {
       // Cross-links: where: { _pathSuffix: "hsa:7157" } → KO entries for TP53
       name: '/link/ko',
       columns: ['source_id', 'target_id'],
-      relations: [],
+      relations: []
     },
     {
       // Database statistics: where: { _pathSuffix: "compound" }
       name: '/info',
       columns: ['entry_id', 'name'],
-      relations: [],
-    },
-  ],
-};
-
+      relations: []
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * RefSeq – NCBI Reference Sequence Database.
@@ -33,8 +33,8 @@ module.exports = {
   connection: {
     database: 'https://api.ncbi.nlm.nih.gov/datasets/v2',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -43,20 +43,20 @@ module.exports = {
       columns: ['gene_id', 'symbol', 'description', 'tax_id', 'taxname', 'type', 'chromosomes', 'location', 'orientation', 'exon_count', 'omim_ids', 'swiss_prot_accessions', 'ensembl_gene_ids', 'refseq_accessions', 'genomic_ranges'],
       relations: [
         { entity: '/genome/accession', foreignKey: 'chromosomes', type: 'belongsTo', alias: 'genome' },
-        { entity: '/lookup/id', foreignKey: 'gene_id', type: 'hasOne', alias: 'ensemblGene', catalog: 'ensembl' },
-      ],
+        { entity: '/lookup/id', foreignKey: 'gene_id', type: 'hasOne', alias: 'ensemblGene', catalog: 'ensembl' }
+      ]
     },
     {
       // Fetch by accession: /genome/accession/GCF_000001405.40/summary
       name: '/genome/accession',
       columns: ['accession', 'assembly_category', 'assembly_level', 'assembly_name', 'bioproject_accession', 'biosample_accession', 'paired_accession', 'organism', 'seq_length', 'submission_date', 'refseq_category', 'annotated', 'gc_count'],
-      relations: [],
+      relations: []
     },
     {
       // Fetch taxonomy: /taxonomy/9606
       name: '/taxonomy',
       columns: ['tax_id', 'sci_name', 'common_name', 'rank', 'parents', 'has_described_species_name', 'counts'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

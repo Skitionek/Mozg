@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * REST Countries – free country data API.
@@ -19,38 +19,38 @@ module.exports = {
   description: 'Free country data API with names, capitals, populations, currencies, languages, flags and more.',
   driver: 'rest',
   connection: {
-    database: 'https://restcountries.com/v3.1',
+    database: 'https://restcountries.com/v3.1'
   },
   entities: [
     {
       name: '/all',
       columns: ['name', 'tld', 'cca2', 'cca3', 'ccn3', 'cioc', 'independent', 'status', 'unMember', 'currencies', 'idd', 'capital', 'altSpellings', 'region', 'subregion', 'languages', 'translations', 'latlng', 'landlocked', 'area', 'population', 'flags', 'coatOfArms', 'timezones', 'continents'],
-      relations: [],
+      relations: []
     },
     {
       name: '/region/europe',
       columns: ['name', 'cca2', 'cca3', 'capital', 'region', 'subregion', 'population', 'area', 'currencies', 'languages', 'flags'],
-      relations: [],
+      relations: []
     },
     {
       name: '/region/asia',
       columns: ['name', 'cca2', 'cca3', 'capital', 'region', 'subregion', 'population', 'area', 'currencies', 'languages', 'flags'],
-      relations: [],
+      relations: []
     },
     {
       name: '/region/africa',
       columns: ['name', 'cca2', 'cca3', 'capital', 'region', 'subregion', 'population', 'area', 'currencies', 'languages', 'flags'],
-      relations: [],
+      relations: []
     },
     {
       name: '/region/americas',
       columns: ['name', 'cca2', 'cca3', 'capital', 'region', 'subregion', 'population', 'area', 'currencies', 'languages', 'flags'],
-      relations: [],
+      relations: []
     },
     {
       name: '/region/oceania',
       columns: ['name', 'cca2', 'cca3', 'capital', 'region', 'subregion', 'population', 'area', 'currencies', 'languages', 'flags'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

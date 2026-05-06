@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Reactome – open-source biological pathway knowledgebase.
@@ -31,16 +31,16 @@ module.exports = {
   connection: {
     database: 'https://reactome.org/ContentService',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
       name: '/data/diseases',
       columns: ['stableId', 'displayName', 'className', 'identifier', 'url', 'name'],
       relations: [
-        { entity: '/data/pathways/top/Homo sapiens', foreignKey: 'dbId', type: 'hasMany', alias: 'pathways' },
-      ],
+        { entity: '/data/pathways/top/Homo sapiens', foreignKey: 'dbId', type: 'hasMany', alias: 'pathways' }
+      ]
     },
     {
       // Use path segment for species: /data/pathways/top/Homo sapiens
@@ -48,25 +48,25 @@ module.exports = {
       columns: ['stableId', 'displayName', 'speciesName', 'isInferred', 'isInDisease', 'className', 'schemaClass'],
       relations: [
         { entity: '/data/pathway', foreignKey: 'stableId', type: 'hasMany', alias: 'containedEvents' },
-        { entity: '/list/pathway', foreignKey: 'stableId', type: 'hasOne', alias: 'keggPathway', catalog: 'kegg' },
-      ],
+        { entity: '/list/pathway', foreignKey: 'stableId', type: 'hasOne', alias: 'keggPathway', catalog: 'kegg' }
+      ]
     },
     {
       // Fetch any Reactome entity: /data/query/R-HSA-1640170
       name: '/data/query',
       columns: ['stableId', 'displayName', 'className', 'schemaClass', 'speciesName', 'isInferred', 'isInDisease', 'summation', 'literatureReference'],
-      relations: [],
+      relations: []
     },
     {
       name: '/search/query',
       columns: ['found', 'results', 'facets', 'suggester', 'spellcheck'],
-      relations: [],
+      relations: []
     },
     {
       // Use where: { } and path: /data/species/all
       name: '/data/species/all',
       columns: ['stableId', 'displayName', 'taxId', 'abbreviation'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * TrypanoCyc – metabolic pathway database for Trypanosoma brucei.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Trypanosoma brucei (sleeping sickness pathogen). Tier 1: extensively curated. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'TRYPANO',
+    database: 'TRYPANO'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

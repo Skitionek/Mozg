@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * DrosoCyc – metabolic pathway database for Drosophila melanogaster.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Drosophila melanogaster (fruit fly model organism). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'DROME',
+    database: 'DROME'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

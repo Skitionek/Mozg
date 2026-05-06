@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * UniProt – universal protein knowledgebase maintained by UniProt Consortium.
@@ -30,8 +30,8 @@ module.exports = {
   connection: {
     database: 'https://rest.uniprot.org',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -42,30 +42,30 @@ module.exports = {
         { entity: '/taxonomy', foreignKey: 'taxonId', type: 'belongsTo', alias: 'taxonomy' },
         { entity: '/entry', foreignKey: 'accession', type: 'hasMany', alias: 'pdbStructures', catalog: 'pdb' },
         { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'interproEntries', catalog: 'interpro' },
-        { entity: '/get_string_ids', foreignKey: 'accession', type: 'hasOne', alias: 'stringInteractions', catalog: 'string-db' },
-      ],
+        { entity: '/get_string_ids', foreignKey: 'accession', type: 'hasOne', alias: 'stringInteractions', catalog: 'string-db' }
+      ]
     },
     {
       // Use where: { query: "…", format: "json", size: "25" }
       name: '/uniref/search',
       columns: ['id', 'name', 'commonTaxon', 'commonTaxonId', 'memberCount', 'updated', 'entryType', 'representativeMember'],
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'hasMany', alias: 'members' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'hasMany', alias: 'members' }
+      ]
     },
     {
       // Use where: { query: "…", format: "json", size: "25" }
       name: '/uniparc/search',
       columns: ['uniParcId', 'crossReferenceCount', 'sequenceLength', 'oldestCrossRefCreated', 'mostRecentCrossRefUpdated', 'sequence'],
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' }
+      ]
     },
     {
       // Use where: { query: "…", format: "json", size: "25" }
       name: '/taxonomy/search',
       columns: ['taxonId', 'scientificName', 'commonName', 'mnemonic', 'rank', 'parentLink', 'childrenLinks', 'statistics'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

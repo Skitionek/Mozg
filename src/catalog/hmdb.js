@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * HMDB – Human Metabolome Database.
@@ -30,8 +30,8 @@ module.exports = {
   connection: {
     database: 'https://hmdb.ca',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -41,28 +41,28 @@ module.exports = {
       relations: [
         { entity: '/proteins.json', foreignKey: 'protein_accessions', type: 'hasMany', alias: 'proteins' },
         { entity: '/diseases.json', foreignKey: 'disease_names', type: 'hasMany', alias: 'diseases' },
-        { entity: '/find/compound', foreignKey: 'kegg_id', type: 'hasOne', alias: 'keggCompound', catalog: 'kegg' },
-      ],
+        { entity: '/find/compound', foreignKey: 'kegg_id', type: 'hasOne', alias: 'keggCompound', catalog: 'kegg' }
+      ]
     },
     {
       // Search: /metabolites/search.json?query=glucose
       name: '/metabolites/search.json',
       columns: ['accession', 'name', 'chemical_formula', 'average_molecular_weight', 'smiles', 'inchikey'],
-      relations: [],
+      relations: []
     },
     {
       // Paginated list: /proteins.json?page=1
       name: '/proteins.json',
       columns: ['accession', 'name', 'uniprot_id', 'gene_name', 'protein_type', 'general_function', 'pathways'],
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'uniprot_id', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'uniprot_id', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' }
+      ]
     },
     {
       // Paginated list: /diseases.json?page=1
       name: '/diseases.json',
       columns: ['name', 'omim_id', 'references'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

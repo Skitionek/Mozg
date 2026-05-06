@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Metropolitan Museum of Art – open access collection API.
@@ -23,22 +23,22 @@ module.exports = {
   description: 'Open access collection API for the Metropolitan Museum of Art with objects, departments and search.',
   driver: 'rest',
   connection: {
-    database: 'https://collectionapi.metmuseum.org/public/collection/v1',
+    database: 'https://collectionapi.metmuseum.org/public/collection/v1'
   },
   entities: [
     {
       name: '/departments',
       columns: ['departmentId', 'displayName'],
       relations: [
-        { entity: '/objects', foreignKey: 'departmentId', type: 'hasMany', alias: 'objects' },
-      ],
+        { entity: '/objects', foreignKey: 'departmentId', type: 'hasMany', alias: 'objects' }
+      ]
     },
     {
       name: '/objects',
       columns: ['objectID', 'isHighlight', 'accessionNumber', 'accessionYear', 'isPublicDomain', 'primaryImage', 'department', 'objectType', 'title', 'artistDisplayName', 'artistNationality', 'objectDate', 'medium', 'dimensions', 'country', 'period', 'culture', 'departmentId'],
       relations: [
-        { entity: '/departments', foreignKey: 'departmentId', type: 'belongsTo', alias: 'department' },
-      ],
-    },
-  ],
-};
+        { entity: '/departments', foreignKey: 'departmentId', type: 'belongsTo', alias: 'department' }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * WormBase – C. elegans and related nematode biology database.
@@ -35,8 +35,8 @@ module.exports = {
   connection: {
     database: 'https://wormbase.org',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -47,26 +47,26 @@ module.exports = {
         { entity: '/rest/widget/gene/phenotype', foreignKey: 'name', type: 'hasMany', alias: 'phenotypes' },
         { entity: '/rest/widget/gene/expression', foreignKey: 'name', type: 'hasMany', alias: 'expression' },
         { entity: '/api/v1.0/chado/gene', foreignKey: 'name', type: 'hasMany', alias: 'flybaseOrthologs', catalog: 'flybase' },
-        { entity: '/gene', foreignKey: 'name', type: 'hasMany', alias: 'zfinOrthologs', catalog: 'zfin' },
-      ],
+        { entity: '/gene', foreignKey: 'name', type: 'hasMany', alias: 'zfinOrthologs', catalog: 'zfin' }
+      ]
     },
     {
       // Gene phenotype data: /rest/widget/gene/WBGene00000001/phenotype
       name: '/rest/widget/gene/phenotype',
       columns: ['phenotype', 'phenotype_id', 'evidence', 'allele', 'rnai', 'transgene', 'references'],
-      relations: [],
+      relations: []
     },
     {
       // Gene expression data: /rest/widget/gene/WBGene00000001/expression
       name: '/rest/widget/gene/expression',
       columns: ['anatomy_terms', 'life_stage', 'expression_pattern', 'subcellular_localization', 'references'],
-      relations: [],
+      relations: []
     },
     {
       // Variation overview: /rest/widget/variation/WBVar00000001/overview
       name: '/rest/widget/variation',
       columns: ['name', 'object', 'allele_type', 'gene', 'location', 'molecular_change', 'amino_acid_change', 'phenotypes'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

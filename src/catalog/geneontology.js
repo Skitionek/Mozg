@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Gene Ontology (GO) – controlled vocabulary for gene product attributes.
@@ -35,8 +35,8 @@ module.exports = {
   connection: {
     database: 'https://api.geneontology.org/api',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -45,8 +45,8 @@ module.exports = {
       name: '/search/entity',
       columns: ['id', 'label', 'category', 'definition', 'synonym', 'taxon', 'highlight'],
       relations: [
-        { entity: '/ontology/term', foreignKey: 'id', type: 'belongsTo', alias: 'term' },
-      ],
+        { entity: '/ontology/term', foreignKey: 'id', type: 'belongsTo', alias: 'term' }
+      ]
     },
     {
       // Fetch a specific GO term: from "/ontology/term" where: { _pathSuffix: "GO:0006915" }
@@ -55,30 +55,30 @@ module.exports = {
       relations: [
         { entity: '/ontology/term/children', foreignKey: 'id', type: 'hasMany', alias: 'children' },
         { entity: '/bioentity/function', foreignKey: 'id', type: 'hasMany', alias: 'annotatedGenes' },
-        { entity: '/terms', foreignKey: 'label', type: 'hasMany', alias: 'chebiCompounds', catalog: 'chebi' },
-      ],
+        { entity: '/terms', foreignKey: 'label', type: 'hasMany', alias: 'chebiCompounds', catalog: 'chebi' }
+      ]
     },
     {
       // Children of a GO term: from "/ontology/term/children" where: { _pathSuffix: "GO:0006915" }
       name: '/ontology/term/children',
       columns: ['id', 'label', 'definition', 'synonyms', 'namespace'],
-      relations: [],
+      relations: []
     },
     {
       // Genes/proteins annotated with a GO term: from "/bioentity/function" where: { _pathSuffix: "GO:0006915", rows: "25" }
       name: '/bioentity/function',
       columns: ['id', 'label', 'taxon', 'taxon_label', 'qualifier', 'evidence', 'reference', 'assigned_by'],
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'id', type: 'hasMany', alias: 'uniprotEntries', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'id', type: 'hasMany', alias: 'uniprotEntries', catalog: 'uniprot' }
+      ]
     },
     {
       // GO annotations for a specific gene: from "/bioentity/gene/function" where: { _pathSuffix: "UniProtKB:P04637" }
       name: '/bioentity/gene/function',
       columns: ['id', 'label', 'qualifier', 'evidence', 'reference', 'term', 'term_label', 'assigned_by'],
       relations: [
-        { entity: '/ontology/term', foreignKey: 'term', type: 'belongsTo', alias: 'goTerm' },
-      ],
-    },
-  ],
-};
+        { entity: '/ontology/term', foreignKey: 'term', type: 'belongsTo', alias: 'goTerm' }
+      ]
+    }
+  ]
+}

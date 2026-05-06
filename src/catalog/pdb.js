@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * PDB – RCSB Protein Data Bank, archive of 3D macromolecular structures.
@@ -27,7 +27,7 @@ module.exports = {
   description: 'RCSB Protein Data Bank archive of experimentally determined 3D structures of biological macromolecules. Free JSON access to entry, polymer entity and chain-level data. PDB IDs are 4-character codes (e.g. 1TUP).',
   driver: 'rest',
   connection: {
-    database: 'https://data.rcsb.org/rest/v1/core',
+    database: 'https://data.rcsb.org/rest/v1/core'
   },
   entities: [
     {
@@ -37,30 +37,30 @@ module.exports = {
       relations: [
         { entity: '/polymer_entity', foreignKey: 'entry_id', type: 'hasMany', alias: 'polymerEntities' },
         { entity: '/uniprotkb/search', foreignKey: 'entry_id', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' },
-        { entity: '/structure/PDB', foreignKey: 'entry_id', type: 'hasMany', alias: 'interproAnnotations', catalog: 'interpro' },
-      ],
+        { entity: '/structure/PDB', foreignKey: 'entry_id', type: 'hasMany', alias: 'interproAnnotations', catalog: 'interpro' }
+      ]
     },
     {
       // Fetch by entry+entity: /polymer_entity/1TUP/1
       name: '/polymer_entity',
       columns: ['entry_id', 'entity_id', 'entity', 'rcsb_polymer_entity', 'rcsb_entity_source_organism', 'rcsb_cluster_membership', 'struct_ref'],
       relations: [
-        { entity: '/polymer_entity_instance', foreignKey: 'asym_id', type: 'hasMany', alias: 'chains' },
-      ],
+        { entity: '/polymer_entity_instance', foreignKey: 'asym_id', type: 'hasMany', alias: 'chains' }
+      ]
     },
     {
       // Fetch by entry+asym: /polymer_entity_instance/1TUP/A
       name: '/polymer_entity_instance',
       columns: ['entry_id', 'asym_id', 'auth_asym_id', 'rcsb_polymer_entity_instance_container_identifiers', 'rcsb_polymer_instance_annotation'],
-      relations: [],
+      relations: []
     },
     {
       // Fetch by PDB ID: /assembly/1TUP/1
       name: '/assembly',
       columns: ['entry_id', 'assembly_id', 'rcsb_assembly_info', 'rcsb_struct_symmetry', 'pdbx_struct_assembly'],
       relations: [
-        { entity: '/entry', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' },
-      ],
-    },
-  ],
-};
+        { entity: '/entry', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' }
+      ]
+    }
+  ]
+}
