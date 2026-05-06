@@ -82,9 +82,7 @@ async function executeQuery (input) {
     where,
     relations,
     limit,
-    offset,
-    orderBy: _orderBy,
-    orderDirection: _orderDirection
+    offset
   } = input
 
   const base = (connection.database || '').replace(/\/$/, '')
