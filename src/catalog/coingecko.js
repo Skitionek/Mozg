@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * CoinGecko – free cryptocurrency data API.
@@ -23,37 +23,37 @@ module.exports = {
   description: 'Free cryptocurrency data API with coin listings, market data, exchanges and asset platforms.',
   driver: 'rest',
   connection: {
-    database: 'https://api.coingecko.com/api/v3',
+    database: 'https://api.coingecko.com/api/v3'
   },
   entities: [
     {
       name: '/coins/list',
       columns: ['id', 'symbol', 'name', 'platforms'],
       relations: [
-        { entity: '/asset_platforms', foreignKey: 'id', type: 'hasMany', alias: 'platforms' },
-      ],
+        { entity: '/asset_platforms', foreignKey: 'id', type: 'hasMany', alias: 'platforms' }
+      ]
     },
     {
       name: '/coins/markets',
       columns: ['id', 'symbol', 'name', 'image', 'current_price', 'market_cap', 'market_cap_rank', 'total_volume', 'high_24h', 'low_24h', 'price_change_percentage_24h', 'circulating_supply', 'total_supply', 'max_supply'],
-      relations: [],
+      relations: []
     },
     {
       name: '/exchanges',
       columns: ['id', 'name', 'year_established', 'country', 'description', 'url', 'image', 'has_trading_incentive', 'trust_score', 'trust_score_rank', 'trade_volume_24h_btc'],
-      relations: [],
+      relations: []
     },
     {
       name: '/asset_platforms',
       columns: ['id', 'chain_identifier', 'name', 'shortname', 'native_coin_id'],
       relations: [
-        { entity: '/coins/list', foreignKey: 'native_coin_id', type: 'belongsTo', alias: 'nativeCoin' },
-      ],
+        { entity: '/coins/list', foreignKey: 'native_coin_id', type: 'belongsTo', alias: 'nativeCoin' }
+      ]
     },
     {
       name: '/coins/categories/list',
       columns: ['category_id', 'name'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

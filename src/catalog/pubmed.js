@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * PubMed – NCBI biomedical literature database (30+ million citations).
@@ -21,7 +21,7 @@ module.exports = {
   description: 'NCBI PubMed biomedical literature database with 30+ million citations for biomedical articles from MEDLINE, life science journals and online books. Pass db=pubmed and retmode=json in where params.',
   driver: 'rest',
   connection: {
-    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
+    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
   },
   entities: [
     {
@@ -29,22 +29,22 @@ module.exports = {
       name: '/esearch.fcgi',
       columns: ['count', 'retmax', 'retstart', 'idlist', 'translationset', 'querytranslation', 'errorlist'],
       relations: [
-        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'articles' },
-      ],
+        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'articles' }
+      ]
     },
     {
       // Use where: { db: "pubmed", id: "<pmid>", retmode: "json" }
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'uid', type: 'hasMany', alias: 'relatedProteins', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'uid', type: 'hasMany', alias: 'relatedProteins', catalog: 'uniprot' }
+      ]
     },
     {
       // Use where: { dbfrom: "pubmed", db: "pmc", id: "<pmid>", retmode: "json" }
       name: '/elink.fcgi',
       columns: ['linksets'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

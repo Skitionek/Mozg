@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * AraCyc – metabolic pathway database for Arabidopsis thaliana Columbia.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Arabidopsis thaliana Columbia. Tier 1: extensively curated. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'ARACYC',
+    database: 'ARACYC'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

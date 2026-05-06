@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * LeishCyc – metabolic pathway database for Leishmania major Friedlin.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Leishmania major Friedlin (leishmaniasis pathogen). Tier 1: extensively curated. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'LEISHCYC',
+    database: 'LEISHCYC'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * GEO – NCBI Gene Expression Omnibus.
@@ -27,7 +27,7 @@ module.exports = {
   description: 'NCBI Gene Expression Omnibus — public repository of high-throughput functional genomic data (microarray, RNA-seq, ChIP-seq). Use db=gds and retmode=json in where params. Accessions: GSE (series), GSM (sample), GDS (dataset), GPL (platform).',
   driver: 'rest',
   connection: {
-    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
+    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
   },
   entities: [
     {
@@ -35,22 +35,22 @@ module.exports = {
       name: '/esearch.fcgi',
       columns: ['count', 'retmax', 'retstart', 'idlist', 'translationset', 'querytranslation'],
       relations: [
-        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'datasets' },
-      ],
+        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'datasets' }
+      ]
     },
     {
       // Use where: { db: "gds", id: "<uid>", retmode: "json" }
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
       relations: [
-        { entity: '/esearch.fcgi', foreignKey: 'pubmed_id', type: 'hasOne', alias: 'pubmedArticle', catalog: 'pubmed' },
-      ],
+        { entity: '/esearch.fcgi', foreignKey: 'pubmed_id', type: 'hasOne', alias: 'pubmedArticle', catalog: 'pubmed' }
+      ]
     },
     {
       // Use where: { dbfrom: "gds", db: "sra", id: "<uid>", retmode: "json" }
       name: '/elink.fcgi',
       columns: ['linksets'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * KEGG driver – Kyoto Encyclopedia of Genes and Genomes REST API adapter.
@@ -34,7 +34,7 @@
  */
 
 // Separator used when appending continuation lines to the current field value
-const CONTINUATION_SEP = '; ';
+const CONTINUATION_SEP = '; '
 
 /**
  * Parse a tab-delimited KEGG response into an array of row objects.
@@ -42,19 +42,19 @@ const CONTINUATION_SEP = '; ';
  * @param {string[]} cols  column names for the two tab-separated fields
  * @returns {object[]}
  */
-function parseTsv(text, cols) {
-  const rows = [];
+function parseTsv (text, cols) {
+  const rows = []
   for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const parts = trimmed.split('\t');
-    const row = {};
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const parts = trimmed.split('\t')
+    const row = {}
     for (let i = 0; i < cols.length; i++) {
-      row[cols[i]] = parts[i] !== undefined ? parts[i] : null;
+      row[cols[i]] = parts[i] !== undefined ? parts[i] : null
     }
-    rows.push(row);
+    rows.push(row)
   }
-  return rows;
+  return rows
 }
 
 /**
@@ -72,44 +72,44 @@ function parseTsv(text, cols) {
  * @param {string} text  raw flat-file text
  * @returns {object[]}
  */
-function parseFlatFile(text) {
-  const result = {};
-  let currentKey = null;
+function parseFlatFile (text) {
+  const result = {}
+  let currentKey = null
 
   for (const line of text.split('\n')) {
-    if (line.startsWith('///')) break;
+    if (line.startsWith('///')) break
 
     // Field line: starts with an UPPERCASE key at column 0
-    const fieldMatch = line.match(/^([A-Z_]+)\s+(.*)/);
+    const fieldMatch = line.match(/^([A-Z_]+)\s+(.*)/)
     if (fieldMatch) {
-      currentKey = fieldMatch[1].toLowerCase();
-      const value = fieldMatch[2].trim();
+      currentKey = fieldMatch[1].toLowerCase()
+      const value = fieldMatch[2].trim()
 
       if (Object.prototype.hasOwnProperty.call(result, currentKey)) {
-        const existing = result[currentKey];
+        const existing = result[currentKey]
         if (Array.isArray(existing)) {
-          existing.push(value);
+          existing.push(value)
         } else {
-          result[currentKey] = [existing, value];
+          result[currentKey] = [existing, value]
         }
       } else {
-        result[currentKey] = value;
+        result[currentKey] = value
       }
     } else if (currentKey) {
       // Continuation line – append to the current key's value
-      const cont = line.trim();
-      if (!cont) continue;
+      const cont = line.trim()
+      if (!cont) continue
 
-      const existing = result[currentKey];
+      const existing = result[currentKey]
       if (Array.isArray(existing)) {
-        existing[existing.length - 1] += CONTINUATION_SEP + cont;
+        existing[existing.length - 1] += CONTINUATION_SEP + cont
       } else {
-        result[currentKey] = existing + CONTINUATION_SEP + cont;
+        result[currentKey] = existing + CONTINUATION_SEP + cont
       }
     }
   }
 
-  return [result];
+  return [result]
 }
 
 /**
@@ -118,19 +118,19 @@ function parseFlatFile(text) {
  * @param {string} path  the request path (e.g. "/find/compound/glucose")
  * @returns {object[]}
  */
-function parseResponse(text, path) {
-  const family = path.replace(/^\/+/, '').split('/')[0];
+function parseResponse (text, path) {
+  const family = path.replace(/^\/+/, '').split('/')[0]
 
   if (family === 'get') {
-    return parseFlatFile(text);
+    return parseFlatFile(text)
   }
 
   if (family === 'link') {
-    return parseTsv(text, ['source_id', 'target_id']);
+    return parseTsv(text, ['source_id', 'target_id'])
   }
 
   // /list, /find, /info → entry_id + name
-  return parseTsv(text, ['entry_id', 'name']);
+  return parseTsv(text, ['entry_id', 'name'])
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -141,65 +141,65 @@ function parseResponse(text, path) {
  * @param {string[]|undefined} select
  * @returns {object[]}
  */
-function applySelect(rows, select) {
-  if (!select || select.length === 0) return rows;
+function applySelect (rows, select) {
+  if (!select || select.length === 0) return rows
   return rows.map((row) => {
-    const filtered = {};
+    const filtered = {}
     for (const field of select) {
       if (Object.prototype.hasOwnProperty.call(row, field)) {
-        filtered[field] = row[field];
+        filtered[field] = row[field]
       }
     }
-    return filtered;
-  });
+    return filtered
+  })
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-async function executeQuery(input) {
+async function executeQuery (input) {
   const {
     connection,
     from,
     select,
     where,
     limit,
-    offset,
-  } = input;
+    offset
+  } = input
 
-  const base = (connection.database || '').replace(/\/$/, '');
-  const path = from.startsWith('/') ? from : `/${from}`;
+  const base = (connection.database || '').replace(/\/$/, '')
+  const path = from.startsWith('/') ? from : `/${from}`
 
   // Append _pathSuffix as a path segment when provided (used for /find, /link, /get)
-  let fullPath = path;
+  let fullPath = path
   if (where && where._pathSuffix != null) {
-    fullPath = `${path}/${encodeURIComponent(String(where._pathSuffix))}`;
+    fullPath = `${path}/${encodeURIComponent(String(where._pathSuffix))}`
   }
 
-  const url = `${base}${fullPath}`;
+  const url = `${base}${fullPath}`
 
   const res = await globalThis.fetch(url, {
-    headers: { Accept: 'text/plain, */*' },
-  });
+    headers: { Accept: 'text/plain, */*' }
+  })
 
   if (!res.ok) {
-    throw new Error(`KEGG fetch failed: ${res.status} ${res.statusText} — ${url}`);
+    throw new Error(`KEGG fetch failed: ${res.status} ${res.statusText} — ${url}`)
   }
 
-  const text = await res.text();
-  let rows = parseResponse(text, fullPath);
+  const text = await res.text()
+  let rows = parseResponse(text, fullPath)
 
-  rows = applySelect(rows, select);
+  rows = applySelect(rows, select)
 
   // Client-side pagination (KEGG returns full lists)
-  const start = offset != null ? offset : 0;
-  const end   = limit  != null ? start + limit : undefined;
-  const page  = end != null ? rows.slice(start, end) : rows.slice(start);
+  const start = offset != null ? offset : 0
+  const end = limit != null ? start + limit : undefined
+  const page = end != null ? rows.slice(start, end) : rows.slice(start)
 
-  return { data: page, count: rows.length };
+  return { data: page, count: rows.length }
 }
 
-async function introspect(_connection) {
-  return { tables: [] };
+async function introspect (_connection) {
+  return { tables: [] }
 }
 
-module.exports = { executeQuery, introspect, parseTsv, parseFlatFile, parseResponse };
+module.exports = { executeQuery, introspect, parseTsv, parseFlatFile, parseResponse }

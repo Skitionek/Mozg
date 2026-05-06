@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * VibrioCyc – metabolic pathway database for Vibrio cholerae.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Vibrio cholerae (cholera pathogen). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'VIBCYC',
+    database: 'VIBCYC'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

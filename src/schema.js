@@ -1,37 +1,37 @@
-'use strict';
+'use strict'
 
-const { executeQuery } = require('./database/connector');
-const { introspectDatabase } = require('./database/introspect');
+const { executeQuery } = require('./database/connector')
+const { introspectDatabase } = require('./database/introspect')
 
 // ---------------------------------------------------------------------------
 // JSON scalar
 // ---------------------------------------------------------------------------
-const { Kind } = require('graphql');
+const { Kind } = require('graphql')
 
-function parseLiteralJSON(ast) {
+function parseLiteralJSON (ast) {
   switch (ast.kind) {
     case Kind.STRING:
     case Kind.BOOLEAN:
-      return ast.value;
+      return ast.value
     case Kind.INT:
-      return parseInt(ast.value, 10);
+      return parseInt(ast.value, 10)
     case Kind.FLOAT:
-      return parseFloat(ast.value);
+      return parseFloat(ast.value)
     case Kind.NULL:
-      return null;
+      return null
     case Kind.OBJECT: {
-      const obj = {};
+      const obj = {}
       for (const field of ast.fields) {
-        obj[field.name.value] = parseLiteralJSON(field.value);
+        obj[field.name.value] = parseLiteralJSON(field.value)
       }
-      return obj;
+      return obj
     }
     case Kind.LIST:
-      return ast.values.map(parseLiteralJSON);
+      return ast.values.map(parseLiteralJSON)
     case Kind.ENUM:
-      return ast.value;
+      return ast.value
     default:
-      return null;
+      return null
   }
 }
 
@@ -365,7 +365,7 @@ const typeDefs = /* GraphQL */ `
     catalog: String
     type: RelationType!
   }
-`;
+`
 
 // ---------------------------------------------------------------------------
 // Resolvers
@@ -374,18 +374,18 @@ const resolvers = {
   JSON: {
     serialize: (value) => value,
     parseValue: (value) => value,
-    parseLiteral: parseLiteralJSON,
+    parseLiteral: parseLiteralJSON
   },
   Query: {
     query: (_parent, { input }) => executeQuery(input),
     introspect: (_parent, { connection }) => introspectDatabase(connection),
     // Catalog is lazy-required so the files are only loaded when the resolver runs
     catalog: (_parent, { name }) => require('./catalog').getCatalog(name),
-    generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input),
+    generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input)
   },
   Mutation: {
-    ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input),
-  },
-};
+    ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input)
+  }
+}
 
-module.exports = { typeDefs, resolvers };
+module.exports = { typeDefs, resolvers }

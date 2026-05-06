@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * CauloCyc – metabolic pathway database for Caulobacter crescentus.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Caulobacter crescentus (model organism for cell-cycle research). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'CAULOBACTER',
+    database: 'CAULOBACTER'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

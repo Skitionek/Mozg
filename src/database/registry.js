@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Resolve a driver module by its name.
@@ -21,7 +21,7 @@
  * The legacy `rest` driver remains available for plain HTTP endpoints that
  * do not have an OpenAPI specification; use `openapi` for spec-backed REST.
  */
-function getDriver(driverName) {
+function getDriver (driverName) {
   switch (driverName) {
     // ── Mesh-backed drivers ────────────────────────────────────────────────
     case 'postgres':
@@ -32,36 +32,36 @@ function getDriver(driverName) {
     case 'odata':
     case 'thrift':
     case 'mongodb':
-      return require('./drivers/mesh-adapter');
+      return require('./drivers/mesh-adapter')
 
     // ── SQLite3 (legacy knex driver – tuql has critical vulnerability) ─────
     case 'sqlite3':
-      return require('./drivers/sqlite3');
+      return require('./drivers/sqlite3')
 
     // ── Legacy custom drivers ──────────────────────────────────────────────
     // ArangoDB: no graphql-mesh handler available
     case 'arango':
-      return require('./drivers/arango');
+      return require('./drivers/arango')
 
     // BioCyc: no graphql-mesh handler available
     case 'biocyc':
-      return require('./drivers/biocyc');
+      return require('./drivers/biocyc')
 
     // Plain REST without an OpenAPI spec (use `openapi` for spec-backed REST)
     case 'rest':
-      return require('./drivers/rest');
+      return require('./drivers/rest')
 
     // KEGG (rest.kegg.jp) – text/plain adapter with TSV + flat-file parsing
     case 'kegg':
-      return require('./drivers/kegg');
+      return require('./drivers/kegg')
 
     // Elasticsearch – REST adapter supporting GET and POST /_search queries
     case 'elasticsearch':
-      return require('./drivers/elasticsearch');
+      return require('./drivers/elasticsearch')
 
     default:
-      throw new Error(`Unknown driver: ${driverName}`);
+      throw new Error(`Unknown driver: ${driverName}`)
   }
 }
 
-module.exports = { getDriver };
+module.exports = { getDriver }

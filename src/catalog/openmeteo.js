@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Open-Meteo – free weather API, no API key required.
@@ -24,13 +24,13 @@ module.exports = {
   description: 'Free weather forecast API with no API key. Supply latitude/longitude via the `where` argument.',
   driver: 'rest',
   connection: {
-    database: 'https://api.open-meteo.com/v1',
+    database: 'https://api.open-meteo.com/v1'
   },
   entities: [
     {
       name: '/forecast',
       columns: ['latitude', 'longitude', 'generationtime_ms', 'utc_offset_seconds', 'timezone', 'timezone_abbreviation', 'elevation', 'current_weather', 'hourly', 'hourly_units', 'daily', 'daily_units'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

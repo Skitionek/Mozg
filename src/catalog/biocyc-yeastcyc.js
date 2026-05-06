@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * YeastCyc – metabolic pathway database for Saccharomyces cerevisiae S288C.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Saccharomyces cerevisiae S288C. Tier 1: extensively curated. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'YEAST',
+    database: 'YEAST'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

@@ -1,4 +1,4 @@
-import js from '@eslint/js';
+import js from '@eslint/js'
 
 export default [
   js.configs.recommended,
@@ -32,15 +32,15 @@ export default [
         parseFloat: 'readonly',
         encodeURIComponent: 'readonly',
         decodeURIComponent: 'readonly',
-        globalThis: 'readonly',
-      },
+        globalThis: 'readonly'
+      }
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      'no-console': 'off',
-    },
+      'no-console': 'off'
+    }
   },
   {
-    ignores: ['node_modules/', 'examples/sample.db'],
-  },
-];
+    ignores: ['node_modules/', 'examples/sample.db']
+  }
+]

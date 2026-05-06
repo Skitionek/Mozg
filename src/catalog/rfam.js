@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Rfam – public RNA families database maintained by the Wellcome Sanger Institute.
@@ -22,30 +22,30 @@ module.exports = {
     port: 4497,
     database: 'Rfam',
     user: 'rfamro',
-    password: '',
+    password: ''
   },
   entities: [
     {
       name: 'family',
       columns: ['rfam_acc', 'rfam_id', 'description', 'author', 'type', 'gathering_cutoff', 'noise_cutoff', 'number_of_species', 'number_3d_structures', 'created', 'updated'],
       relations: [
-        { entity: 'full_region', foreignKey: 'rfam_acc', localKey: 'rfam_acc', type: 'hasMany', alias: 'regions' },
-      ],
+        { entity: 'full_region', foreignKey: 'rfam_acc', localKey: 'rfam_acc', type: 'hasMany', alias: 'regions' }
+      ]
     },
     {
       name: 'full_region',
       columns: ['rfam_acc', 'rfamseq_acc', 'seq_start', 'seq_end', 'score', 'e_value', 'is_significant', 'type'],
       relations: [
         { entity: 'family', foreignKey: 'rfam_acc', localKey: 'rfam_acc', type: 'belongsTo', alias: 'family' },
-        { entity: 'rfamseq', foreignKey: 'rfamseq_acc', localKey: 'rfamseq_acc', type: 'belongsTo', alias: 'sequence' },
-      ],
+        { entity: 'rfamseq', foreignKey: 'rfamseq_acc', localKey: 'rfamseq_acc', type: 'belongsTo', alias: 'sequence' }
+      ]
     },
     {
       name: 'rfamseq',
       columns: ['rfamseq_acc', 'description', 'length', 'ncbi_id', 'mol_type', 'source'],
       relations: [
-        { entity: 'full_region', foreignKey: 'rfamseq_acc', localKey: 'rfamseq_acc', type: 'hasMany', alias: 'regions' },
-      ],
-    },
-  ],
-};
+        { entity: 'full_region', foreignKey: 'rfamseq_acc', localKey: 'rfamseq_acc', type: 'hasMany', alias: 'regions' }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * NCBI E-utilities – programmatic access to all NCBI databases.
@@ -27,32 +27,32 @@ module.exports = {
   description: 'Programmatic access to all NCBI databases including PubMed, GenBank, Gene, Taxonomy and more via the E-utilities API. Pass retmode=json and a db param in where to select the target database.',
   driver: 'rest',
   connection: {
-    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
+    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
   },
   entities: [
     {
       name: '/einfo.fcgi',
       columns: ['dblist', 'dbinfo'],
-      relations: [],
+      relations: []
     },
     {
       name: '/esearch.fcgi',
       columns: ['count', 'retmax', 'retstart', 'idlist', 'translationset', 'querytranslation', 'errorlist', 'warninglist'],
       relations: [
-        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'summaries' },
-      ],
+        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'summaries' }
+      ]
     },
     {
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'uid', type: 'hasMany', alias: 'relatedProteins', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'uid', type: 'hasMany', alias: 'relatedProteins', catalog: 'uniprot' }
+      ]
     },
     {
       name: '/elink.fcgi',
       columns: ['linksets'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

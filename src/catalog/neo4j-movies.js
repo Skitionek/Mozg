@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Neo4j Movies – public demo graph database hosted by Neo4j Labs.
@@ -23,7 +23,7 @@ module.exports = {
     database: 'movies',
     user: 'movies',
     password: 'movies',
-    scheme: 'neo4j+s',
+    scheme: 'neo4j+s'
   },
   entities: [
     {
@@ -31,16 +31,16 @@ module.exports = {
       columns: ['title', 'released', 'tagline'],
       relations: [
         { entity: 'Person', foreignKey: 'ACTED_IN', type: 'hasMany', alias: 'actors' },
-        { entity: 'Person', foreignKey: 'DIRECTED', type: 'hasMany', alias: 'directors' },
-      ],
+        { entity: 'Person', foreignKey: 'DIRECTED', type: 'hasMany', alias: 'directors' }
+      ]
     },
     {
       name: 'Person',
       columns: ['name', 'born'],
       relations: [
         { entity: 'Movie', foreignKey: 'ACTED_IN', type: 'hasMany', alias: 'actedIn' },
-        { entity: 'Movie', foreignKey: 'DIRECTED', type: 'hasMany', alias: 'directed' },
-      ],
-    },
-  ],
-};
+        { entity: 'Movie', foreignKey: 'DIRECTED', type: 'hasMany', alias: 'directed' }
+      ]
+    }
+  ]
+}

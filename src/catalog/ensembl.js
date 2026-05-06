@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Ensembl – genome browser and annotation database.
@@ -32,20 +32,20 @@ module.exports = {
   connection: {
     database: 'https://rest.ensembl.org',
     headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    }
   },
   entities: [
     {
       name: '/info/species',
       columns: ['species', 'name', 'common_name', 'display_name', 'taxon_id', 'assembly', 'release', 'division', 'groups'],
-      relations: [],
+      relations: []
     },
     {
       name: '/info/genomes',
       columns: ['name', 'display_name', 'organism', 'taxonomy_id', 'assembly_name', 'assembly_accession', 'genebuild', 'division'],
-      relations: [],
+      relations: []
     },
     {
       // Fetch gene by stable ID: /lookup/id/ENSG00000139618
@@ -55,30 +55,30 @@ module.exports = {
         { entity: '/xrefs/id', foreignKey: 'id', type: 'hasMany', alias: 'xrefs' },
         { entity: '/uniprotkb/search', foreignKey: 'id', type: 'hasOne', alias: 'uniprotEntry', catalog: 'uniprot' },
         { entity: '/data/query', foreignKey: 'id', type: 'hasMany', alias: 'reactomePathways', catalog: 'reactome' },
-        { entity: '/find/ko', foreignKey: 'id', type: 'hasMany', alias: 'keggOrthology', catalog: 'kegg' },
-      ],
+        { entity: '/find/ko', foreignKey: 'id', type: 'hasMany', alias: 'keggOrthology', catalog: 'kegg' }
+      ]
     },
     {
       // Fetch sequence by stable ID: /sequence/id/ENSG00000139618
       name: '/sequence/id',
       columns: ['id', 'seq', 'molecule', 'query', 'version', 'desc'],
       relations: [
-        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'gene' },
-      ],
+        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'gene' }
+      ]
     },
     {
       // Cross-database references: /xrefs/id/ENSG00000139618
       name: '/xrefs/id',
       columns: ['primary_id', 'display_id', 'dbname', 'db_display_name', 'description', 'info_type', 'info_text', 'synonyms'],
-      relations: [],
+      relations: []
     },
     {
       // Variant annotation: /variation/homo_sapiens/rs699
       name: '/variation/homo_sapiens',
       columns: ['name', 'mappings', 'ambiguity', 'var_class', 'synonyms', 'source', 'minor_allele', 'minor_allele_freq', 'minor_allele_count', 'clinical_significance'],
       relations: [
-        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'gene' },
-      ],
-    },
-  ],
-};
+        { entity: '/lookup/id', foreignKey: 'id', type: 'belongsTo', alias: 'gene' }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Open Library – Internet Archive's open book catalog.
@@ -23,23 +23,23 @@ module.exports = {
   description: 'Internet Archive open book catalog with millions of books, authors and subjects.',
   driver: 'rest',
   connection: {
-    database: 'https://openlibrary.org',
+    database: 'https://openlibrary.org'
   },
   entities: [
     {
       name: '/subjects/science.json',
       columns: ['key', 'name', 'edition_count', 'ebook_count_i', 'cover_i', 'first_publish_year', 'subject'],
-      relations: [],
+      relations: []
     },
     {
       name: '/subjects/fiction.json',
       columns: ['key', 'name', 'edition_count', 'ebook_count_i', 'cover_i', 'first_publish_year', 'subject'],
-      relations: [],
+      relations: []
     },
     {
       name: '/subjects/history.json',
       columns: ['key', 'name', 'edition_count', 'ebook_count_i', 'cover_i', 'first_publish_year'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}
