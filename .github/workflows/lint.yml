@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Run unified lint action
-        uses: Skitionek/lint
+        uses: Skitionek/lint@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
