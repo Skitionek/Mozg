@@ -12,3 +12,8 @@ SPELL_LYCHEE_DISABLE_ERRORS: true # megalinter.io URL may 404 on older version p
 SPELL_MISSPELL_DISABLE_ERRORS: true # spelling findings are advisory
 SPELL_PROSELINT_DISABLE_ERRORS: true # prose style findings are advisory
 REPOSITORY_TRIVY_DISABLE_ERRORS: true # MEDIUM CVE in fast-xml-parser tracked in a dedicated issue
+LATEX_CHKTEX_DISABLE_ERRORS: true # paper/mozg.tex uses intentional LaTeX formatting (aligned table spacing, code-listing quotes)
+REPOSITORY_GRYPE_DISABLE_ERRORS: true # those are handled by dependabot
+
+# Exclude JSONC files (which support comments) from strict JSON linting
+JSON_JSONLINT_FILTER_REGEX_EXCLUDE: "(devcontainer\\.json|\\.vscode/)"

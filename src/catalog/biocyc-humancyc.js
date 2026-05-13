@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * HumanCyc – metabolic pathway database for Homo sapiens.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Homo sapiens. Tier 1: extensively curated. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'HUMAN',
+    database: 'HUMAN'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

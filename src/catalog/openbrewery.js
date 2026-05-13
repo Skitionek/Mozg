@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Open Brewery DB – free public database of breweries worldwide.
@@ -13,13 +13,13 @@ module.exports = {
   description: 'Free public database of breweries worldwide. Filter by type, city, state, or country using the `where` argument.',
   driver: 'rest',
   connection: {
-    database: 'https://api.openbrewerydb.org/v1',
+    database: 'https://api.openbrewerydb.org/v1'
   },
   entities: [
     {
       name: '/breweries',
       columns: ['id', 'name', 'brewery_type', 'address_1', 'city', 'state_province', 'country', 'website_url', 'longitude', 'latitude'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

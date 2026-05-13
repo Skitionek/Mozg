@@ -1,240 +1,240 @@
-'use strict';
+'use strict'
 
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { getCatalog, listCatalog } = require('../src/catalog/index');
+const { test, describe } = require('node:test')
+const assert = require('node:assert/strict')
+const { getCatalog, listCatalog } = require('../src/catalog/index')
 
 describe('catalog', () => {
   test('listCatalog returns an array of name strings', () => {
-    const names = listCatalog();
-    assert.ok(Array.isArray(names), 'should be an array');
-    assert.ok(names.length >= 1, 'should have at least one entry');
+    const names = listCatalog()
+    assert.ok(Array.isArray(names), 'should be an array')
+    assert.ok(names.length >= 1, 'should have at least one entry')
     for (const n of names) {
-      assert.equal(typeof n, 'string');
+      assert.equal(typeof n, 'string')
     }
-  });
+  })
 
   test('getCatalog with no argument returns all entries', () => {
-    const all = getCatalog();
-    const names = listCatalog();
-    assert.equal(all.length, names.length);
-  });
+    const all = getCatalog()
+    const names = listCatalog()
+    assert.equal(all.length, names.length)
+  })
 
   test('getCatalog with a name returns a single-element array', () => {
-    const entries = getCatalog('jsonplaceholder');
-    assert.equal(entries.length, 1);
-  });
+    const entries = getCatalog('jsonplaceholder')
+    assert.equal(entries.length, 1)
+  })
 
   test('getCatalog throws for unknown catalog name', () => {
     assert.throws(
       () => getCatalog('no-such-catalog'),
-      /Unknown catalog/,
-    );
-  });
+      /Unknown catalog/
+    )
+  })
 
   test('every catalog entry has required top-level fields', () => {
-    const entries = getCatalog();
+    const entries = getCatalog()
     for (const entry of entries) {
-      assert.ok(entry.name,        `${entry.name}: name is required`);
-      assert.ok(entry.label,       `${entry.name}: label is required`);
-      assert.ok(entry.driver,      `${entry.name}: driver is required`);
-      assert.ok(entry.connection,  `${entry.name}: connection is required`);
+      assert.ok(entry.name, `${entry.name}: name is required`)
+      assert.ok(entry.label, `${entry.name}: label is required`)
+      assert.ok(entry.driver, `${entry.name}: driver is required`)
+      assert.ok(entry.connection, `${entry.name}: connection is required`)
       assert.ok(
         typeof entry.connection === 'object' && entry.connection !== null,
-        `${entry.name}: connection must be an object`,
-      );
-      assert.ok(Array.isArray(entry.entities), `${entry.name}: entities must be an array`);
+        `${entry.name}: connection must be an object`
+      )
+      assert.ok(Array.isArray(entry.entities), `${entry.name}: entities must be an array`)
     }
-  });
+  })
 
   test('every catalog entity has name, columns array, and relations array', () => {
-    const entries = getCatalog();
+    const entries = getCatalog()
     for (const entry of entries) {
       for (const entity of entry.entities) {
-        assert.ok(entity.name,                   `${entry.name}/${entity.name}: name is required`);
-        assert.ok(Array.isArray(entity.columns),  `${entry.name}/${entity.name}: columns must be an array`);
-        assert.ok(Array.isArray(entity.relations), `${entry.name}/${entity.name}: relations must be an array`);
+        assert.ok(entity.name, `${entry.name}/${entity.name}: name is required`)
+        assert.ok(Array.isArray(entity.columns), `${entry.name}/${entity.name}: columns must be an array`)
+        assert.ok(Array.isArray(entity.relations), `${entry.name}/${entity.name}: relations must be an array`)
       }
     }
-  });
+  })
 
   test('every catalog relation has entity, foreignKey, and type', () => {
-    const entries = getCatalog();
+    const entries = getCatalog()
     for (const entry of entries) {
       for (const entity of entry.entities) {
         for (const rel of entity.relations) {
-          assert.ok(rel.entity,     `relation in ${entry.name}/${entity.name}: entity is required`);
-          assert.ok(rel.foreignKey, `relation in ${entry.name}/${entity.name}: foreignKey is required`);
-          assert.ok(rel.type,       `relation in ${entry.name}/${entity.name}: type is required`);
+          assert.ok(rel.entity, `relation in ${entry.name}/${entity.name}: entity is required`)
+          assert.ok(rel.foreignKey, `relation in ${entry.name}/${entity.name}: foreignKey is required`)
+          assert.ok(rel.type, `relation in ${entry.name}/${entity.name}: type is required`)
           assert.ok(
             ['hasMany', 'hasOne', 'belongsTo'].includes(rel.type),
-            `relation in ${entry.name}/${entity.name}: type must be a valid RelationType`,
-          );
+            `relation in ${entry.name}/${entity.name}: type must be a valid RelationType`
+          )
         }
       }
     }
-  });
+  })
 
   test('getCatalog is lazy – each call to getCatalog loads only requested entries', () => {
     // Verify that calling getCatalog with a specific name only returns that entry
     for (const name of listCatalog()) {
-      const entries = getCatalog(name);
-      assert.equal(entries.length, 1);
-      assert.equal(entries[0].name, name);
+      const entries = getCatalog(name)
+      assert.equal(entries.length, 1)
+      assert.equal(entries[0].name, name)
     }
-  });
+  })
 
   test('catalog files are not loaded until getCatalog is called (lazy loading)', () => {
-    const path = require('node:path');
-    const catalogDir = path.join(__dirname, '../src/catalog');
+    const path = require('node:path')
+    const catalogDir = path.join(__dirname, '../src/catalog')
 
     // Evict all catalog entry modules from the require cache
     for (const name of listCatalog()) {
-      const resolved = require.resolve(path.join(catalogDir, name === 'neo4j-movies' ? 'neo4j-movies' : name));
-      delete require.cache[resolved];
+      const resolved = require.resolve(path.join(catalogDir, name === 'neo4j-movies' ? 'neo4j-movies' : name))
+      delete require.cache[resolved]
     }
 
     // Also evict the index so we get a fresh loader registry
-    const indexResolved = require.resolve(path.join(catalogDir, 'index'));
-    delete require.cache[indexResolved];
+    const indexResolved = require.resolve(path.join(catalogDir, 'index'))
+    delete require.cache[indexResolved]
 
     // Re-require only the index – no entry file should be loaded yet
-    const { getCatalog: freshGet, listCatalog: freshList } = require(path.join(catalogDir, 'index'));
+    const { getCatalog: freshGet, listCatalog: freshList } = require(path.join(catalogDir, 'index'))
 
     // Confirm entry files are absent from cache before any getCatalog call
     for (const name of freshList()) {
-      const resolved = require.resolve(path.join(catalogDir, name));
-      assert.equal(require.cache[resolved], undefined, `${name} should not be cached before getCatalog()`);
+      const resolved = require.resolve(path.join(catalogDir, name))
+      assert.equal(require.cache[resolved], undefined, `${name} should not be cached before getCatalog()`)
     }
 
     // Load one specific entry and confirm only that file is now cached
-    const targetName = freshList()[0];
-    freshGet(targetName);
-    const targetResolved = require.resolve(path.join(catalogDir, targetName));
-    assert.ok(require.cache[targetResolved], `${targetName} should be cached after getCatalog('${targetName}')`);
+    const targetName = freshList()[0]
+    freshGet(targetName)
+    const targetResolved = require.resolve(path.join(catalogDir, targetName))
+    assert.ok(require.cache[targetResolved], `${targetName} should be cached after getCatalog('${targetName}')`)
 
     // Other entry files must still be absent
     for (const name of freshList().slice(1)) {
-      const resolved = require.resolve(path.join(catalogDir, name));
-      assert.equal(require.cache[resolved], undefined, `${name} should not yet be cached`);
+      const resolved = require.resolve(path.join(catalogDir, name))
+      assert.equal(require.cache[resolved], undefined, `${name} should not yet be cached`)
     }
-  });
+  })
 
   // Spot-check individual catalog entries
 
   test('chinook has Artist entity with ArtistId column', () => {
-    const [entry] = getCatalog('chinook');
-    const artist = entry.entities.find(e => e.name === 'Artist');
-    assert.ok(artist, 'Artist entity should exist');
-    assert.ok(artist.columns.includes('ArtistId'));
-  });
+    const [entry] = getCatalog('chinook')
+    const artist = entry.entities.find(e => e.name === 'Artist')
+    assert.ok(artist, 'Artist entity should exist')
+    assert.ok(artist.columns.includes('ArtistId'))
+  })
 
   test('jsonplaceholder /posts entity has a hasMany relation to /comments', () => {
-    const [entry] = getCatalog('jsonplaceholder');
-    const posts = entry.entities.find(e => e.name === '/posts');
-    assert.ok(posts, '/posts entity should exist');
-    const rel = posts.relations.find(r => r.entity === '/comments' && r.type === 'hasMany');
-    assert.ok(rel, '/posts should have a hasMany relation to /comments');
-  });
+    const [entry] = getCatalog('jsonplaceholder')
+    const posts = entry.entities.find(e => e.name === '/posts')
+    assert.ok(posts, '/posts entity should exist')
+    const rel = posts.relations.find(r => r.entity === '/comments' && r.type === 'hasMany')
+    assert.ok(rel, '/posts should have a hasMany relation to /comments')
+  })
 
   test('rnacentral has postgres driver and public connection host', () => {
-    const [entry] = getCatalog('rnacentral');
-    assert.equal(entry.driver, 'postgres');
-    assert.ok(entry.connection.host, 'connection.host should be set');
-  });
+    const [entry] = getCatalog('rnacentral')
+    assert.equal(entry.driver, 'postgres')
+    assert.ok(entry.connection.host, 'connection.host should be set')
+  })
 
   test('neo4j-movies has neo4j driver with scheme set', () => {
-    const [entry] = getCatalog('neo4j-movies');
-    assert.equal(entry.driver, 'neo4j');
-    assert.ok(entry.connection.scheme, 'connection.scheme should be set');
-  });
+    const [entry] = getCatalog('neo4j-movies')
+    assert.equal(entry.driver, 'neo4j')
+    assert.ok(entry.connection.scheme, 'connection.scheme should be set')
+  })
 
   // Cross-catalog relation spot-checks
   test('uniprot /uniprotkb/search has cross-catalog relation to pdb', () => {
-    const [entry] = getCatalog('uniprot');
-    const entity = entry.entities.find(e => e.name === '/uniprotkb/search');
-    const rel = entity.relations.find(r => r.catalog === 'pdb');
-    assert.ok(rel, 'uniprot /uniprotkb/search should have a cross-catalog relation to pdb');
-    assert.equal(rel.entity, '/entry');
-  });
+    const [entry] = getCatalog('uniprot')
+    const entity = entry.entities.find(e => e.name === '/uniprotkb/search')
+    const rel = entity.relations.find(r => r.catalog === 'pdb')
+    assert.ok(rel, 'uniprot /uniprotkb/search should have a cross-catalog relation to pdb')
+    assert.equal(rel.entity, '/entry')
+  })
 
   test('ensembl /lookup/id has cross-catalog relations to uniprot and reactome', () => {
-    const [entry] = getCatalog('ensembl');
-    const entity = entry.entities.find(e => e.name === '/lookup/id');
-    const uniprotRel = entity.relations.find(r => r.catalog === 'uniprot');
-    const reactomeRel = entity.relations.find(r => r.catalog === 'reactome');
-    assert.ok(uniprotRel, 'ensembl /lookup/id should link to uniprot');
-    assert.ok(reactomeRel, 'ensembl /lookup/id should link to reactome');
-  });
+    const [entry] = getCatalog('ensembl')
+    const entity = entry.entities.find(e => e.name === '/lookup/id')
+    const uniprotRel = entity.relations.find(r => r.catalog === 'uniprot')
+    const reactomeRel = entity.relations.find(r => r.catalog === 'reactome')
+    assert.ok(uniprotRel, 'ensembl /lookup/id should link to uniprot')
+    assert.ok(reactomeRel, 'ensembl /lookup/id should link to reactome')
+  })
 
   test('flybase /api/v1.0/gene/orthologs has cross-catalog relations to wormbase and zfin', () => {
-    const [entry] = getCatalog('flybase');
-    const entity = entry.entities.find(e => e.name === '/api/v1.0/gene/orthologs');
-    const wbRel = entity.relations.find(r => r.catalog === 'wormbase');
-    const zfinRel = entity.relations.find(r => r.catalog === 'zfin');
-    assert.ok(wbRel, 'flybase orthologs should link to wormbase');
-    assert.ok(zfinRel, 'flybase orthologs should link to zfin');
-  });
+    const [entry] = getCatalog('flybase')
+    const entity = entry.entities.find(e => e.name === '/api/v1.0/gene/orthologs')
+    const wbRel = entity.relations.find(r => r.catalog === 'wormbase')
+    const zfinRel = entity.relations.find(r => r.catalog === 'zfin')
+    assert.ok(wbRel, 'flybase orthologs should link to wormbase')
+    assert.ok(zfinRel, 'flybase orthologs should link to zfin')
+  })
 
   test('kegg /list/enzyme has cross-catalog relation to uniprot', () => {
-    const [entry] = getCatalog('kegg');
-    const entity = entry.entities.find(e => e.name === '/list/enzyme');
-    const rel = entity.relations.find(r => r.catalog === 'uniprot');
-    assert.ok(rel, 'kegg /list/enzyme should cross-link to uniprot');
-  });
+    const [entry] = getCatalog('kegg')
+    const entity = entry.entities.find(e => e.name === '/list/enzyme')
+    const rel = entity.relations.find(r => r.catalog === 'uniprot')
+    assert.ok(rel, 'kegg /list/enzyme should cross-link to uniprot')
+  })
 
   test('every cross-catalog relation references a valid catalog name', () => {
-    const allNames = new Set(listCatalog());
-    const entries = getCatalog();
+    const allNames = new Set(listCatalog())
+    const entries = getCatalog()
     for (const entry of entries) {
       for (const entity of entry.entities) {
         for (const rel of entity.relations) {
           if (rel.catalog) {
             assert.ok(
               allNames.has(rel.catalog),
-              `${entry.name}/${entity.name}: cross-catalog relation references unknown catalog "${rel.catalog}"`,
-            );
+              `${entry.name}/${entity.name}: cross-catalog relation references unknown catalog "${rel.catalog}"`
+            )
           }
         }
       }
     }
-  });
+  })
 
   // ── New lifelike-integration entries ───────────────────────────────────
 
   test('chebi has rest driver and OLS4 connection', () => {
-    const [entry] = getCatalog('chebi');
-    assert.equal(entry.driver, 'rest');
-    assert.ok(entry.connection.database.includes('ols4'), 'connection.database should reference ols4');
-    const terms = entry.entities.find(e => e.name === '/terms');
-    assert.ok(terms, '/terms entity should exist');
-    assert.ok(terms.columns.includes('iri'), '/terms should have iri column');
-  });
+    const [entry] = getCatalog('chebi')
+    assert.equal(entry.driver, 'rest')
+    assert.ok(entry.connection.database.includes('ols4'), 'connection.database should reference ols4')
+    const terms = entry.entities.find(e => e.name === '/terms')
+    assert.ok(terms, '/terms entity should exist')
+    assert.ok(terms.columns.includes('iri'), '/terms should have iri column')
+  })
 
   test('geneontology has rest driver and GOC API connection', () => {
-    const [entry] = getCatalog('geneontology');
-    assert.equal(entry.driver, 'rest');
-    assert.ok(entry.connection.database.includes('geneontology.org'), 'connection.database should point to geneontology.org');
-    const term = entry.entities.find(e => e.name === '/ontology/term');
-    assert.ok(term, '/ontology/term entity should exist');
-    assert.ok(term.columns.includes('id'), '/ontology/term should have id column');
-  });
+    const [entry] = getCatalog('geneontology')
+    assert.equal(entry.driver, 'rest')
+    assert.ok(entry.connection.database.includes('geneontology.org'), 'connection.database should point to geneontology.org')
+    const term = entry.entities.find(e => e.name === '/ontology/term')
+    assert.ok(term, '/ontology/term entity should exist')
+    assert.ok(term.columns.includes('id'), '/ontology/term should have id column')
+  })
 
   test('mesh has rest driver and NLM connection', () => {
-    const [entry] = getCatalog('mesh');
-    assert.equal(entry.driver, 'rest');
-    assert.ok(entry.connection.database.includes('nlm.nih.gov'), 'connection.database should point to nlm.nih.gov');
-    const descriptor = entry.entities.find(e => e.name === '/lookup/descriptor');
-    assert.ok(descriptor, '/lookup/descriptor entity should exist');
-    assert.ok(descriptor.columns.includes('ui'), '/lookup/descriptor should have ui column');
-  });
+    const [entry] = getCatalog('mesh')
+    assert.equal(entry.driver, 'rest')
+    assert.ok(entry.connection.database.includes('nlm.nih.gov'), 'connection.database should point to nlm.nih.gov')
+    const descriptor = entry.entities.find(e => e.name === '/lookup/descriptor')
+    assert.ok(descriptor, '/lookup/descriptor entity should exist')
+    assert.ok(descriptor.columns.includes('ui'), '/lookup/descriptor should have ui column')
+  })
 
   test('regulondb has rest driver and CCUS connection', () => {
-    const [entry] = getCatalog('regulondb');
-    assert.equal(entry.driver, 'rest');
-    assert.ok(entry.connection.database.includes('regulondb'), 'connection.database should point to regulondb');
-    const genes = entry.entities.find(e => e.name === '/genes');
-    assert.ok(genes, '/genes entity should exist');
-    assert.ok(genes.columns.includes('gene_id'), '/genes should have gene_id column');
-  });
-});
+    const [entry] = getCatalog('regulondb')
+    assert.equal(entry.driver, 'rest')
+    assert.ok(entry.connection.database.includes('regulondb'), 'connection.database should point to regulondb')
+    const genes = entry.entities.find(e => e.name === '/genes')
+    assert.ok(genes, '/genes entity should exist')
+    assert.ok(genes.columns.includes('gene_id'), '/genes should have gene_id column')
+  })
+})

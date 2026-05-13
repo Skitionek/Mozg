@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * NASA APIs – public APIs from NASA.
@@ -20,18 +20,18 @@ module.exports = {
   description: 'Public NASA data APIs including Astronomy Picture of the Day (APOD) and Near Earth Objects. Use DEMO_KEY or register for a free API key at api.nasa.gov.',
   driver: 'rest',
   connection: {
-    database: 'https://api.nasa.gov',
+    database: 'https://api.nasa.gov'
   },
   entities: [
     {
       name: '/planetary/apod',
       columns: ['date', 'explanation', 'hdurl', 'media_type', 'service_version', 'title', 'url', 'copyright'],
-      relations: [],
+      relations: []
     },
     {
       name: '/neo/rest/v1/feed',
       columns: ['element_count', 'near_earth_objects'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

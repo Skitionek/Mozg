@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * EMBL-EBI – European Bioinformatics Institute data resources.
@@ -33,8 +33,8 @@ module.exports = {
   connection: {
     database: 'https://www.ebi.ac.uk/ena/portal/api',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -42,25 +42,25 @@ module.exports = {
       name: '/search',
       columns: ['accession', 'description', 'scientific_name', 'tax_id', 'sequence_length', 'base_count', 'study_accession', 'experiment_accession', 'run_accession', 'first_public', 'last_updated'],
       relations: [
-        { entity: '/esearch.fcgi', foreignKey: 'accession', type: 'hasOne', alias: 'ncbiEntry', catalog: 'genbank' },
-      ],
+        { entity: '/esearch.fcgi', foreignKey: 'accession', type: 'hasOne', alias: 'ncbiEntry', catalog: 'genbank' }
+      ]
     },
     {
       name: '/count',
       columns: ['count'],
-      relations: [],
+      relations: []
     },
     {
       // Returns available result types (studies, sequences, runs, etc.)
       name: '/results',
       columns: ['id', 'name', 'description', 'displayName'],
-      relations: [],
+      relations: []
     },
     {
       // Use where: { result: "sequence" } to list available fields for that result type
       name: '/returnFields',
       columns: ['columnId', 'freeText', 'description', 'type'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

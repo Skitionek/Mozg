@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * DDBJ – DNA Data Bank of Japan, the sole nucleotide archive in Asia.
@@ -34,8 +34,8 @@ module.exports = {
   connection: {
     database: 'https://ddbj.nig.ac.jp/search/api/v1',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -45,22 +45,22 @@ module.exports = {
       relations: [
         { entity: '/search/bioproject', foreignKey: 'bioproject_accession', type: 'belongsTo', alias: 'bioproject' },
         { entity: '/esearch.fcgi', foreignKey: 'accession', type: 'hasOne', alias: 'genbankEntry', catalog: 'genbank' },
-        { entity: '/search', foreignKey: 'accession', type: 'hasOne', alias: 'emblEntry', catalog: 'embl-ebi' },
-      ],
+        { entity: '/search', foreignKey: 'accession', type: 'hasOne', alias: 'emblEntry', catalog: 'embl-ebi' }
+      ]
     },
     {
       // Use where: { q: "human genome", size: "20" }
       name: '/search/bioproject',
       columns: ['accession', 'title', 'description', 'organism', 'taxon_id', 'submission_date', 'last_modified_date'],
       relations: [
-        { entity: '/search/biosample', foreignKey: 'accession', type: 'hasMany', alias: 'biosamples' },
-      ],
+        { entity: '/search/biosample', foreignKey: 'accession', type: 'hasMany', alias: 'biosamples' }
+      ]
     },
     {
       // Use where: { q: "liver tissue", size: "20" }
       name: '/search/biosample',
       columns: ['accession', 'title', 'organism', 'taxon_id', 'tissue_type', 'cell_type', 'dev_stage', 'submission_date'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

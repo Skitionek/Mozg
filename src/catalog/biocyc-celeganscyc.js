@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * CelegansCyc – metabolic pathway database for Caenorhabditis elegans.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Caenorhabditis elegans (model nematode). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'CELEGANS',
+    database: 'CELEGANS'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

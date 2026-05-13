@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * GenBank – NCBI annotated nucleotide sequence database.
@@ -24,7 +24,7 @@ module.exports = {
   description: 'NCBI GenBank nucleotide sequence database. Search and retrieve annotated DNA/RNA sequences. Use db=nuccore in where params. Accessions follow the format AB123456 or NM_001234.',
   driver: 'rest',
   connection: {
-    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
+    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
   },
   entities: [
     {
@@ -34,20 +34,20 @@ module.exports = {
       relations: [
         { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'summaries' },
         { entity: '/search', foreignKey: 'idlist', type: 'hasMany', alias: 'emblSequences', catalog: 'embl-ebi' },
-        { entity: '/search/sequence', foreignKey: 'idlist', type: 'hasMany', alias: 'ddbjSequences', catalog: 'ddbj' },
-      ],
+        { entity: '/search/sequence', foreignKey: 'idlist', type: 'hasMany', alias: 'ddbjSequences', catalog: 'ddbj' }
+      ]
     },
     {
       // Use where: { db: "nuccore", id: "<uid>", retmode: "json" }
       name: '/esummary.fcgi',
       columns: ['result', 'uids'],
-      relations: [],
+      relations: []
     },
     {
       // Use where: { dbfrom: "nuccore", db: "pubmed", id: "<uid>", retmode: "json" }
       name: '/elink.fcgi',
       columns: ['linksets'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

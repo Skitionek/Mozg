@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Mozg – a cross-database query layer with a single GraphQL endpoint for PostgreSQL, MySQL, SQLite, Neo4j, ArangoDB and REST APIs." />
+  <meta name="keywords" content="GraphQL, cross-database, query, PostgreSQL, MySQL, SQLite, Neo4j, ArangoDB, REST, federation" />
   <title>Mozg – Cross-Database Query Interface</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -586,7 +588,7 @@
       <label>API Key Query Param (optional, e.g. api_key)</label>
       <input id="conn-api-key-param" type="text" placeholder="api_key" />
       <label>Extra Headers (JSON object, optional)</label>
-      <textarea id="conn-headers" rows="2" placeholder='{"X-App-Id": "mozg"}'></textarea>
+      <textarea id="conn-headers" rows="2" placeholder="{&quot;X-App-Id&quot;: &quot;mozg&quot;}"></textarea>
     </div>
 
     <label id="conn-db-label">Database / File</label>
@@ -605,7 +607,7 @@
     <input id="q-select" type="text" placeholder="id, name, email" />
 
     <label>Where (JSON)</label>
-    <textarea id="q-where" rows="2" placeholder='{"active": true}'></textarea>
+    <textarea id="q-where" rows="2" placeholder="{&quot;active&quot;: true}"></textarea>
 
     <div class="row2">
       <div>
