@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * CampyCyc – metabolic pathway database for Campylobacter jejuni.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Campylobacter jejuni (food-borne pathogen, leading cause of bacterial gastroenteritis). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'CAMPY',
+    database: 'CAMPY'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

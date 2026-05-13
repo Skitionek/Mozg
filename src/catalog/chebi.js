@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * ChEBI – Chemical Entities of Biological Interest.
@@ -31,8 +31,8 @@ module.exports = {
   connection: {
     database: 'https://www.ebi.ac.uk/ols4/api/ontologies/chebi',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -41,28 +41,28 @@ module.exports = {
       columns: ['iri', 'label', 'description', 'short_form', 'obo_id', 'is_obsolete', 'term_replaced_by', 'annotation'],
       relations: [
         { entity: '/uniprotkb/search', foreignKey: 'label', type: 'hasMany', alias: 'proteins', catalog: 'uniprot' },
-        { entity: '/find/compound', foreignKey: 'label', type: 'hasMany', alias: 'keggCompounds', catalog: 'kegg' },
-      ],
+        { entity: '/find/compound', foreignKey: 'label', type: 'hasMany', alias: 'keggCompounds', catalog: 'kegg' }
+      ]
     },
     {
       // Individual term record by IRI or short form
       name: '/terms/{id}',
       columns: ['iri', 'label', 'description', 'short_form', 'obo_id', 'synonyms', 'annotation', 'is_obsolete'],
       relations: [
-        { entity: '/children', foreignKey: 'short_form', type: 'hasMany', alias: 'children' },
-      ],
+        { entity: '/children', foreignKey: 'short_form', type: 'hasMany', alias: 'children' }
+      ]
     },
     {
       // Direct children of a term: where: { short_form: "CHEBI:17234", parentRestriction: "DIRECT" }
       name: '/children',
       columns: ['iri', 'label', 'short_form', 'obo_id', 'is_obsolete'],
-      relations: [],
+      relations: []
     },
     {
       // All descendants: where: { short_form: "CHEBI:17234" }
       name: '/descendants',
       columns: ['iri', 'label', 'short_form', 'obo_id', 'is_obsolete'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

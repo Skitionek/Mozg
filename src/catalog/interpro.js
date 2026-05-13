@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * InterPro – protein families, domains and functional sites database.
@@ -30,8 +30,8 @@ module.exports = {
   connection: {
     database: 'https://www.ebi.ac.uk/interpro/api',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -39,16 +39,16 @@ module.exports = {
       name: '/entry/all',
       columns: ['accession', 'name', 'type', 'integrated', 'member_databases', 'go_terms', 'description', 'literature', 'overlaps_with'],
       relations: [
-        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' },
-      ],
+        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' }
+      ]
     },
     {
       // Entries from a specific member database: /entry/pfam
       name: '/entry/pfam',
       columns: ['accession', 'name', 'type', 'integrated', 'short_name', 'source_database'],
       relations: [
-        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' },
-      ],
+        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' }
+      ]
     },
     {
       // Proteins with InterPro annotations: /protein/UniProt/
@@ -57,24 +57,24 @@ module.exports = {
       relations: [
         { entity: '/entry/all', foreignKey: 'accession', type: 'hasMany', alias: 'entries' },
         { entity: '/structure/PDB', foreignKey: 'accession', type: 'hasMany', alias: 'structures' },
-        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' }
+      ]
     },
     {
       // Structures with InterPro annotations: /structure/PDB/
       name: '/structure/PDB',
       columns: ['accession', 'name', 'experiment_type', 'release_date', 'chains'],
       relations: [
-        { entity: '/entry', foreignKey: 'accession', type: 'belongsTo', alias: 'pdbEntry', catalog: 'pdb' },
-      ],
+        { entity: '/entry', foreignKey: 'accession', type: 'belongsTo', alias: 'pdbEntry', catalog: 'pdb' }
+      ]
     },
     {
       // Taxonomy nodes with InterPro annotations: /taxonomy/uniprot/
       name: '/taxonomy/uniprot',
       columns: ['accession', 'name', 'rank', 'lineage', 'children', 'proteins', 'entries'],
       relations: [
-        { entity: '/protein/UniProt', foreignKey: 'taxId', type: 'hasMany', alias: 'proteins' },
-      ],
-    },
-  ],
-};
+        { entity: '/protein/UniProt', foreignKey: 'taxId', type: 'hasMany', alias: 'proteins' }
+      ]
+    }
+  ]
+}

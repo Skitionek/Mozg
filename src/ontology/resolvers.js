@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Generates GraphQL resolver objects from an ontology entityMap.
@@ -13,20 +13,20 @@
  * @returns {{ Query: object, [typeName: string]: object }}
  */
 
-const { executeQuery } = require('../database/connector');
+const { executeQuery } = require('../database/connector')
 
-function generateResolvers(entityMap) {
-  const Query = {};
-  const typeResolvers = {};
+function generateResolvers (entityMap) {
+  const Query = {}
+  const typeResolvers = {}
 
   for (const [typeName, entity] of entityMap) {
-    if (entity.isAbstract) continue;
+    if (entity.isAbstract) continue
 
     // Root query field: <typeName>s(connection, filter, …): [TypeName!]!
     const queryField =
       typeName.charAt(0).toLowerCase() +
       typeName.slice(1) +
-      (typeName.endsWith('s') ? 'es' : 's');
+      (typeName.endsWith('s') ? 'es' : 's')
 
     Query[queryField] = async (
       _parent,
@@ -39,35 +39,35 @@ function generateResolvers(entityMap) {
         limit: limit ?? undefined,
         offset: offset ?? undefined,
         orderBy: orderBy ?? undefined,
-        orderDirection: orderDirection ?? undefined,
-      });
-      return result.data;
-    };
+        orderDirection: orderDirection ?? undefined
+      })
+      return result.data
+    }
 
     // Relation field resolvers
-    const fieldResolvers = {};
+    const fieldResolvers = {}
     for (const rel of entity.relations) {
-      const { fieldName, targetTable, foreignKey, localKey, relationType } = rel;
+      const { fieldName, targetTable, foreignKey, localKey, relationType } = rel
 
       fieldResolvers[fieldName] = async (parent, { connection }) => {
-        const parentKey = parent[localKey] ?? parent.id;
+        const parentKey = parent[localKey] ?? parent.id
         const result = await executeQuery({
           connection,
           from: targetTable,
-          where: { [foreignKey]: parentKey },
-        });
-        const rows = result.data || [];
-        if (relationType === 'hasMany') return rows;
-        return rows[0] ?? null;
-      };
+          where: { [foreignKey]: parentKey }
+        })
+        const rows = result.data || []
+        if (relationType === 'hasMany') return rows
+        return rows[0] ?? null
+      }
     }
 
     if (Object.keys(fieldResolvers).length > 0) {
-      typeResolvers[typeName] = fieldResolvers;
+      typeResolvers[typeName] = fieldResolvers
     }
   }
 
-  return { Query, ...typeResolvers };
+  return { Query, ...typeResolvers }
 }
 
-module.exports = { generateResolvers };
+module.exports = { generateResolvers }

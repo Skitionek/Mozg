@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * BRENDA – BRaunschweig ENzyme DAtabase, the world's largest enzyme database.
@@ -32,7 +32,7 @@ module.exports = {
   description: 'BRaunschweig ENzyme DAtabase — comprehensive enzyme/metabolism data for 80 000+ enzymes across all organisms. Free registration required. EC numbers follow the 1.1.1.1 format. SOAP and REST interfaces available.',
   driver: 'rest',
   connection: {
-    database: 'https://www.brenda-enzymes.org/rest',
+    database: 'https://www.brenda-enzymes.org/rest'
     // Credentials are user-supplied at query time (not stored in the catalog).
     // Pass user (registered email) and password (SHA-256 of password + email)
     // via the GraphQL query's connection argument.
@@ -46,26 +46,26 @@ module.exports = {
         { entity: '/km_value', foreignKey: 'ecNumber', type: 'hasMany', alias: 'kmValues' },
         { entity: '/turnover_number', foreignKey: 'ecNumber', type: 'hasMany', alias: 'turnoverNumbers' },
         { entity: '/temperature_optimum', foreignKey: 'ecNumber', type: 'hasMany', alias: 'temperatureOptima' },
-        { entity: '/list/enzyme', foreignKey: 'ecNumber', type: 'hasOne', alias: 'keggEnzyme', catalog: 'kegg' },
-      ],
+        { entity: '/list/enzyme', foreignKey: 'ecNumber', type: 'hasOne', alias: 'keggEnzyme', catalog: 'kegg' }
+      ]
     },
     {
       // Kinetic constants (Km) for a given EC number: /km_value/1.1.1.1
       name: '/km_value',
       columns: ['ecNumber', 'organism', 'substrate', 'value', 'unit', 'commentary', 'reference'],
-      relations: [],
+      relations: []
     },
     {
       // Turnover number (kcat): /turnover_number/1.1.1.1
       name: '/turnover_number',
       columns: ['ecNumber', 'organism', 'substrate', 'value', 'unit', 'commentary', 'reference'],
-      relations: [],
+      relations: []
     },
     {
       // Temperature and pH optima: /temperature_optimum/1.1.1.1
       name: '/temperature_optimum',
       columns: ['ecNumber', 'organism', 'value', 'unit', 'commentary', 'reference'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

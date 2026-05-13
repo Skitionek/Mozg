@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * ListCyc – metabolic pathway database for Listeria monocytogenes.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Listeria monocytogenes (food-borne pathogen). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'LISTCYC',
+    database: 'LISTCYC'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

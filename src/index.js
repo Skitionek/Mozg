@@ -1,15 +1,15 @@
-'use strict';
+'use strict'
 
-const { createServer } = require('node:http');
-const { readFileSync } = require('node:fs');
-const { join } = require('node:path');
-const { createYoga, createSchema } = require('graphql-yoga');
-const { typeDefs, resolvers } = require('./schema');
-const { handleStreamRequest } = require('./stream');
+const { createServer } = require('node:http')
+const { readFileSync } = require('node:fs')
+const { join } = require('node:path')
+const { createYoga, createSchema } = require('graphql-yoga')
+const { typeDefs, resolvers } = require('./schema')
+const { handleStreamRequest } = require('./stream')
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4000
 
-const schema = createSchema({ typeDefs, resolvers });
+const schema = createSchema({ typeDefs, resolvers })
 
 const yoga = createYoga({
   schema,
@@ -41,69 +41,69 @@ const yoga = createYoga({
 #     data
 #   }
 # }
-`,
+`
   },
-  landingPage: false,
-});
+  landingPage: false
+})
 
 // ── Static directories ──────────────────────────────────────────────────────
-const PUBLIC_DIR   = join(__dirname, '..', 'public');
-const EXAMPLES_DIR = join(__dirname, '..', 'examples');
+const PUBLIC_DIR = join(__dirname, '..', 'public')
+const EXAMPLES_DIR = join(__dirname, '..', 'examples')
 
 const MIME_MAP = {
   html: 'text/html',
-  js:   'text/javascript',
-  css:  'text/css',
+  js: 'text/javascript',
+  css: 'text/css',
   json: 'application/json',
-  ttl:  'text/turtle',
-  owl:  'application/rdf+xml',
-  rdf:  'application/rdf+xml',
-  txt:  'text/plain',
-};
+  ttl: 'text/turtle',
+  owl: 'application/rdf+xml',
+  rdf: 'application/rdf+xml',
+  txt: 'text/plain'
+}
 
-function serveFile(filePath, res) {
+function serveFile (filePath, res) {
   try {
-    const content = readFileSync(filePath);
-    const ext = filePath.split('.').pop().toLowerCase();
-    const mime = MIME_MAP[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': `${mime}; charset=utf-8` });
-    res.end(content);
+    const content = readFileSync(filePath)
+    const ext = filePath.split('.').pop().toLowerCase()
+    const mime = MIME_MAP[ext] || 'application/octet-stream'
+    res.writeHead(200, { 'Content-Type': `${mime}; charset=utf-8` })
+    res.end(content)
   } catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not found');
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end('Not found')
   }
 }
 
-function serveStatic(pathname, res) {
-  const safe = pathname.replace(/\.\./g, '').replace(/\/+/g, '/');
+function serveStatic (pathname, res) {
+  const safe = pathname.replace(/\.\./g, '').replace(/\/+/g, '/')
 
   // Serve examples/ directory (queries.json, .ttl, .owl, …)
   if (safe.startsWith('/examples/')) {
-    const relPath = safe.slice('/examples/'.length);
-    return serveFile(join(EXAMPLES_DIR, relPath), res);
+    const relPath = safe.slice('/examples/'.length)
+    return serveFile(join(EXAMPLES_DIR, relPath), res)
   }
 
-  serveFile(join(PUBLIC_DIR, safe === '/' ? 'index.html' : safe), res);
+  serveFile(join(PUBLIC_DIR, safe === '/' ? 'index.html' : safe), res)
 }
 
 // ── HTTP server ─────────────────────────────────────────────────────────────
 const server = createServer((req, res) => {
-  const url = new URL(req.url, `http://localhost`);
+  const url = new URL(req.url, 'http://localhost')
 
   if (url.pathname.startsWith('/graphql')) {
-    return yoga(req, res);
+    return yoga(req, res)
   }
 
   if (url.pathname === '/stream') {
-    return handleStreamRequest(req, res);
+    return handleStreamRequest(req, res)
   }
 
-  serveStatic(url.pathname, res);
-});
+  serveStatic(url.pathname, res)
+})
 
 server.listen(PORT, () => {
-  console.log(`Mozg server is running`);
-  console.log(`  Web interface  →  http://localhost:${PORT}/`);
-  console.log(`  GraphQL API    →  http://localhost:${PORT}/graphql`);
-  console.log(`  Streaming API  →  http://localhost:${PORT}/stream`);
-});
+  console.log('Mozg server is running')
+  console.log(`  Web interface  →  http://localhost:${PORT}/`)
+  console.log(`  GraphQL API    →  http://localhost:${PORT}/graphql`)
+  console.log(`  Streaming API  →  http://localhost:${PORT}/stream`)
+})

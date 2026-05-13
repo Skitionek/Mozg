@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * PseudoCyc – metabolic pathway database for Pseudomonas aeruginosa PAO1.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Pseudomonas aeruginosa PAO1 (opportunistic pathogen). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'PSEUDO',
+    database: 'PSEUDO'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

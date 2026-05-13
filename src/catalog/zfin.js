@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * ZFIN – Zebrafish Information Network.
@@ -32,8 +32,8 @@ module.exports = {
   connection: {
     database: 'https://zfin.org/action/api',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -41,8 +41,8 @@ module.exports = {
       name: '/marker/search',
       columns: ['zdbId', 'abbreviation', 'name', 'markerType', 'organism', 'chromosome', 'startPosition', 'endPosition'],
       relations: [
-        { entity: '/gene', foreignKey: 'zdbId', type: 'belongsTo', alias: 'geneDetail' },
-      ],
+        { entity: '/gene', foreignKey: 'zdbId', type: 'belongsTo', alias: 'geneDetail' }
+      ]
     },
     {
       // Gene detail: /gene/ZDB-GENE-000112-37
@@ -51,20 +51,20 @@ module.exports = {
       relations: [
         { entity: '/gene/expression', foreignKey: 'zdbId', type: 'hasMany', alias: 'expression' },
         { entity: '/gene/phenotype', foreignKey: 'zdbId', type: 'hasMany', alias: 'phenotype' },
-        { entity: '/gene/orthologs', foreignKey: 'zdbId', type: 'hasMany', alias: 'orthologs' },
-      ],
+        { entity: '/gene/orthologs', foreignKey: 'zdbId', type: 'hasMany', alias: 'orthologs' }
+      ]
     },
     {
       // Expression: /gene/ZDB-GENE-000112-37/expression
       name: '/gene/expression',
       columns: ['gene', 'start', 'end', 'anatomyTerms', 'expressionPattern', 'assay', 'publication'],
-      relations: [],
+      relations: []
     },
     {
       // Phenotype: /gene/ZDB-GENE-000112-37/phenotype
       name: '/gene/phenotype',
       columns: ['gene', 'allele', 'zygosity', 'anatomyTerms', 'qualityTerms', 'phenotypeStatement', 'publication'],
-      relations: [],
+      relations: []
     },
     {
       // Orthologues: /gene/ZDB-GENE-000112-37/orthologs
@@ -72,14 +72,14 @@ module.exports = {
       columns: ['zebrafishGeneId', 'zebrafishGeneSymbol', 'orthologGeneId', 'orthologSymbol', 'orthologOrg', 'supportedBy'],
       relations: [
         { entity: '/api/v1.0/chado/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'flybaseOrthologs', catalog: 'flybase' },
-        { entity: '/rest/widget/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'wormbaseOrthologs', catalog: 'wormbase' },
-      ],
+        { entity: '/rest/widget/gene', foreignKey: 'zdbId', type: 'hasMany', alias: 'wormbaseOrthologs', catalog: 'wormbase' }
+      ]
     },
     {
       // Anatomy terms: /anatomy/ZDB-ANAT-010921-100
       name: '/anatomy',
       columns: ['zdbId', 'name', 'abbreviation', 'start', 'end', 'parent', 'children', 'aliases'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

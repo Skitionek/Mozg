@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Jikan – unofficial MyAnimeList REST API.
@@ -22,63 +22,63 @@ module.exports = {
   description: 'Unofficial MyAnimeList API with anime, manga, characters, people and genres.',
   driver: 'rest',
   connection: {
-    database: 'https://api.jikan.moe/v4',
+    database: 'https://api.jikan.moe/v4'
   },
   entities: [
     {
       name: '/anime',
       columns: ['mal_id', 'title', 'title_english', 'type', 'source', 'episodes', 'status', 'airing', 'score', 'rank', 'popularity', 'season', 'year'],
       relations: [
-        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
-      ],
+        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
+      ]
     },
     {
       name: '/manga',
       columns: ['mal_id', 'title', 'title_english', 'type', 'chapters', 'volumes', 'status', 'score', 'rank', 'popularity'],
       relations: [
-        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
-      ],
+        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
+      ]
     },
     {
       name: '/characters',
       columns: ['mal_id', 'name', 'name_kanji', 'nicknames', 'favorites', 'about'],
-      relations: [],
+      relations: []
     },
     {
       name: '/people',
       columns: ['mal_id', 'name', 'family_name', 'given_name', 'birthday', 'favorites', 'about'],
-      relations: [],
+      relations: []
     },
     {
       name: '/genres/anime',
       columns: ['mal_id', 'name', 'url', 'count'],
-      relations: [],
+      relations: []
     },
     {
       name: '/genres/manga',
       columns: ['mal_id', 'name', 'url', 'count'],
-      relations: [],
+      relations: []
     },
     {
       name: '/top/anime',
       columns: ['mal_id', 'title', 'type', 'episodes', 'score', 'rank', 'popularity', 'members'],
       relations: [
-        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
-      ],
+        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
+      ]
     },
     {
       name: '/top/manga',
       columns: ['mal_id', 'title', 'type', 'chapters', 'score', 'rank', 'popularity', 'members'],
       relations: [
-        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
-      ],
+        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
+      ]
     },
     {
       name: '/seasons/now',
       columns: ['mal_id', 'title', 'type', 'episodes', 'score', 'season', 'year'],
       relations: [
-        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' },
-      ],
-    },
-  ],
-};
+        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
+      ]
+    }
+  ]
+}

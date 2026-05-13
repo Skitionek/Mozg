@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * SalentCyc – metabolic pathway database for Salmonella enterica.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Salmonella enterica (food-borne pathogen). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'SALENT',
+    database: 'SALENT'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

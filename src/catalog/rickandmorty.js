@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Rick and Morty API – free REST API for the Rick and Morty TV show.
@@ -22,7 +22,7 @@ module.exports = {
   description: 'Free REST API for the Rick and Morty TV show with characters, episodes and locations.',
   driver: 'rest',
   connection: {
-    database: 'https://rickandmortyapi.com/api',
+    database: 'https://rickandmortyapi.com/api'
   },
   entities: [
     {
@@ -30,18 +30,18 @@ module.exports = {
       columns: ['id', 'name', 'status', 'species', 'type', 'gender', 'origin', 'location', 'episode', 'created'],
       relations: [
         { entity: '/location', foreignKey: 'location.url', type: 'belongsTo', alias: 'currentLocation' },
-        { entity: '/location', foreignKey: 'origin.url', type: 'belongsTo', alias: 'originLocation' },
-      ],
+        { entity: '/location', foreignKey: 'origin.url', type: 'belongsTo', alias: 'originLocation' }
+      ]
     },
     {
       name: '/episode',
       columns: ['id', 'name', 'air_date', 'episode', 'characters', 'created'],
-      relations: [],
+      relations: []
     },
     {
       name: '/location',
       columns: ['id', 'name', 'type', 'dimension', 'residents', 'created'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

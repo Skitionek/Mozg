@@ -1,11 +1,10 @@
-'use strict';
+'use strict'
 
-const { getDriver } = require('./registry');
+const { getDriver } = require('./registry')
 
-async function executeQuery(input) {
-  const driver = getDriver(input.connection.driver);
-  return driver.executeQuery(input);
+async function executeQuery (input) {
+  const driver = getDriver(input.connection.driver)
+  return driver.executeQuery(input)
 }
 
-module.exports = { executeQuery };
-
+module.exports = { executeQuery }

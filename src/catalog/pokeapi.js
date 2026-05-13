@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * PokéAPI – free, open Pokémon data API.
@@ -26,7 +26,7 @@ module.exports = {
   description: 'Free, open Pokémon data API with Pokémon, abilities, moves, types and generations.',
   driver: 'rest',
   connection: {
-    database: 'https://pokeapi.co/api/v2',
+    database: 'https://pokeapi.co/api/v2'
   },
   entities: [
     {
@@ -34,47 +34,47 @@ module.exports = {
       columns: ['id', 'name', 'base_experience', 'height', 'weight', 'order', 'is_default'],
       relations: [
         { entity: '/type', foreignKey: 'name', type: 'hasMany', alias: 'types' },
-        { entity: '/ability', foreignKey: 'name', type: 'hasMany', alias: 'abilities' },
-      ],
+        { entity: '/ability', foreignKey: 'name', type: 'hasMany', alias: 'abilities' }
+      ]
     },
     {
       name: '/ability',
       columns: ['id', 'name', 'is_main_series', 'generation', 'effect_entries', 'pokemon'],
       relations: [
-        { entity: '/generation', foreignKey: 'name', type: 'belongsTo', alias: 'generation' },
-      ],
+        { entity: '/generation', foreignKey: 'name', type: 'belongsTo', alias: 'generation' }
+      ]
     },
     {
       name: '/type',
       columns: ['id', 'name', 'damage_relations', 'pokemon', 'moves'],
-      relations: [],
+      relations: []
     },
     {
       name: '/move',
       columns: ['id', 'name', 'accuracy', 'effect_chance', 'pp', 'priority', 'power', 'type', 'damage_class'],
       relations: [
         { entity: '/type', foreignKey: 'name', type: 'belongsTo', alias: 'type' },
-        { entity: '/generation', foreignKey: 'name', type: 'belongsTo', alias: 'generation' },
-      ],
+        { entity: '/generation', foreignKey: 'name', type: 'belongsTo', alias: 'generation' }
+      ]
     },
     {
       name: '/generation',
       columns: ['id', 'name', 'abilities', 'main_region', 'moves', 'pokemon_species', 'types', 'version_groups'],
       relations: [
-        { entity: '/region', foreignKey: 'name', type: 'belongsTo', alias: 'mainRegion' },
-      ],
+        { entity: '/region', foreignKey: 'name', type: 'belongsTo', alias: 'mainRegion' }
+      ]
     },
     {
       name: '/nature',
       columns: ['id', 'name', 'decreased_stat', 'increased_stat', 'hates_flavor', 'likes_flavor'],
-      relations: [],
+      relations: []
     },
     {
       name: '/region',
       columns: ['id', 'name', 'locations', 'main_generation', 'pokedexes', 'version_groups'],
       relations: [
-        { entity: '/generation', foreignKey: 'name', type: 'belongsTo', alias: 'mainGeneration' },
-      ],
-    },
-  ],
-};
+        { entity: '/generation', foreignKey: 'name', type: 'belongsTo', alias: 'mainGeneration' }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * EcoCyc – comprehensive genome and metabolic-pathway database for
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Genome and metabolic pathway database for Escherichia coli K-12 MG1655. NIH-funded and freely accessible without credentials.',
   driver: 'biocyc',
   connection: {
-    database: 'ECOLI',
+    database: 'ECOLI'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

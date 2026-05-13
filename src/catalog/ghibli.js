@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Studio Ghibli API – resource data from Studio Ghibli films.
@@ -21,7 +21,7 @@ module.exports = {
   description: 'Resource data from Studio Ghibli films: films, characters, locations, species and vehicles.',
   driver: 'rest',
   connection: {
-    database: 'https://ghibliapi.vercel.app',
+    database: 'https://ghibliapi.vercel.app'
   },
   entities: [
     {
@@ -31,32 +31,32 @@ module.exports = {
         { entity: '/people', foreignKey: 'url', type: 'hasMany', alias: 'people' },
         { entity: '/locations', foreignKey: 'url', type: 'hasMany', alias: 'locations' },
         { entity: '/species', foreignKey: 'url', type: 'hasMany', alias: 'species' },
-        { entity: '/vehicles', foreignKey: 'url', type: 'hasMany', alias: 'vehicles' },
-      ],
+        { entity: '/vehicles', foreignKey: 'url', type: 'hasMany', alias: 'vehicles' }
+      ]
     },
     {
       name: '/people',
       columns: ['id', 'name', 'gender', 'age', 'eye_color', 'hair_color', 'films', 'species', 'url'],
       relations: [
-        { entity: '/species', foreignKey: 'species', type: 'belongsTo', alias: 'species' },
-      ],
+        { entity: '/species', foreignKey: 'species', type: 'belongsTo', alias: 'species' }
+      ]
     },
     {
       name: '/locations',
       columns: ['id', 'name', 'climate', 'terrain', 'surface_water', 'residents', 'films', 'url'],
-      relations: [],
+      relations: []
     },
     {
       name: '/species',
       columns: ['id', 'name', 'classification', 'eye_colors', 'hair_colors', 'people', 'films', 'url'],
-      relations: [],
+      relations: []
     },
     {
       name: '/vehicles',
       columns: ['id', 'name', 'description', 'vehicle_class', 'length', 'pilot', 'films', 'url'],
       relations: [
-        { entity: '/people', foreignKey: 'pilot', type: 'belongsTo', alias: 'pilot' },
-      ],
-    },
-  ],
-};
+        { entity: '/people', foreignKey: 'pilot', type: 'belongsTo', alias: 'pilot' }
+      ]
+    }
+  ]
+}

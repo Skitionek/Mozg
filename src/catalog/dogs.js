@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * The Dog API – dogs data for developers.
@@ -16,18 +16,18 @@ module.exports = {
   description: 'Free dog image API based on the Stanford Dogs Dataset. Fetch random images or browse by breed.',
   driver: 'rest',
   connection: {
-    database: 'https://dog.ceo/api',
+    database: 'https://dog.ceo/api'
   },
   entities: [
     {
       name: '/breeds/list/all',
       columns: ['affenpinscher', 'african', 'airedale', 'akita', 'appenzeller', 'australian', 'basenji', 'beagle'],
-      relations: [],
+      relations: []
     },
     {
       name: '/breeds/image/random',
       columns: ['message', 'status'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

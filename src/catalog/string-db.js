@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * STRING – protein-protein interaction database.
@@ -29,7 +29,7 @@ module.exports = {
   description: 'STRING protein-protein interaction database covering 14 000+ organisms. Provides functional and physical interaction networks with confidence scores, interaction partners and functional enrichment. Use species=9606 for human.',
   driver: 'rest',
   connection: {
-    database: 'https://string-db.org/api/json',
+    database: 'https://string-db.org/api/json'
   },
   entities: [
     {
@@ -39,32 +39,32 @@ module.exports = {
       relations: [
         { entity: '/interaction_partners', foreignKey: 'stringId', type: 'hasMany', alias: 'interactionPartners' },
         { entity: '/enrichment', foreignKey: 'stringId', type: 'hasMany', alias: 'enrichment' },
-        { entity: '/uniprotkb/search', foreignKey: 'identifier', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'identifier', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' }
+      ]
     },
     {
       // Interaction network: /network?identifiers=TP53%0dBRCA1&species=9606
       name: '/network',
       columns: ['stringId_A', 'stringId_B', 'preferredName_A', 'preferredName_B', 'ncbiTaxonId', 'score', 'nscore', 'fscore', 'pscore', 'ascore', 'escore', 'dscore', 'tscore'],
-      relations: [],
+      relations: []
     },
     {
       // Interaction partners of a single protein: /interaction_partners?identifiers=TP53&species=9606
       name: '/interaction_partners',
       columns: ['stringId_A', 'stringId_B', 'preferredName_A', 'preferredName_B', 'ncbiTaxonId', 'score', 'nscore', 'fscore', 'pscore', 'ascore', 'escore', 'dscore', 'tscore'],
-      relations: [],
+      relations: []
     },
     {
       // Functional enrichment: /enrichment?identifiers=TP53%0dBRCA1&species=9606
       name: '/enrichment',
       columns: ['category', 'term', 'number_of_genes', 'number_of_genes_in_background', 'ncbiTaxonId', 'inputGenes', 'preferredNames', 'p_value', 'fdr', 'description'],
-      relations: [],
+      relations: []
     },
     {
       // PPI enrichment stats: /ppi_enrichment?identifiers=TP53%0dBRCA1&species=9606
       name: '/ppi_enrichment',
       columns: ['number_of_nodes', 'number_of_edges', 'average_node_degree', 'local_clustering_coefficient', 'expected_number_of_edges', 'p_value'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

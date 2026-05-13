@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Art Institute of Chicago – free public REST API.
@@ -17,27 +17,27 @@ module.exports = {
   description: 'Free public REST API for the Art Institute of Chicago with artworks, artists, and exhibitions.',
   driver: 'rest',
   connection: {
-    database: 'https://api.artic.edu/api/v1',
+    database: 'https://api.artic.edu/api/v1'
   },
   entities: [
     {
       name: '/artworks',
       columns: ['id', 'title', 'date_display', 'medium_display', 'artist_display', 'artist_id', 'place_of_origin', 'dimensions', 'image_id'],
       relations: [
-        { entity: '/artists', foreignKey: 'artist_id', type: 'belongsTo', alias: 'artist' },
-      ],
+        { entity: '/artists', foreignKey: 'artist_id', type: 'belongsTo', alias: 'artist' }
+      ]
     },
     {
       name: '/artists',
       columns: ['id', 'title', 'birth_date', 'death_date', 'birth_place', 'death_place', 'description'],
       relations: [
-        { entity: '/artworks', foreignKey: 'id', type: 'hasMany', alias: 'artworks' },
-      ],
+        { entity: '/artworks', foreignKey: 'id', type: 'hasMany', alias: 'artworks' }
+      ]
     },
     {
       name: '/exhibitions',
       columns: ['id', 'title', 'description', 'status', 'aic_start_at', 'aic_end_at'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}

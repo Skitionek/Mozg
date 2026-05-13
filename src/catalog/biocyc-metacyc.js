@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * MetaCyc – reference database of experimentally elucidated metabolic pathways
@@ -16,7 +16,7 @@ module.exports = {
   description: 'Reference database of experimentally elucidated metabolic pathways from over 3,400 organisms. Freely accessible without credentials.',
   driver: 'biocyc',
   connection: {
-    database: 'META',
+    database: 'META'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

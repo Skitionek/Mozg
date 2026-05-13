@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * BsubCyc – metabolic pathway database for Bacillus subtilis 168.
@@ -15,7 +15,7 @@ module.exports = {
   description: 'Metabolic pathway database for Bacillus subtilis 168 (model Gram-positive bacterium). Tier 2: computationally predicted with manual curation. Requires a BioCyc subscription (user/password).',
   driver: 'biocyc',
   connection: {
-    database: 'BSUB',
+    database: 'BSUB'
   },
-  entities: require('./biocyc-entities'),
-};
+  entities: require('./biocyc-entities')
+}

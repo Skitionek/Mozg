@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * MusicBrainz – open music encyclopedia maintained by the community.
@@ -27,8 +27,8 @@ module.exports = {
     database: 'https://musicbrainz.org/ws/2',
     headers: {
       'User-Agent': 'Mozg/0.1.0 (https://github.com/Skitionek/Mozg)',
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -37,32 +37,32 @@ module.exports = {
       relations: [
         { entity: '/recording', foreignKey: 'id', type: 'hasMany', alias: 'recordings' },
         { entity: '/release-group', foreignKey: 'id', type: 'hasMany', alias: 'releaseGroups' },
-        { entity: '/release', foreignKey: 'id', type: 'hasMany', alias: 'releases' },
-      ],
+        { entity: '/release', foreignKey: 'id', type: 'hasMany', alias: 'releases' }
+      ]
     },
     {
       name: '/recording',
       columns: ['id', 'title', 'length', 'score', 'disambiguation', 'first-release-date', 'artist-credit', 'releases'],
       relations: [
         { entity: '/artist', foreignKey: 'artist-credit', type: 'belongsTo', alias: 'artist' },
-        { entity: '/release', foreignKey: 'id', type: 'hasMany', alias: 'releases' },
-      ],
+        { entity: '/release', foreignKey: 'id', type: 'hasMany', alias: 'releases' }
+      ]
     },
     {
       name: '/release',
       columns: ['id', 'title', 'status', 'date', 'country', 'score', 'track-count', 'artist-credit', 'release-group'],
       relations: [
         { entity: '/artist', foreignKey: 'artist-credit', type: 'belongsTo', alias: 'artist' },
-        { entity: '/release-group', foreignKey: 'release-group', type: 'belongsTo', alias: 'releaseGroup' },
-      ],
+        { entity: '/release-group', foreignKey: 'release-group', type: 'belongsTo', alias: 'releaseGroup' }
+      ]
     },
     {
       name: '/release-group',
       columns: ['id', 'title', 'primary-type', 'score', 'first-release-date', 'artist-credit'],
       relations: [
         { entity: '/artist', foreignKey: 'artist-credit', type: 'belongsTo', alias: 'artist' },
-        { entity: '/release', foreignKey: 'id', type: 'hasMany', alias: 'releases' },
-      ],
-    },
-  ],
-};
+        { entity: '/release', foreignKey: 'id', type: 'hasMany', alias: 'releases' }
+      ]
+    }
+  ]
+}

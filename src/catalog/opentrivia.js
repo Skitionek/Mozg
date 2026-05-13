@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * Open Trivia Database – free trivia questions API.
@@ -23,22 +23,22 @@ module.exports = {
   description: 'Free trivia questions API with multiple categories, difficulties and question types.',
   driver: 'rest',
   connection: {
-    database: 'https://opentdb.com',
+    database: 'https://opentdb.com'
   },
   entities: [
     {
       name: '/api.php',
       columns: ['type', 'difficulty', 'category', 'question', 'correct_answer', 'incorrect_answers'],
       relations: [
-        { entity: '/api_category.php', foreignKey: 'category', type: 'belongsTo', alias: 'category' },
-      ],
+        { entity: '/api_category.php', foreignKey: 'category', type: 'belongsTo', alias: 'category' }
+      ]
     },
     {
       name: '/api_category.php',
       columns: ['id', 'name'],
       relations: [
-        { entity: '/api.php', foreignKey: 'id', type: 'hasMany', alias: 'questions' },
-      ],
-    },
-  ],
-};
+        { entity: '/api.php', foreignKey: 'id', type: 'hasMany', alias: 'questions' }
+      ]
+    }
+  ]
+}

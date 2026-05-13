@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /**
  * MeSH – Medical Subject Headings controlled vocabulary.
@@ -32,8 +32,8 @@ module.exports = {
   connection: {
     database: 'https://id.nlm.nih.gov/mesh',
     headers: {
-      'Accept': 'application/json',
-    },
+      Accept: 'application/json'
+    }
   },
   entities: [
     {
@@ -43,8 +43,8 @@ module.exports = {
       columns: ['ui', 'name', 'note'],
       relations: [
         { entity: '/esearch.fcgi', foreignKey: 'ui', type: 'hasMany', alias: 'pubmedArticles', catalog: 'ncbi' },
-        { entity: '/uniprotkb/search', foreignKey: 'name', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' },
-      ],
+        { entity: '/uniprotkb/search', foreignKey: 'name', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' }
+      ]
     },
     {
       // Search supplementary concept records: where: { label: "aspirin", rdftype: "scr_chemical", match: "contains", limit: "10" }
@@ -53,14 +53,14 @@ module.exports = {
       columns: ['ui', 'name', 'note', 'rdfType'],
       relations: [
         { entity: '/terms', foreignKey: 'name', type: 'hasMany', alias: 'chebiCompounds', catalog: 'chebi' },
-        { entity: '/lookup/descriptor', foreignKey: 'name', type: 'belongsTo', alias: 'mappedDescriptor' },
-      ],
+        { entity: '/lookup/descriptor', foreignKey: 'name', type: 'belongsTo', alias: 'mappedDescriptor' }
+      ]
     },
     {
       // Qualify descriptor by subheading: where: { descriptor: "D001249", qualifier: "Q000494", limit: "10" }
       name: '/lookup/combine',
       columns: ['ui', 'name'],
-      relations: [],
-    },
-  ],
-};
+      relations: []
+    }
+  ]
+}
