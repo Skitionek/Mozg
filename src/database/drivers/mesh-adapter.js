@@ -219,6 +219,16 @@ function findArg (args, ...names) {
 }
 
 /**
+ * Return true when `name` is a syntactically valid GraphQL name.
+ * GraphQL names must match /^[_A-Za-z][_0-9A-Za-z]*$/ (spec §2.1.9).
+ * Used to reject user-supplied field names that contain injection characters
+ * before they are interpolated into a raw GraphQL query string.
+ */
+function isValidGraphQLName (name) {
+  return typeof name === 'string' && /^[_A-Za-z][_0-9A-Za-z]*$/.test(name)
+}
+
+/**
  * Serialize a plain JS value as an inline GraphQL literal.
  * Strings are double-quoted; numbers/booleans/null are native;
  * objects become `{k: v, …}`; arrays become `[v, …]`.
@@ -330,11 +340,23 @@ async function executeQuery (input) {
   if (offsetArg && offset != null) argParts.push(`${offsetArg.name}: ${offset}`)
 
   if (where && Object.keys(where).length > 0) {
+    // Validate top-level where keys to prevent GraphQL query injection via
+    // specially crafted field names (e.g. keys containing `}`, `{`, `:`).
+    for (const k of Object.keys(where)) {
+      if (!isValidGraphQLName(k)) {
+        throw new Error(`Invalid where field name "${k}" for entity "${from}"`)
+      }
+    }
     const whereArg = findArg(args, 'where', 'condition', 'filter')
     if (whereArg) argParts.push(`${whereArg.name}: ${toGQLLiteral(where)}`)
   }
 
   if (orderBy) {
+    // Validate orderBy against the schema-derived allowlist of leaf fields to
+    // prevent GraphQL query injection via user-controlled identifier strings.
+    if (!allLeaf.includes(orderBy)) {
+      throw new Error(`orderBy field "${orderBy}" is not a valid field for entity "${from}"`)
+    }
     const orderByArg = findArg(args, 'orderBy')
     if (orderByArg) {
       const literal = buildOrderByLiteral(orderByArg, orderBy, orderDirection)
@@ -465,4 +487,4 @@ async function introspect (connection) {
   return { tables }
 }
 
-module.exports = { executeQuery, introspect }
+module.exports = { executeQuery, introspect, isValidGraphQLName }
