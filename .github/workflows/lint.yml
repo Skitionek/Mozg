@@ -34,7 +34,7 @@ jobs:
           always()
         # continue-on-error so the job doesn't fail when SARIF wasn't produced
         # (e.g. no linting errors were found, or the reporter was not enabled).
-        uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v3
         continue-on-error: true
         with:
           sarif_file: megalinter-reports/megalinter-report.sarif
