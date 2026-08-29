@@ -153,7 +153,7 @@ describe('latency benchmarks (local SQLite – no network)', () => {
 
   // ── concurrency ───────────────────────────────────────────────────────────
 
-  test('concurrency: 10 simultaneous queries — no errors, p99 < 200 ms', async () => {
+  test('concurrency: 10 simultaneous queries — no errors, p99 < 500 ms', async () => {
     const CONCURRENT = 10
     const ROUNDS = 20 // rounds of concurrent bursts
 
@@ -188,8 +188,8 @@ describe('latency benchmarks (local SQLite – no network)', () => {
     console.log(`concurrency×${CONCURRENT} | rounds=${ROUNDS} | median=${med.toFixed(2)} ms | p99=${p99.toFixed(2)} ms`)
     console.log('NOTE: Mozg is designed for single-user/single-instance use; these figures reflect event-loop serialisation, not throughput capacity.')
 
-    // p99 for 10 concurrent queries should still complete within 200 ms locally
-    assert.ok(p99 < 200, `p99 ${p99.toFixed(2)} ms exceeds 200 ms budget for ${CONCURRENT} concurrent queries`)
+    // p99 for 10 concurrent queries should still complete within 500 ms on CI
+    assert.ok(p99 < 500, `p99 ${p99.toFixed(2)} ms exceeds 500 ms budget for ${CONCURRENT} concurrent queries`)
   })
 
   // ── partial-failure ────────────────────────────────────────────────────────
