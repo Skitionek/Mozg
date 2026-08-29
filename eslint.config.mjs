@@ -32,7 +32,9 @@ export default [
         parseFloat: 'readonly',
         encodeURIComponent: 'readonly',
         decodeURIComponent: 'readonly',
-        globalThis: 'readonly'
+        globalThis: 'readonly',
+        AbortController: 'readonly',
+        TextDecoder: 'readonly'
       }
     },
     rules: {
