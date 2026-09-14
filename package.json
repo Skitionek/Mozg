@@ -25,7 +25,7 @@
     "graphql": "^16.14.1",
     "graphql-yoga": "^5.22.0",
     "knex": "^3.3.0",
-    "n3": "^2.1.1",
+    "n3": "^2.7.12",
     "rdfxml-streaming-parser": "^3.2.0",
     "sqlite3": "6.0.1"
   },
