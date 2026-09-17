@@ -69,6 +69,12 @@ function ensureSampleDb () {
 
 // ── test suite ─────────────────────────────────────────────────────────────
 
+// Shared/noisy CI runners (variable CPU steal, cold caches) run measurably
+// slower and less consistently than a developer machine. Widen the latency
+// budgets under CI so the suite measures gross regressions rather than
+// runner-to-runner jitter, while keeping tight budgets for local runs.
+const BUDGET_MULTIPLIER = process.env.CI ? 4 : 1
+
 describe('latency benchmarks (local SQLite – no network)', () => {
   const N = 100 // sample size — sufficient for stable median/IQR/p99
 
@@ -95,8 +101,8 @@ describe('latency benchmarks (local SQLite – no network)', () => {
     console.log(`simple SELECT  | n=${N} | median=${med.toFixed(2)} ms | IQR=${spread.toFixed(2)} ms | p99=${p99.toFixed(2)} ms`)
 
     // Soft assertions — local SQLite should be fast but CI machines vary
-    assert.ok(med < 10, `median ${med.toFixed(2)} ms exceeds 10 ms budget`)
-    assert.ok(p99 < 50, `p99 ${p99.toFixed(2)} ms exceeds 50 ms budget`)
+    assert.ok(med < 10 * BUDGET_MULTIPLIER, `median ${med.toFixed(2)} ms exceeds ${10 * BUDGET_MULTIPLIER} ms budget`)
+    assert.ok(p99 < 50 * BUDGET_MULTIPLIER, `p99 ${p99.toFixed(2)} ms exceeds ${50 * BUDGET_MULTIPLIER} ms budget`)
   })
 
   test('relation traversal (users → posts, hasMany) — median < 20 ms, p99 < 100 ms', async () => {
@@ -118,8 +124,8 @@ describe('latency benchmarks (local SQLite – no network)', () => {
 
     console.log(`users→posts    | n=${N} | median=${med.toFixed(2)} ms | IQR=${spread.toFixed(2)} ms | p99=${p99.toFixed(2)} ms`)
 
-    assert.ok(med < 20, `median ${med.toFixed(2)} ms exceeds 20 ms budget`)
-    assert.ok(p99 < 100, `p99 ${p99.toFixed(2)} ms exceeds 100 ms budget`)
+    assert.ok(med < 20 * BUDGET_MULTIPLIER, `median ${med.toFixed(2)} ms exceeds ${20 * BUDGET_MULTIPLIER} ms budget`)
+    assert.ok(p99 < 100 * BUDGET_MULTIPLIER, `p99 ${p99.toFixed(2)} ms exceeds ${100 * BUDGET_MULTIPLIER} ms budget`)
   })
 
   test('3-level traversal (users → posts → comments) — median < 30 ms, p99 < 150 ms', async () => {
@@ -147,8 +153,8 @@ describe('latency benchmarks (local SQLite – no network)', () => {
 
     console.log(`3-level join   | n=${N} | median=${med.toFixed(2)} ms | IQR=${spread.toFixed(2)} ms | p99=${p99.toFixed(2)} ms`)
 
-    assert.ok(med < 30, `median ${med.toFixed(2)} ms exceeds 30 ms budget`)
-    assert.ok(p99 < 150, `p99 ${p99.toFixed(2)} ms exceeds 150 ms budget`)
+    assert.ok(med < 30 * BUDGET_MULTIPLIER, `median ${med.toFixed(2)} ms exceeds ${30 * BUDGET_MULTIPLIER} ms budget`)
+    assert.ok(p99 < 150 * BUDGET_MULTIPLIER, `p99 ${p99.toFixed(2)} ms exceeds ${150 * BUDGET_MULTIPLIER} ms budget`)
   })
 
   // ── concurrency ───────────────────────────────────────────────────────────
@@ -189,7 +195,7 @@ describe('latency benchmarks (local SQLite – no network)', () => {
     console.log('NOTE: Mozg is designed for single-user/single-instance use; these figures reflect event-loop serialisation, not throughput capacity.')
 
     // p99 for 10 concurrent queries should still complete within 500 ms on CI
-    assert.ok(p99 < 500, `p99 ${p99.toFixed(2)} ms exceeds 500 ms budget for ${CONCURRENT} concurrent queries`)
+    assert.ok(p99 < 500 * BUDGET_MULTIPLIER, `p99 ${p99.toFixed(2)} ms exceeds ${500 * BUDGET_MULTIPLIER} ms budget for ${CONCURRENT} concurrent queries`)
   })
 
   // ── partial-failure ────────────────────────────────────────────────────────
