@@ -13,6 +13,13 @@ const sqlite3 = require('sqlite3').verbose()
 const DB_PATH = path.join(__dirname, 'sample.db')
 const db = new sqlite3.Database(DB_PATH)
 
+// tests/bench.test.js and tests/examples.test.js both seed this file from
+// their own `before()` hooks, and Node's test runner executes test files
+// concurrently by default — so two `seed.js` processes can open the same
+// database at once. Without a busy timeout, SQLite fails a writer that
+// finds the file locked instead of waiting for the other process to finish.
+db.configure('busyTimeout', 10000)
+
 function run (sql, params = []) {
   return new Promise((resolve, reject) => {
     db.run(sql, params, function (err) {
