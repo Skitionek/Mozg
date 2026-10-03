@@ -109,7 +109,7 @@ const typeDefs = /* GraphQL */ `
     host: String
     """Port (defaults to driver default when omitted)"""
     port: Int
-    """Database name, file path (SQLite), base URL (REST/openapi), spec URL (openapi/soap/odata/thrift), or connection string (mongodb)"""
+    """Database name, file path (SQLite), base URL (REST/openapi), WSDL URL (soap), or IDL URL (thrift)"""
     database: String!
     """Username or API key value (REST)"""
     user: String
@@ -117,6 +117,8 @@ const typeDefs = /* GraphQL */ `
     password: String
     """Connection scheme, e.g. bolt, neo4j+s, http, https"""
     scheme: String
+    """URL path appended to host:port when building the service endpoint (thrift only)"""
+    path: String
     """Default request headers as a JSON object (REST driver only)"""
     headers: JSON
     """Query-parameter name to use for the API key (REST driver only)"""
@@ -152,9 +154,9 @@ const typeDefs = /* GraphQL */ `
     """Apache Thrift service (via @graphql-mesh/thrift);
        set database to the service endpoint"""
     thrift
-    """MongoDB via Mongoose models (via @graphql-mesh/mongoose);
-       set database to the mongodb:// connection string"""
-    mongodb
+    """Elasticsearch / OpenSearch REST API (legacy custom driver);
+       set database to the cluster base URL"""
+    elasticsearch
   }
 
   enum SortDirection {
@@ -174,8 +176,13 @@ const typeDefs = /* GraphQL */ `
     foreignKey: String!
     """Property name in the result (defaults to entity name)"""
     alias: String
+    """Key on the related entity that foreignKey points at (belongsTo only, default: id)"""
+    ownerKey: String
     """Relation type (default: hasMany)"""
     type: RelationType
+    """Resolve this relation against another catalog entry's connection
+       instead of the parent query's connection (see CatalogRelation.catalog)"""
+    catalog: String
     """Columns to select from the related entity"""
     select: [String!]
     """Filter conditions for the related entity"""
@@ -345,6 +352,8 @@ const typeDefs = /* GraphQL */ `
     """Included only for databases with publicly documented read-only credentials"""
     password: String
     scheme: String
+    """Default request headers as a JSON object (REST driver only)"""
+    headers: JSON
   }
 
   """A table, node label, or API path defined in a catalog entry"""
