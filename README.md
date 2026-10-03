@@ -27,7 +27,7 @@ And because not every user wants to think in GraphQL, Mozg includes a browser-ba
 - 🔌 **One endpoint** – `/graphql` queries any supported database or REST API
 - 🔑 **Credentials in the query** – connection parameters are part of the GraphQL input
 - 🔗 **Relation traversal** – `hasMany`, `hasOne`, `belongsTo` across tables / endpoints
-- 🗺 **Schema introspection** – discover tables & columns of any connected database
+- 🗺 **Schema introspection** – discover tables & columns of SQL and graph databases; REST sources are described from their catalog entry
 - 🌐 **Web UI** – visual query builder at `/` with examples dropdown
 - 🧪 **GraphiQL** – full IDE at `/graphql`
 - 🦉 **OWL ontology ingestion** – parse Turtle, RDF/XML, OWL/XML and Manchester Syntax ontologies via `ingestOntology` mutation
@@ -40,7 +40,7 @@ And because not every user wants to think in GraphQL, Mozg includes a browser-ba
 npm install
 npm start          # http://localhost:4000
 # or
-npm run dev        # restarts on file changes (Node ≥ 18.11)
+npm run dev        # restarts on file changes
 ```
 
 ---
@@ -67,7 +67,7 @@ The following free, public endpoints can be used directly — no sign-up require
 
 | Name | Driver | Host | Database | User | Password | Notes |
 |------|--------|------|----------|------|----------|-------|
-| RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | *(public read-only — see [RNAcentral docs](https://rnacentral.org/help/public-database))* | RNA sequences |
+| RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | *(public read-only — see [RNAcentral docs](https://rnacentral.org/help/public-database))* | ⚠️ Currently degraded: the public `reader` account has no `USAGE` on the `rnacen` schema, so introspection returns almost nothing and queries fail with *permission denied for schema rnacen* |
 | RFAM | `mysql` | `mysql-rfam-public.ebi.ac.uk` | `Rfam` | `rfamro` | *(empty)* | RNA families |
 | Neo4j Movies | `neo4j` | `demo.neo4jlabs.com` | `movies` | `movies` | *(public demo — see [Neo4j Labs](https://demo.neo4jlabs.com))* | Movie graph (scheme: `neo4j+s`) |
 | JSONPlaceholder | `rest` | – | `https://jsonplaceholder.typicode.com` | – | – | Fake REST data |
@@ -97,7 +97,6 @@ Pass connection parameters as shown; entity names and `where` filters follow eac
 | Reactome | `rest` | `reactome` | `https://reactome.org/ContentService` | Biological pathway knowledgebase |
 | KEGG | `kegg` | `kegg` | `https://rest.kegg.jp` | Pathway/compound/reaction; academic use; pass `where: { _pathSuffix: "…" }` for `/find`, `/get`, `/link` |
 | EMBL-EBI (ENA) | `rest` | `embl-ebi` | `https://www.ebi.ac.uk/ena/portal/api` | European Nucleotide Archive |
-| DDBJ | `rest` | `ddbj` | `https://ddbj.nig.ac.jp/search/api/v1` | DNA Data Bank of Japan |
 | FlyBase | `rest` | `flybase` | `https://api.flybase.org` | Drosophila genetics and genomics |
 | WormBase | `rest` | `wormbase` | `https://wormbase.org` | *C. elegans* biology |
 | ZFIN | `rest` | `zfin` | `https://zfin.org/action/api` | Zebrafish genetics and genomics |

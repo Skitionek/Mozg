@@ -555,6 +555,12 @@
       <option value="arango">ArangoDB</option>
       <option value="biocyc">BioCyc</option>
       <option value="rest">REST API</option>
+      <option value="kegg">KEGG</option>
+      <option value="elasticsearch">Elasticsearch</option>
+      <option value="openapi">OpenAPI / Swagger</option>
+      <option value="odata">OData</option>
+      <option value="soap">SOAP / WSDL</option>
+      <option value="thrift">Apache Thrift</option>
     </select>
 
     <!-- Standard host/port/user/password group (SQL + graph DBs) -->
@@ -729,7 +735,7 @@
             <div class="feature-grid">
               <div class="feature-card">
                 <span class="fi">⚡</span>
-                <div><strong>Universal endpoint</strong><small>Query PostgreSQL, MySQL, Neo4j, MongoDB, REST APIs and more through a single /graphql URL — no ETL, no data duplication</small></div>
+                <div><strong>Universal endpoint</strong><small>Query PostgreSQL, MySQL, Neo4j, ArangoDB, REST APIs and more through a single /graphql URL — no ETL, no data duplication</small></div>
               </div>
               <div class="feature-card">
                 <span class="fi">🔗</span>
@@ -750,11 +756,14 @@
               <span class="driver-pill">MySQL</span>
               <span class="driver-pill">Neo4j</span>
               <span class="driver-pill">ArangoDB</span>
-              <span class="driver-pill">MongoDB</span>
+              <span class="driver-pill">BioCyc</span>
               <span class="driver-pill">REST API</span>
+              <span class="driver-pill">KEGG</span>
+              <span class="driver-pill">Elasticsearch</span>
               <span class="driver-pill">OpenAPI</span>
               <span class="driver-pill">OData</span>
               <span class="driver-pill">SOAP</span>
+              <span class="driver-pill">Thrift</span>
             </div>
             <p class="welcome-cta">← Select a <strong>Known Database</strong> or load an <strong>Example</strong> from the sidebar, then press <strong>▶ Run Query</strong></p>
           </div>
@@ -808,7 +817,7 @@
   // ── Load examples ─────────────────────────────────────────────
   async function loadExamples() {
     try {
-      const res = await fetch('/examples/queries.json');
+      const res = await fetch('examples/queries.json');
       if (!res.ok) return;
       examplesData = await res.json();
       const sel = document.getElementById('examples-select');
