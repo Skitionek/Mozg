@@ -112,23 +112,26 @@ function listCatalog () {
 }
 
 /**
- * Find the catalog entry whose connection points at the given database or
- * base URL, ignoring a trailing slash.
+ * Find every catalog entry whose connection points at the given database or
+ * base URL, ignoring a trailing slash.  Several catalog entries can share one
+ * base URL (NCBI E-utilities backs `ncbi`, `genbank`, `pubmed` and `geo`,
+ * distinguished only by a `where: { db }` the caller supplies per query, which
+ * a bare connection does not carry) — returning every match lets a caller
+ * combine them rather than silently picking one at random.
  * @param {string} database
- * @returns {object|null}
+ * @returns {object[]}
  */
-function findCatalogByDatabase (database) {
-  if (!database) return null
+function findCatalogsByDatabase (database) {
+  if (!database) return []
 
   const wanted = String(database).replace(/\/$/, '')
 
-  for (const load of Object.values(REGISTRY)) {
-    const entry = load()
-    const candidate = (entry.connection && entry.connection.database) || ''
-    if (candidate.replace(/\/$/, '') === wanted) return entry
-  }
-
-  return null
+  return Object.values(REGISTRY)
+    .map((load) => load())
+    .filter((entry) => {
+      const candidate = (entry.connection && entry.connection.database) || ''
+      return candidate.replace(/\/$/, '') === wanted
+    })
 }
 
-module.exports = { getCatalog, listCatalog, findCatalogByDatabase }
+module.exports = { getCatalog, listCatalog, findCatalogsByDatabase }
