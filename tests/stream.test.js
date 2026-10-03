@@ -24,6 +24,14 @@ function makeRes () {
     end (chunk) {
       if (chunk != null) chunks.push(String(chunk))
       this.ended = true
+      this._finishListeners?.forEach((fn) => fn())
+    },
+    // Real responses are EventEmitters; the handler listens for 'finish' to
+    // know the body has flushed before it tears down the request.
+    once (event, fn) {
+      if (event !== 'finish') return this
+      this._finishListeners = (this._finishListeners || []).concat(fn)
+      return this
     },
     body () {
       return chunks.join('')
@@ -206,6 +214,57 @@ describe('streamQuery', () => {
 
     const successLine = relLines.find((b) => Array.isArray(b) && b.length > 0)
     assert.ok(successLine, 'successful relation should still be streamed')
+  })
+
+  test('a catalog-tagged relation is resolved against that catalog\'s connection, not the parent\'s', async () => {
+    // Given a relation naming another catalog entry
+    const seenConnections = []
+    mock.method(connector, 'executeQuery', async (input) => {
+      seenConnections.push(input.connection)
+      return input.from === 'users'
+        ? { data: [{ id: 1, kegg_id: 'C00031' }], count: 1 }
+        : { data: [{ name: 'Glucose' }], count: 1 }
+    })
+
+    const res = makeRes()
+    // When streamed with a relation tagged to the kegg catalog
+    await streamQuery(
+      {
+        connection: { driver: 'sqlite3', database: ':memory:' },
+        from: 'users',
+        relations: [{ entity: '/find/compound', foreignKey: 'kegg_id', type: 'belongsTo', alias: 'c', catalog: 'kegg' }]
+      },
+      res
+    )
+
+    // Then the relation query used kegg's connection, not the parent's sqlite3 one
+    const relationCall = seenConnections.find((c) => c.driver !== 'sqlite3')
+    assert.ok(relationCall, `expected a non-sqlite3 connection among ${JSON.stringify(seenConnections)}`)
+    assert.equal(relationCall.driver, 'kegg')
+  })
+
+  test('redacts credentials from an error written onto the stream', async () => {
+    // Given a relation lookup that fails with a message echoing a connection
+    // string
+    mock.method(connector, 'executeQuery', async (input) => {
+      if (!input.where) return { data: [{ id: 1 }], count: 1 }
+      throw new Error('auth failed for mongodb://root:s3cret@localhost:27017')
+    })
+
+    const res = makeRes()
+    await streamQuery(
+      {
+        connection: { driver: 'sqlite3', database: ':memory:' },
+        from: 'users',
+        relations: [{ entity: 'posts', foreignKey: 'user_id', type: 'hasMany' }]
+      },
+      res
+    )
+
+    // Then the password never reaches the client
+    const body = res.body()
+    assert.ok(!body.includes('s3cret'), body)
+    assert.ok(body.includes('root:***@'), body)
   })
 })
 
