@@ -126,7 +126,7 @@ const typeDefs = /* GraphQL */ `
   }
 
   enum Driver {
-    """PostgreSQL (via @graphql-mesh/postgraphile)"""
+    """PostgreSQL (query and introspection both via knex)"""
     postgres
     """MySQL (via @graphql-mesh/mysql)"""
     mysql

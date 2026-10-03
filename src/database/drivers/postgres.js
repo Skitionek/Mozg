@@ -3,10 +3,15 @@
 /**
  * PostgreSQL driver.
  *
- * Query execution goes through the mesh handler (Postgraphile).  Schema
- * discovery does not: Postgraphile introspects via `pg_extension`, which
- * read-only roles on public databases are not granted — RNAcentral's documented
- * `reader` account fails with "permission denied for table pg_extension".
+ * Both query execution and schema discovery go through knex directly, the
+ * same pattern sqlite3.js uses, rather than through the Postgraphile mesh
+ * handler. Postgraphile introspects via pg_extension, which read-only roles
+ * on public databases are not granted — RNAcentral's documented `reader`
+ * account fails with "permission denied for table pg_extension" — and its
+ * GraphQL field names (pluralised, camelCased) do not round-trip back into
+ * the plain table names a `query` call needs for `from`, so introspecting
+ * through one path and querying through another left the two disagreeing
+ * about what a table was called.
  *
  * Discovery reads pg_catalog rather than information_schema.  The
  * information_schema views are filtered to objects the role holds a recorded
@@ -17,7 +22,7 @@
  */
 
 const knex = require('knex')
-const meshAdapter = require('./mesh-adapter')
+const { executeKnexQuery } = require('./knex-query')
 
 const connectionCache = new Map()
 
@@ -105,8 +110,12 @@ async function destroyAll () {
   connectionCache.clear()
 }
 
+async function executeQuery (input) {
+  return executeKnexQuery(getKnexInstance, input)
+}
+
 module.exports = {
-  executeQuery: meshAdapter.executeQuery,
+  executeQuery,
   introspect,
   buildTables,
   destroyAll
