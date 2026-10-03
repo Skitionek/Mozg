@@ -175,18 +175,52 @@ describe('executeQuery', () => {
     assert.equal(result.count, 2)
   })
 
-  test('rejects a same-source relation instead of dropping it silently', async () => {
-    // Given a query asking KEGG to join within itself
-    const input = {
-      connection: { database: 'https://rest.kegg.jp' },
-      from: 'list/pathway',
-      relations: [{ entity: 'compound', foreignKey: 'entry_id', type: 'hasMany' }]
+  test('resolves a same-source relation via _pathSuffix instead of dropping it', async () => {
+    // Given a list response and a stub that answers the relation lookup with
+    // the full KEGG entry flat-file format
+    let requestedUrl = null
+    const original = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      requestedUrl = String(url)
+      if (requestedUrl.endsWith('/list/pathway')) {
+        return { ok: true, status: 200, statusText: 'OK', text: async () => 'path:map00010\tGlycolysis\n' }
+      }
+      return { ok: true, status: 200, statusText: 'OK', text: async () => 'ENTRY       map00010  Pathway\nNAME        Glycolysis\n///\n' }
     }
 
-    // When it is executed
-    const attempt = executeQuery(input)
+    // When querying with a same-source relation, as the kegg catalog declares
+    const result = await executeQuery({
+      connection: { database: 'https://rest.kegg.jp' },
+      from: 'list/pathway',
+      relations: [{ entity: '/get', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' }]
+    })
+    globalThis.fetch = original
 
-    // Then the limitation is reported rather than ignored
-    await assert.rejects(attempt, /cannot join within its own source/)
+    // Then the relation is resolved as a path-suffix lookup, not dropped
+    assert.ok(requestedUrl.includes('/get/path%3Amap00010'), requestedUrl)
+    assert.ok(result.data[0].entry, JSON.stringify(result.data[0]))
+  })
+
+  test('reports a failing same-source relation in place, keeping the parent rows', async () => {
+    // Given a relation lookup that fails
+    const original = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      if (String(url).endsWith('/list/pathway')) {
+        return { ok: true, status: 200, statusText: 'OK', text: async () => 'path:map00010\tGlycolysis\n' }
+      }
+      return { ok: false, status: 500, statusText: 'Error' }
+    }
+
+    // When the relation is resolved
+    const result = await executeQuery({
+      connection: { database: 'https://rest.kegg.jp' },
+      from: 'list/pathway',
+      relations: [{ entity: '/get', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' }]
+    })
+    globalThis.fetch = original
+
+    // Then the parent row survives and carries the relation's error
+    assert.equal(result.data[0].entry_id, 'path:map00010')
+    assert.match(result.data[0].entry.error, /relation fetch failed/)
   })
 })

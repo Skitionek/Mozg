@@ -156,6 +156,49 @@ function applySelect (rows, select) {
   })
 }
 
+// ── Relations ────────────────────────────────────────────────────────────────
+
+/**
+ * KEGG has no SQL-style join, but every one of its endpoints accepts a single
+ * identifier as a path segment via `where._pathSuffix` (/get/{id},
+ * /link/pathway/{id}, …).  A same-source relation is therefore one more
+ * `_pathSuffix` lookup per row, using the parent row's `foreignKey` field as
+ * the id — the exact mechanism the catalog's own relation comments describe.
+ */
+async function loadRelations (connection, rows, relations) {
+  if (!rows.length) return
+
+  for (const rel of relations) {
+    const { entity, foreignKey, alias, type = 'hasMany', select, relations: nested } = rel
+    const resultKey = alias || entity
+
+    for (const row of rows) {
+      const pathVal = row[foreignKey]
+      if (pathVal == null) {
+        row[resultKey] = type === 'hasMany' ? [] : null
+        continue
+      }
+
+      try {
+        const { data } = await executeQuery({
+          connection,
+          from: entity,
+          select,
+          where: { _pathSuffix: pathVal }
+        })
+
+        if (nested && nested.length > 0) await loadRelations(connection, data, nested)
+
+        row[resultKey] = type === 'hasMany' ? data : (data[0] ?? null)
+      } catch (err) {
+        // Keep the row: report the failed relation in place rather than
+        // losing the rest of the result over one bad lookup.
+        row[resultKey] = { error: `relation fetch failed for ${entity}: ${err.message}` }
+      }
+    }
+  }
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 async function executeQuery (input) {
@@ -164,18 +207,10 @@ async function executeQuery (input) {
     from,
     select,
     where,
+    relations,
     limit,
     offset
   } = input
-
-  // KEGG's REST interface has no join facility.  Relations naming another
-  // catalog are resolved by the connector before a driver sees them, so
-  // anything still here would otherwise be dropped without a trace.
-  if (input.relations && input.relations.length > 0) {
-    throw new Error(
-      'KEGG driver cannot join within its own source; give the relation a `catalog` to join across sources'
-    )
-  }
 
   const base = (connection.database || '').replace(/\/$/, '')
   const path = from.startsWith('/') ? from : `/${from}`
@@ -205,6 +240,10 @@ async function executeQuery (input) {
   const start = offset != null ? offset : 0
   const end = limit != null ? start + limit : undefined
   const page = end != null ? rows.slice(start, end) : rows.slice(start)
+
+  if (relations && relations.length > 0) {
+    await loadRelations(connection, page, relations)
+  }
 
   return { data: page, count: page.length }
 }
