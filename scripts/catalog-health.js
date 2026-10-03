@@ -76,9 +76,14 @@ async function probe (entry) {
       .finally(() => clearTimeout(timer))
 
     if (!res.ok) {
-      // A 4xx means the catalog is wrong about this endpoint; a 5xx means
-      // their server is having a bad day.  Only the first is our problem.
-      const status = res.status >= 500 ? 'unavailable' : 'broken'
+      // A 4xx usually means the catalog is wrong about this endpoint, and a
+      // 5xx means their server is having a bad day — only the first is our
+      // problem.  429/408 are the exception: they mean the server is there
+      // and the request was otherwise fine, just throttled or slow to accept
+      // it, so they get the same treatment as a 5xx rather than failing the
+      // job over something that was never the catalog's fault.
+      const transient = res.status >= 500 || res.status === 429 || res.status === 408
+      const status = transient ? 'unavailable' : 'broken'
       return { status, httpStatus: res.status, url: url.toString() }
     }
 
@@ -163,7 +168,13 @@ async function main () {
   process.exit(broken.length > 0 ? 1 : 0)
 }
 
-main().catch((err) => {
-  console.error('catalog-health: fatal error:', err.message)
-  process.exit(1)
-})
+// Guarded so this file can be required by tests (to unit-test `probe`)
+// without running the whole probe suite and calling process.exit.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('catalog-health: fatal error:', err.message)
+    process.exit(1)
+  })
+}
+
+module.exports = { probe }
