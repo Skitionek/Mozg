@@ -333,4 +333,62 @@ describe('handleStreamRequest', () => {
       done()
     }, 50)
   })
+  test('rejects a body larger than the limit with 413', (_, done) => {
+    // Given a body well past the 1 MiB cap
+    const oversized = 'x'.repeat(1024 * 1024 + 10)
+    const req = makeReq('POST', oversized)
+    const res = makeRes()
+
+    // When it is streamed to the handler
+    handleStreamRequest(req, res)
+
+    // Then the request is refused before it is parsed
+    setTimeout(() => {
+      assert.equal(res.statusCode, 413)
+      const body = JSON.parse(res.body())
+      assert.match(body.error, /exceeds/)
+      done()
+    }, 50)
+  })
+
+  test('reports an unknown driver as 400 rather than 500', (_, done) => {
+    // Given a connection whose driver the registry rejects
+    mock.method(connector, 'executeQuery', async () => {
+      throw new Error('Unknown driver: nosuchdb')
+    })
+    const req = makeReq('POST', { connection: { driver: 'nosuchdb' }, from: 'users' })
+    const res = makeRes()
+
+    // When the handler runs
+    handleStreamRequest(req, res)
+
+    // Then it is reported as a client error, not a server fault
+    setTimeout(() => {
+      assert.equal(res.statusCode, 400)
+      const body = JSON.parse(res.body())
+      assert.match(body.error, /Unknown driver/)
+      done()
+    }, 50)
+  })
+
+  test('a failure on the first query gets an error status, not a 200', (_, done) => {
+    // Given a connection whose very first round-trip fails
+    mock.method(connector, 'executeQuery', async () => {
+      throw new Error('permission denied for table pg_extension')
+    })
+    const req = makeReq('POST', { connection: { driver: 'postgres' }, from: 'users' })
+    const res = makeRes()
+
+    // When the handler runs
+    handleStreamRequest(req, res)
+
+    // Then the caller sees a 500, not a 200 whose body mentions an error
+    setTimeout(() => {
+      mock.restoreAll()
+      assert.equal(res.statusCode, 500)
+      const body = JSON.parse(res.body())
+      assert.match(body.error, /permission denied/)
+      done()
+    }, 50)
+  })
 })
