@@ -21,14 +21,6 @@ const meshSourceCache = new Map()
 
 // ── Handler config builders ───────────────────────────────────────────────────
 
-function buildPostgresUrl (c) {
-  const user = encodeURIComponent(c.user || '')
-  const pass = c.password ? `:${encodeURIComponent(c.password)}` : ''
-  const host = c.host || 'localhost'
-  const port = c.port || 5432
-  return `postgres://${user}${pass}@${host}:${port}/${c.database}`
-}
-
 /**
  * Return `{ pkg, config }` for the given driver/connection.
  * `pkg`    – the @graphql-mesh/* handler package name
@@ -36,12 +28,6 @@ function buildPostgresUrl (c) {
  */
 function buildHandlerDescriptor (driver, connection) {
   switch (driver) {
-    case 'postgres':
-      return {
-        pkg: '@graphql-mesh/postgraphile',
-        config: { connectionString: buildPostgresUrl(connection) }
-      }
-
     case 'mysql':
       return {
         pkg: '@graphql-mesh/mysql',
@@ -109,11 +95,12 @@ function buildHandlerDescriptor (driver, connection) {
 // ── Mesh source factory ───────────────────────────────────────────────────────
 
 async function getOrCreateMeshSource (connection) {
-  const { driver, host, port, database, user } = connection
+  const { driver, host, port, database, user, path, scheme } = connection
   // Key excludes password intentionally (same deferred concern as the legacy
   // sql.js driver – tracked as a TODO; same-user different-password connections
-  // may reuse the same cached source).
-  const cacheKey = JSON.stringify({ driver, host, port, database, user })
+  // may reuse the same cached source).  path and scheme are included because
+  // the thrift handler builds its endpoint from them.
+  const cacheKey = JSON.stringify({ driver, host, port, database, user, path, scheme })
 
   if (meshSourceCache.has(cacheKey)) return meshSourceCache.get(cacheKey)
 
@@ -507,4 +494,4 @@ async function introspect (connection) {
   return { tables }
 }
 
-module.exports = { executeQuery, introspect, isValidGraphQLName }
+module.exports = { executeQuery, introspect, isValidGraphQLName, buildHandlerDescriptor }
