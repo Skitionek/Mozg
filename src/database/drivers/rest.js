@@ -1,5 +1,7 @@
 'use strict'
 
+const { introspectFromCatalog } = require('../catalog-schema')
+
 const UNWRAP_KEYS = ['data', 'results', 'items', 'records', 'list', 'entries']
 
 /**
@@ -82,7 +84,9 @@ async function executeQuery (input) {
     where,
     relations,
     limit,
-    offset
+    offset,
+    orderBy,
+    orderDirection
   } = input
 
   const base = (connection.database || '').replace(/\/$/, '')
@@ -97,9 +101,13 @@ async function executeQuery (input) {
     }
   }
 
-  // JSONPlaceholder-style pagination
+  // JSONPlaceholder-style pagination and sorting
   if (limit != null) rawUrl.searchParams.set('_limit', String(limit))
   if (offset != null) rawUrl.searchParams.set('_start', String(offset))
+  if (orderBy) {
+    rawUrl.searchParams.set('_sort', String(orderBy))
+    rawUrl.searchParams.set('_order', String(orderDirection || 'asc'))
+  }
 
   const { url: authedUrl, headers: authHeaders } = buildAuth(connection, rawUrl.toString())
 
@@ -169,8 +177,8 @@ async function loadRelations (base, headers, rows, relations) {
   }
 }
 
-async function introspect (_connection) {
-  return { tables: [] }
+async function introspect (connection) {
+  return introspectFromCatalog(connection)
 }
 
 module.exports = { executeQuery, introspect }

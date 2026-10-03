@@ -1,5 +1,7 @@
 'use strict'
 
+const { introspectFromCatalog } = require('../catalog-schema')
+
 /**
  * KEGG driver – Kyoto Encyclopedia of Genes and Genomes REST API adapter.
  *
@@ -166,6 +168,15 @@ async function executeQuery (input) {
     offset
   } = input
 
+  // KEGG's REST interface has no join facility.  Relations naming another
+  // catalog are resolved by the connector before a driver sees them, so
+  // anything still here would otherwise be dropped without a trace.
+  if (input.relations && input.relations.length > 0) {
+    throw new Error(
+      'KEGG driver cannot join within its own source; give the relation a `catalog` to join across sources'
+    )
+  }
+
   const base = (connection.database || '').replace(/\/$/, '')
   const path = from.startsWith('/') ? from : `/${from}`
 
@@ -195,11 +206,11 @@ async function executeQuery (input) {
   const end = limit != null ? start + limit : undefined
   const page = end != null ? rows.slice(start, end) : rows.slice(start)
 
-  return { data: page, count: rows.length }
+  return { data: page, count: page.length }
 }
 
-async function introspect (_connection) {
-  return { tables: [] }
+async function introspect (connection) {
+  return introspectFromCatalog(connection)
 }
 
 module.exports = { executeQuery, introspect, parseTsv, parseFlatFile, parseResponse }

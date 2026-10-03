@@ -145,3 +145,48 @@ describe('parseResponse', () => {
     assert.ok(Object.prototype.hasOwnProperty.call(rows[0], 'entry_id'))
   })
 })
+
+// ── executeQuery ─────────────────────────────────────────────────────────────
+
+describe('executeQuery', () => {
+  const { executeQuery } = require('../src/database/drivers/kegg')
+
+  /** Answer any KEGG fetch with a fixed TSV payload. */
+  function stubFetch (text) {
+    const original = globalThis.fetch
+    globalThis.fetch = async () => ({ ok: true, status: 200, statusText: 'OK', text: async () => text })
+    return () => { globalThis.fetch = original }
+  }
+
+  test('count reports the rows returned, not the whole unpaginated list', async () => {
+    // Given a KEGG list response with four entries
+    const restore = stubFetch('path:map1\tOne\npath:map2\tTwo\npath:map3\tThree\npath:map4\tFour\n')
+
+    // When querying with a limit of two
+    const result = await executeQuery({
+      connection: { database: 'https://rest.kegg.jp' },
+      from: 'list/pathway',
+      limit: 2
+    })
+    restore()
+
+    // Then count matches the page that was actually returned
+    assert.equal(result.data.length, 2)
+    assert.equal(result.count, 2)
+  })
+
+  test('rejects a same-source relation instead of dropping it silently', async () => {
+    // Given a query asking KEGG to join within itself
+    const input = {
+      connection: { database: 'https://rest.kegg.jp' },
+      from: 'list/pathway',
+      relations: [{ entity: 'compound', foreignKey: 'entry_id', type: 'hasMany' }]
+    }
+
+    // When it is executed
+    const attempt = executeQuery(input)
+
+    // Then the limitation is reported rather than ignored
+    await assert.rejects(attempt, /cannot join within its own source/)
+  })
+})
