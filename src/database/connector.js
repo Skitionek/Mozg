@@ -17,13 +17,27 @@ function connectionForCatalog (catalogName) {
  * Resolve the relations that target a *different* catalog entry.  Drivers only
  * know how to join within their own source, so these are resolved here, one
  * follow-up query per row, after the parent rows are in hand.
+ *
+ * A relation naming an unknown catalog, or one that otherwise fails to
+ * resolve, is reported in place on the row rather than thrown — the same
+ * partial-failure contract every driver's own relation loader already
+ * honours, so one bad relation does not void the parent rows that already
+ * fetched successfully.
  */
 async function loadCrossCatalogRelations (rows, relations) {
   if (!rows || rows.length === 0) return
 
   for (const rel of relations) {
     const resultKey = rel.alias || rel.entity
-    const connection = connectionForCatalog(rel.catalog)
+
+    let connection
+    try {
+      connection = connectionForCatalog(rel.catalog)
+    } catch (err) {
+      const errObj = { error: `relation fetch failed for ${rel.catalog}/${rel.entity}: ${err.message}` }
+      for (const row of rows) row[resultKey] = errObj
+      continue
+    }
 
     for (const row of rows) {
       try {
@@ -55,4 +69,4 @@ async function executeQuery (input) {
   return result
 }
 
-module.exports = { executeQuery }
+module.exports = { executeQuery, connectionForCatalog }

@@ -82,4 +82,25 @@ describe('connector: relation routing', () => {
     assert.equal(result.data[0].id, 1)
     assert.match(result.data[0].c.error, /upstream exploded/)
   })
+
+  test('reports a relation naming an unknown catalog in place, not by failing the query', async () => {
+    // Given a parent query that succeeds and a relation naming a catalog that
+    // does not exist
+    mock.method(registry, 'getDriver', () => ({
+      executeQuery: async () => ({ data: [{ id: 1, kegg_id: 'C1' }], count: 1 })
+    }))
+
+    // When the query runs
+    const result = await executeQuery({
+      connection: { driver: 'sqlite3' },
+      from: 'users',
+      relations: [{ entity: '/x', foreignKey: 'kegg_id', type: 'belongsTo', alias: 'c', catalog: 'nosuchcatalog' }]
+    })
+    mock.restoreAll()
+
+    // Then the parent row survives, carrying the relation's error, rather
+    // than the whole query rejecting
+    assert.equal(result.data[0].id, 1)
+    assert.match(result.data[0].c.error, /Unknown catalog/)
+  })
 })
