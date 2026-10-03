@@ -38,6 +38,7 @@
 
 const connector = require('./database/connector')
 const { fetchRelation: fetchRelationRows } = require('./database/relations')
+const { redactCredentials } = require('./errors')
 
 /**
  * Fetch the data for a single relation of a single parent row.
@@ -47,7 +48,8 @@ const { fetchRelation: fetchRelationRows } = require('./database/relations')
  * `connector.executeQuery` so every driver is supported.
  */
 async function fetchRelation (connection, row, rel) {
-  return fetchRelationRows((input) => connector.executeQuery(input), connection, row, rel)
+  const target = rel.catalog ? connector.connectionForCatalog(rel.catalog) : connection
+  return fetchRelationRows((input) => connector.executeQuery(input), target, row, rel)
 }
 
 /**
@@ -124,7 +126,7 @@ async function streamQuery (input, res) {
               res.write(`/* ${placeholder} */ ${JSON.stringify(value)}\n`)
             })
             .catch((err) => {
-              res.write(`/* ${placeholder} */ ${JSON.stringify({ error: err.message })}\n`)
+              res.write(`/* ${placeholder} */ ${JSON.stringify({ error: redactCredentials(err.message) })}\n`)
             })
         )
       }
@@ -134,7 +136,7 @@ async function streamQuery (input, res) {
   } catch (err) {
     // The status line is already on the wire by this point, so a late failure
     // can only be reported as a JSON object on the stream itself.
-    res.write(JSON.stringify({ error: err.message }) + '\n')
+    res.write(JSON.stringify({ error: redactCredentials(err.message) }) + '\n')
   } finally {
     res.end()
   }
@@ -177,9 +179,12 @@ function handleStreamRequest (req, res) {
     bodyBytes += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length
     if (bodyBytes > MAX_BODY_BYTES) {
       rejected = true
+      // Destroying the request straight away can tear down the socket before
+      // the 413 response finishes writing to it; wait for the response to
+      // flush, then stop the client from sending any more of the oversized body.
       res.writeHead(413, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: `Request body exceeds ${MAX_BODY_BYTES} bytes` }))
-      if (typeof req.destroy === 'function') req.destroy()
+      res.once('finish', () => { if (typeof req.destroy === 'function') req.destroy() })
       return
     }
 
@@ -207,7 +212,7 @@ function handleStreamRequest (req, res) {
     streamQuery(input, res).catch((err) => {
       if (!res.headersSent) {
         res.writeHead(statusForError(err), { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ error: err.message }))
+        res.end(JSON.stringify({ error: redactCredentials(err.message) }))
       } else {
         res.end()
       }
