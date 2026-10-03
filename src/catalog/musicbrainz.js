@@ -30,6 +30,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: search requires a query; fmt selects JSON.
+  probe: { params: { query: 'beatles', fmt: 'json' } },
   entities: [
     {
       name: '/artist',

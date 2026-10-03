@@ -33,6 +33,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: search requires a query and an explicit format.
+  probe: { params: { query: 'insulin', format: 'json', size: '1' } },
   entities: [
     {
       // Use where: { query: "…", format: "json", size: "25" }

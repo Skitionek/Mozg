@@ -25,6 +25,8 @@ module.exports = {
   connection: {
     database: 'https://opentdb.com'
   },
+  // Health-probe hint: the API returns an empty body without amount.
+  probe: { params: { amount: '1' } },
   entities: [
     {
       name: '/api.php',

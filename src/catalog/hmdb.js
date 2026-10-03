@@ -33,6 +33,7 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  probe: { skip: 'HMDB blocks automated clients (403); reachable from a browser only' },
   entities: [
     {
       // Paginated list: /metabolites.json?page=1

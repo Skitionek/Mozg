@@ -35,6 +35,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: the marker endpoint requires a ZFIN id.
+  probe: { entity: '/marker/ZDB-GENE-980526-388/relationships' },
   entities: [
     {
       // Search: /marker/search?name=tp53

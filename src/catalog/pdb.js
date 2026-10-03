@@ -29,6 +29,8 @@ module.exports = {
   connection: {
     database: 'https://data.rcsb.org/rest/v1/core'
   },
+  // Health-probe hint: the entry endpoint requires a PDB id.
+  probe: { entity: '/entry/4HHB' },
   entities: [
     {
       // Fetch by PDB ID: /entry/1TUP

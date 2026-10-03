@@ -36,6 +36,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: the gene endpoint requires an id.
+  probe: { entity: '/gene/id/59067' },
   entities: [
     {
       // Fetch by NCBI Gene ID: /gene/id/672/summary  (672 = BRCA2)

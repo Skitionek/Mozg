@@ -39,7 +39,6 @@ const REGISTRY = {
   kegg: () => require('./kegg'),
   // ── Bioinformatics – nucleotide archives ─────────────────────────────────
   'embl-ebi': () => require('./embl-ebi'),
-  ddbj: () => require('./ddbj'),
   // ── Bioinformatics – model organism databases ─────────────────────────────
   flybase: () => require('./flybase'),
   wormbase: () => require('./wormbase'),
@@ -112,4 +111,24 @@ function listCatalog () {
   return Object.keys(REGISTRY)
 }
 
-module.exports = { getCatalog, listCatalog }
+/**
+ * Find the catalog entry whose connection points at the given database or
+ * base URL, ignoring a trailing slash.
+ * @param {string} database
+ * @returns {object|null}
+ */
+function findCatalogByDatabase (database) {
+  if (!database) return null
+
+  const wanted = String(database).replace(/\/$/, '')
+
+  for (const load of Object.values(REGISTRY)) {
+    const entry = load()
+    const candidate = (entry.connection && entry.connection.database) || ''
+    if (candidate.replace(/\/$/, '') === wanted) return entry
+  }
+
+  return null
+}
+
+module.exports = { getCatalog, listCatalog, findCatalogByDatabase }
