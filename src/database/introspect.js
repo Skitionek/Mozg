@@ -1,9 +1,9 @@
 'use strict'
 
-const { getDriver } = require('./registry')
+const registry = require('./registry')
 
 async function introspectDatabase (connection) {
-  const driver = getDriver(connection.driver)
+  const driver = registry.getDriver(connection.driver)
   return driver.introspect(connection)
 }
 

@@ -75,9 +75,10 @@ function buildHandlerDescriptor (driver, connection) {
       }
 
     case 'soap':
+      // The handler reads `source`, not `wsdl`.
       return {
         pkg: '@graphql-mesh/soap',
-        config: { wsdl: connection.database }
+        config: { source: connection.database }
       }
 
     case 'odata':
@@ -87,15 +88,17 @@ function buildHandlerDescriptor (driver, connection) {
       }
 
     case 'thrift':
+      // The handler loads the IDL from `idl` and assembles its own endpoint
+      // from hostName/port/path — it never reads `endpoint`.
       return {
         pkg: '@graphql-mesh/thrift',
-        config: { endpoint: connection.database }
-      }
-
-    case 'mongodb':
-      return {
-        pkg: '@graphql-mesh/mongoose',
-        config: { connectionString: connection.database }
+        config: {
+          idl: connection.database,
+          hostName: connection.host || 'localhost',
+          port: connection.port || 9090,
+          path: connection.path || '',
+          https: connection.scheme === 'https'
+        }
       }
 
     default:
@@ -417,6 +420,7 @@ async function loadRelations (connection, rows, relations) {
       entity,
       localKey = 'id',
       foreignKey,
+      ownerKey = 'id',
       alias,
       type = 'hasMany',
       select: relSelect,
@@ -449,7 +453,7 @@ async function loadRelations (connection, rows, relations) {
           connection,
           from: entity,
           select: relSelect,
-          where: { ...relWhere, id: fkVal },
+          where: { ...relWhere, [ownerKey]: fkVal },
           relations: nested
         })
         row[resultKey] = relData[0] ?? null
