@@ -27,10 +27,19 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v6
 
+      # The query builder fetches examples/queries.json at runtime, so the
+      # examples directory has to ship alongside public/.
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp -r public/. _site/
+          mkdir -p _site/examples
+          cp examples/queries.json _site/examples/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: public/
+          path: _site/
 
       - name: Deploy to GitHub Pages
         id: deployment

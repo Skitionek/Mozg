@@ -4,6 +4,8 @@ npm-debug.log*
 .env
 .env.*
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 megalinter-reports/

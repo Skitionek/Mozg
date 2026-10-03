@@ -1,8 +1,10 @@
 name: Integration Tests (Weekly)
 
-# Runs weekly to validate that the 63 public catalog endpoints are still
-# reachable and returning expected response shapes.  Results are uploaded
-# as an artifact so catalog staleness can be tracked over time.
+# Runs weekly to validate that the catalog's public endpoints are still
+# reachable.  Entries needing credentials are skipped; the rest are probed and
+# classified as ok, broken (4xx — the catalog is wrong) or unavailable
+# (5xx/network — their server is down).  Results are uploaded as an artifact so
+# catalog staleness can be tracked over time.
 #
 # Also runs on manual trigger so maintainers can run it on demand.
 
@@ -36,10 +38,10 @@ jobs:
         run: npm ci
 
       - name: Run catalog smoke tests
-        # Each catalog entry is probed with a single-entity introspect-or-list call.
-        # Failures are recorded but do not fail the job; a summary is uploaded.
+        # Each probed entry gets one list-or-entity request.  The script exits
+        # non-zero only when an endpoint answers 4xx, which means the catalog
+        # entry itself is wrong; third-party downtime never fails the job.
         run: node scripts/catalog-health.js --output catalog-health.json
-        continue-on-error: true
 
       - name: Upload health report
         uses: actions/upload-artifact@v7
