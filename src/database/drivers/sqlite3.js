@@ -10,13 +10,32 @@
  */
 
 const knex = require('knex')
+const { existsSync } = require('node:fs')
 
 // Connection cache keyed by file path
 // TODO: add LRU eviction to prevent unbounded growth in long-running processes
 const connectionCache = new Map()
 
+// SQLite creates a database when asked to open a path that has none.  Here the
+// path arrives as untrusted GraphQL input, so opening it unchecked lets any
+// caller write an empty file anywhere this process can reach — and makes a typo
+// look like an empty database rather than a mistake.
+function assertDatabaseExists (filename) {
+  if (filename === ':memory:') return
+
+  if (!filename) {
+    throw new Error('SQLite database not found: no database path was given')
+  }
+
+  if (!existsSync(filename)) {
+    throw new Error(`SQLite database not found: ${filename}`)
+  }
+}
+
 function getKnexInstance (config) {
   const cacheKey = config.database
+
+  assertDatabaseExists(cacheKey)
 
   if (!connectionCache.has(cacheKey)) {
     const instance = knex({
@@ -55,7 +74,7 @@ async function loadRelations (db, rows, relations) {
   if (!rows.length) return
 
   for (const rel of relations) {
-    const { entity, localKey = 'id', foreignKey, alias, type = 'hasMany', select, where, relations: nested } = rel
+    const { entity, localKey = 'id', foreignKey, ownerKey = 'id', alias, type = 'hasMany', select, where, relations: nested } = rel
     const resultKey = alias || entity
 
     try {
@@ -93,14 +112,14 @@ async function loadRelations (db, rows, relations) {
         const foreignIds = [...new Set(rows.map((r) => r[foreignKey]).filter((v) => v != null))]
         if (!foreignIds.length) { rows.forEach((r) => { r[resultKey] = null }); continue }
 
-        let relQ = db(entity).whereIn('id', foreignIds)
+        let relQ = db(entity).whereIn(ownerKey, foreignIds)
         relQ = select && select.length > 0 ? relQ.select(select) : relQ.select('*')
         if (where) relQ = relQ.where(where)
         const relRows = await relQ
 
         if (nested && nested.length > 0) await loadRelations(db, relRows, nested)
 
-        const byId = Object.fromEntries(relRows.map((r) => [r.id, r]))
+        const byId = Object.fromEntries(relRows.map((r) => [r[ownerKey], r]))
         for (const row of rows) { row[resultKey] = byId[row[foreignKey]] ?? null }
       }
     } catch (err) {
