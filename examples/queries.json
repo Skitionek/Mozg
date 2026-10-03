@@ -258,12 +258,6 @@
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.ebi.ac.uk/ena/portal/api\" }\n    from: \"/search\"\n    where: { result: \"sequence\", query: \"tax_eq(9606)\" }\n    limit: 5\n  }) { count data }\n}"
   },
   {
-    "name": "DDBJ – search nucleotide sequences",
-    "description": "Search the DDBJ sequence archive for nucleotide entries. Returns INSDC accession numbers and descriptions.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://ddbj.nig.ac.jp/search/api/v1\" }\n    from: \"/search/sequence\"\n    where: { query: \"organism:Homo sapiens\" }\n    limit: 5\n  }) { count data }\n}"
-  },
-  {
     "name": "FlyBase – search Drosophila genes",
     "description": "Search the FlyBase Drosophila melanogaster gene database. Returns gene symbols, names, and IDs.",
     "category": "Bioinformatics",
