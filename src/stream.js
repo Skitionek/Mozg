@@ -37,57 +37,17 @@
  */
 
 const connector = require('./database/connector')
+const { fetchRelation: fetchRelationRows } = require('./database/relations')
 
 /**
  * Fetch the data for a single relation of a single parent row.
  *
- * Mirrors the hasMany / hasOne / belongsTo logic that lives inside the
- * per-driver loadRelations helpers, but operates through the public
- * executeQuery API so it works with every driver.
- *
- * Nested relations are resolved synchronously (non-progressively) inside
- * executeQuery – they do not get their own stream placeholders.
+ * Delegates to the shared resolver so the streaming path and the ordinary
+ * query path agree on relation semantics, while still going through
+ * `connector.executeQuery` so every driver is supported.
  */
 async function fetchRelation (connection, row, rel) {
-  const {
-    entity,
-    localKey = 'id',
-    foreignKey,
-    type = 'hasMany',
-    select,
-    where,
-    relations: nested
-  } = rel
-
-  if (type === 'hasMany' || type === 'hasOne') {
-    const parentId = row[localKey]
-    if (parentId == null) return type === 'hasMany' ? [] : null
-
-    const { data } = await connector.executeQuery({
-      connection,
-      from: entity,
-      select,
-      where: { ...(where || {}), [foreignKey]: parentId },
-      relations: nested
-    })
-    return type === 'hasMany' ? data : (data[0] ?? null)
-  }
-
-  if (type === 'belongsTo') {
-    const fkVal = row[foreignKey]
-    if (fkVal == null) return null
-
-    const { data } = await connector.executeQuery({
-      connection,
-      from: entity,
-      select,
-      where: { ...(where || {}), id: fkVal },
-      relations: nested
-    })
-    return data[0] ?? null
-  }
-
-  return null
+  return fetchRelationRows((input) => connector.executeQuery(input), connection, row, rel)
 }
 
 /**
@@ -98,6 +58,15 @@ async function fetchRelation (connection, row, rel) {
  * @param {import('node:http').ServerResponse} res
  */
 async function streamQuery (input, res) {
+  let nextId = 1
+  const next = () => `$${nextId++}`
+
+  // Phase 1 – fetch main entity rows without relations so the envelope can
+  // be streamed as soon as the first database round-trip completes.  This runs
+  // before any header is written: a failure here still reaches the caller as a
+  // real HTTP status rather than a 200 whose body merely mentions an error.
+  const { data: rows, count } = await connector.executeQuery({ ...input, relations: undefined })
+
   res.writeHead(200, {
     'Content-Type': 'text/plain; charset=utf-8',
     'Transfer-Encoding': 'chunked',
@@ -105,14 +74,7 @@ async function streamQuery (input, res) {
     'Cache-Control': 'no-cache'
   })
 
-  let nextId = 1
-  const next = () => `$${nextId++}`
-
   try {
-    // Phase 1 – fetch main entity rows without relations so the envelope can
-    // be streamed as soon as the first database round-trip completes.
-    const { data: rows, count } = await connector.executeQuery({ ...input, relations: undefined })
-
     const relations = input.relations || []
 
     // When there are no relations (or no rows) we emit a single envelope line
@@ -170,12 +132,22 @@ async function streamQuery (input, res) {
 
     await Promise.all(tasks)
   } catch (err) {
-    // If headers have already been written we cannot change the status code,
-    // so we emit the error as a JSON object on the stream itself.
+    // The status line is already on the wire by this point, so a late failure
+    // can only be reported as a JSON object on the stream itself.
     res.write(JSON.stringify({ error: err.message }) + '\n')
   } finally {
     res.end()
   }
+}
+
+// An unbounded body lets one request exhaust memory; /stream only ever
+// receives a QueryInput, which is small.
+const MAX_BODY_BYTES = 1024 * 1024
+
+// `getDriver` rejects an unrecognised driver name — that is the caller's
+// mistake, not a server fault, so it should not read as a 500.
+function statusForError (err) {
+  return /^Unknown driver:/.test(err.message) ? 400 : 500
 }
 
 /**
@@ -196,8 +168,27 @@ function handleStreamRequest (req, res) {
   }
 
   let body = ''
-  req.on('data', (chunk) => { body += chunk })
+  let bodyBytes = 0
+  let rejected = false
+
+  req.on('data', (chunk) => {
+    if (rejected) return
+
+    bodyBytes += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length
+    if (bodyBytes > MAX_BODY_BYTES) {
+      rejected = true
+      res.writeHead(413, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: `Request body exceeds ${MAX_BODY_BYTES} bytes` }))
+      if (typeof req.destroy === 'function') req.destroy()
+      return
+    }
+
+    body += chunk
+  })
+
   req.on('end', () => {
+    if (rejected) return
+
     let input
     try {
       input = JSON.parse(body)
@@ -215,7 +206,7 @@ function handleStreamRequest (req, res) {
 
     streamQuery(input, res).catch((err) => {
       if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.writeHead(statusForError(err), { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: err.message }))
       } else {
         res.end()
