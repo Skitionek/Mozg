@@ -43,4 +43,21 @@ describe('introspectFromCatalog', () => {
     // Then nothing is claimed about it
     assert.deepEqual(tables, [])
   })
+
+  test('combines entities from every catalog entry sharing a base URL', async () => {
+    // Given a base URL that backs several distinct catalog entries (NCBI
+    // E-utilities serves ncbi, genbank, pubmed and geo alike, distinguished
+    // only by a `where: { db }` the caller supplies per query — information a
+    // bare connection does not carry)
+    const connection = { database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils' }
+
+    // When introspecting it
+    const { tables } = introspectFromCatalog(connection)
+    const names = tables.map((t) => t.name)
+
+    // Then entities from more than one of those entries are present, each
+    // listed once even where entries overlap
+    assert.ok(new Set(names).size === names.length, `expected no duplicates, got ${names}`)
+    assert.ok(names.length > 1, `expected entities from multiple entries, got ${names}`)
+  })
 })
