@@ -33,8 +33,7 @@ module.exports = {
       columns: ['count', 'retmax', 'retstart', 'idlist', 'translationset', 'querytranslation'],
       relations: [
         { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'summaries' },
-        { entity: '/search', foreignKey: 'idlist', type: 'hasMany', alias: 'emblSequences', catalog: 'embl-ebi' },
-        { entity: '/search/sequence', foreignKey: 'idlist', type: 'hasMany', alias: 'ddbjSequences', catalog: 'ddbj' }
+        { entity: '/search', foreignKey: 'idlist', type: 'hasMany', alias: 'emblSequences', catalog: 'embl-ebi' }
       ]
     },
     {

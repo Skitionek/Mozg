@@ -26,6 +26,8 @@ module.exports = {
   connection: {
     database: 'https://api.open-meteo.com/v1'
   },
+  // Health-probe hint: forecast requires coordinates.
+  probe: { params: { latitude: '52.52', longitude: '13.41', current: 'temperature_2m' } },
   entities: [
     {
       name: '/forecast',

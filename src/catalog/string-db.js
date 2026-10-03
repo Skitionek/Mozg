@@ -31,6 +31,8 @@ module.exports = {
   connection: {
     database: 'https://string-db.org/api/json'
   },
+  // Health-probe hint: get_string_ids requires identifiers.
+  probe: { params: { identifiers: 'TP53' } },
   entities: [
     {
       // Map gene names to STRING IDs: /get_string_ids?identifiers=TP53&species=9606

@@ -10,7 +10,7 @@
 module.exports = {
   name: 'rnacentral',
   label: 'RNAcentral (PostgreSQL)',
-  description: 'Public EBI database of non-coding RNA sequences from multiple expert databases.',
+  description: 'Public EBI database of non-coding RNA sequences from multiple expert databases. NOTE: the public reader account currently has no USAGE on the rnacen schema, so this entry is not queryable until EBI restores the grant.',
   driver: 'postgres',
   connection: {
     host: 'hh-pgsql-public.ebi.ac.uk',

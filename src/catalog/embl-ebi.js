@@ -36,6 +36,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: ENA search requires a result type.
+  probe: { params: { result: 'read_run', limit: '1' } },
   entities: [
     {
       // Use where: { result: "sequence", query: "…", format: "json" }

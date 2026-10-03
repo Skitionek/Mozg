@@ -22,6 +22,8 @@ module.exports = {
   connection: {
     database: 'https://api.nasa.gov'
   },
+  // Health-probe hint: the public list endpoint requires an API key.
+  probe: { params: { api_key: 'DEMO_KEY' } },
   entities: [
     {
       name: '/planetary/apod',

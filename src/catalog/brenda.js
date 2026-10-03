@@ -37,6 +37,7 @@ module.exports = {
     // Pass user (registered email) and password (SHA-256 of password + email)
     // via the GraphQL query's connection argument.
   },
+  probe: { skip: 'BRENDA has no anonymous REST endpoint; access requires free registration' },
   entities: [
     {
       // Fetch enzyme by EC number: /enzyme/1.1.1.1

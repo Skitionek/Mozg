@@ -36,6 +36,8 @@ module.exports = {
       'Content-Type': 'application/json'
     }
   },
+  // Health-probe hint: Ensembl negotiates format by query parameter.
+  probe: { params: { 'content-type': 'application/json' } },
   entities: [
     {
       name: '/info/species',

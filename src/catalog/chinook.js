@@ -9,7 +9,7 @@
 module.exports = {
   name: 'chinook',
   label: 'Chinook (SQLite)',
-  description: 'Sample music-store database with artists, albums, tracks, invoices and customers.',
+  description: 'Sample music-store database with artists, albums, tracks, invoices and customers. Bring your own file: download chinook.db from github.com/lerocha/chinook-database and set `database` to its path.',
   driver: 'sqlite3',
   connection: {
     database: 'chinook.db'

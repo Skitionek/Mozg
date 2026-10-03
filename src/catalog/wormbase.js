@@ -38,6 +38,7 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  probe: { skip: 'WormBase REST blocks automated clients (403) on every documented path' },
   entities: [
     {
       // Gene overview: /rest/widget/gene/WBGene00000001/overview

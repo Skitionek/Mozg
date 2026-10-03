@@ -38,6 +38,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: the bioentity endpoint requires a GO id.
+  probe: { entity: '/bioentity/function/GO:0008150' },
   entities: [
     {
       // Full-text search: where: { q: "apoptosis", category: "ontology_class", rows: "10" }

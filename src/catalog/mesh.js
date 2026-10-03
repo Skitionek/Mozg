@@ -35,6 +35,8 @@ module.exports = {
       Accept: 'application/json'
     }
   },
+  // Health-probe hint: descriptor lookup requires a label.
+  probe: { params: { label: 'diabetes', match: 'contains', limit: '1' } },
   entities: [
     {
       // Search MeSH topical descriptors: where: { label: "Glucose", match: "contains", limit: "10", callback: "false" }
