@@ -49,10 +49,8 @@ describe('registry.getDriver', () => {
     assert.equal(typeof d.introspect, 'function')
   })
 
-  test('resolves mongodb to mesh adapter', () => {
-    const d = getDriver('mongodb')
-    assert.equal(typeof d.executeQuery, 'function')
-    assert.equal(typeof d.introspect, 'function')
+  test('rejects mongodb, which is no longer supported', () => {
+    assert.throws(() => getDriver('mongodb'), /Unknown driver/)
   })
 
   // ── Legacy custom drivers ────────────────────────────────────────────────

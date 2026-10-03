@@ -23,15 +23,18 @@
  */
 function getDriver (driverName) {
   switch (driverName) {
-    // ── Mesh-backed drivers ────────────────────────────────────────────────
+    // Postgres: mesh handler for queries, information_schema for discovery
+    // (Postgraphile's introspection needs privileges read-only roles lack).
     case 'postgres':
+      return require('./drivers/postgres')
+
+    // ── Mesh-backed drivers ────────────────────────────────────────────────
     case 'mysql':
     case 'neo4j':
     case 'openapi':
     case 'soap':
     case 'odata':
     case 'thrift':
-    case 'mongodb':
       return require('./drivers/mesh-adapter')
 
     // ── SQLite3 (legacy knex driver – tuql has critical vulnerability) ─────
