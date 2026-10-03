@@ -44,6 +44,10 @@ jobs:
         run: node scripts/catalog-health.js --output catalog-health.json
 
       - name: Upload health report
+        # The report is written before the step above can fail the job (a
+        # broken catalog entry), so upload it on failure too — that is the
+        # one case where this artifact is most worth having.
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: catalog-health-${{ github.run_id }}
