@@ -224,3 +224,40 @@ describe('executeQuery', () => {
     assert.match(result.data[0].entry.error, /relation fetch failed/)
   })
 })
+
+describe('loadRelations: concurrency', () => {
+  const { executeQuery } = require('../src/database/drivers/kegg')
+  test('resolves relations for more rows than the concurrency limit, each exactly once', async () => {
+    // Given 7 rows (more than the concurrency limit) and a stub that counts
+    // how many fetches are in flight at once
+    let inFlight = 0
+    let maxInFlight = 0
+    let calls = 0
+    const original = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      if (String(url).endsWith('/list/pathway')) {
+        const lines = Array.from({ length: 7 }, (_, i) => `path:map0000${i}\tP${i}`).join('\n')
+        return { ok: true, status: 200, statusText: 'OK', text: async () => lines + '\n' }
+      }
+      inFlight++
+      calls++
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight--
+      return { ok: true, status: 200, statusText: 'OK', text: async () => 'ENTRY content\n///\n' }
+    }
+
+    // When querying with a same-source relation
+    const result = await executeQuery({
+      connection: { database: 'https://rest.kegg.jp' },
+      from: 'list/pathway',
+      relations: [{ entity: '/get', foreignKey: 'entry_id', type: 'belongsTo', alias: 'entry' }]
+    })
+    globalThis.fetch = original
+
+    // Then every row got exactly one lookup, never more than 3 at once
+    assert.equal(calls, 7)
+    assert.ok(maxInFlight <= 3, `expected at most 3 concurrent, got ${maxInFlight}`)
+    assert.ok(result.data.every((row) => row.entry && row.entry.entry))
+  })
+})

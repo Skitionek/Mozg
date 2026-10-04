@@ -158,6 +158,27 @@ function applySelect (rows, select) {
 
 // ── Relations ────────────────────────────────────────────────────────────────
 
+// KEGG's own docs ask for at most 3 requests/second; this driver's relation
+// loader respects that by running only this many lookups at once instead of
+// firing one request per row simultaneously.
+const RELATION_CONCURRENCY = 3
+
+/** Run `fn` over `items`, at most `limit` calls in flight at once. */
+async function mapWithConcurrency (items, limit, fn) {
+  const results = new Array(items.length)
+  let next = 0
+
+  async function worker () {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i], i)
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
 /**
  * KEGG has no SQL-style join, but every one of its endpoints accepts a single
  * identifier as a path segment via `where._pathSuffix` (/get/{id},
@@ -182,11 +203,11 @@ async function loadRelations (connection, rows, relations) {
     const { entity, foreignKey, alias, type = 'hasMany', select, relations: nested } = rel
     const resultKey = alias || entity
 
-    for (const row of rows) {
+    await mapWithConcurrency(rows, RELATION_CONCURRENCY, async (row) => {
       const pathVal = row[foreignKey]
       if (pathVal == null) {
         row[resultKey] = type === 'hasMany' ? [] : null
-        continue
+        return
       }
 
       try {
@@ -205,7 +226,7 @@ async function loadRelations (connection, rows, relations) {
         // losing the rest of the result over one bad lookup.
         row[resultKey] = { error: `relation fetch failed for ${entity}: ${err.message}` }
       }
-    }
+    })
   }
 }
 
