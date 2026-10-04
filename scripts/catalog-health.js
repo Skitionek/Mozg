@@ -94,12 +94,15 @@ async function probe (entry) {
       return { status: 'broken', error: 'empty response body', httpStatus: res.status, url: url.toString() }
     }
 
-    return {
-      status: 'ok',
-      httpStatus: res.status,
-      contentType: (res.headers.get('content-type') || '').split(';')[0] || null,
-      url: url.toString()
+    // None of the catalog's REST/KEGG entries legitimately serve an HTML page
+    // as their actual data — a 200 with an HTML body is a moved endpoint, a
+    // maintenance page, or a bot-check wall wearing a success status.
+    const contentType = (res.headers.get('content-type') || '').split(';')[0] || null
+    if (contentType === 'text/html') {
+      return { status: 'broken', error: 'responded 200 with an HTML page, not data', httpStatus: res.status, url: url.toString() }
     }
+
+    return { status: 'ok', httpStatus: res.status, contentType, url: url.toString() }
   } catch (err) {
     // Timeouts and DNS/connection failures are availability problems, not
     // evidence that the catalog entry is wrong.
