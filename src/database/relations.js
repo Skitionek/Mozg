@@ -114,13 +114,16 @@ async function resolveCrossCatalogRelation (executeQuery, rows, rel) {
     return
   }
 
-  for (const row of rows) {
+  // Each row's lookup is independent (and this is one HTTP round-trip per
+  // row for most cross-catalog targets), so run them concurrently rather
+  // than one at a time.
+  await Promise.all(rows.map(async (row) => {
     try {
       row[resultKey] = await fetchRelation(executeQuery, connection, row, rel)
     } catch (err) {
       row[resultKey] = describeFailure(err)
     }
-  }
+  }))
 }
 
 module.exports = { fetchRelation, connectionForCatalog, resolveCrossCatalogRelation }
