@@ -32,6 +32,18 @@ async function loadKnexRelations (db, rows, relations) {
   if (!rows.length) return
 
   for (const rel of relations) {
+    // A relation naming another catalog entry — at any nesting depth — has no
+    // local table to join against; hand it to the connector, which knows how
+    // to resolve it against the connection that catalog entry actually names.
+    // Required lazily: this file is loaded by the drivers connector.js itself
+    // dispatches to, and the cost is only paid when such a relation appears.
+    if (rel.catalog) {
+      const { resolveCrossCatalogRelation } = require('../relations')
+      const connector = require('../connector')
+      await resolveCrossCatalogRelation(connector.executeQuery, rows, rel)
+      continue
+    }
+
     const { entity, localKey = 'id', foreignKey, ownerKey = 'id', alias, type = 'hasMany', select, where, relations: nested } = rel
     const resultKey = alias || entity
 

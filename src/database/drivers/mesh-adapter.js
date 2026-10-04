@@ -403,6 +403,16 @@ async function executeQuery (input) {
  * performance concern as rest.js). */
 async function loadRelations (connection, rows, relations) {
   for (const rel of relations) {
+    // A relation naming another catalog entry has no local source to join
+    // against; hand it to the connector, which knows how to resolve it
+    // against the connection that catalog entry actually names.
+    if (rel.catalog) {
+      const { resolveCrossCatalogRelation } = require('../relations')
+      const connector = require('../connector')
+      await resolveCrossCatalogRelation(connector.executeQuery, rows, rel)
+      continue
+    }
+
     const {
       entity,
       localKey = 'id',
