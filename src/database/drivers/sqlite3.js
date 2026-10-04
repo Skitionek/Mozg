@@ -9,13 +9,12 @@
  * available.  See the deferred issues table in .github/copilot-instructions.md.
  */
 
-const knex = require('knex')
 const { existsSync } = require('node:fs')
-const { executeKnexQuery } = require('./knex-query')
+const { executeKnexQuery, createConnectionCache } = require('./knex-query')
 
-// Connection cache keyed by file path
+// Connection cache keyed by file path.
 // TODO: add LRU eviction to prevent unbounded growth in long-running processes
-const connectionCache = new Map()
+const pool = createConnectionCache()
 
 // SQLite creates a database when asked to open a path that has none.  Here the
 // path arrives as untrusted GraphQL input, so opening it unchecked lets any
@@ -38,17 +37,12 @@ function getKnexInstance (config) {
 
   assertDatabaseExists(cacheKey)
 
-  if (!connectionCache.has(cacheKey)) {
-    const instance = knex({
-      client: 'sqlite3',
-      connection: { filename: config.database },
-      useNullAsDefault: true,
-      pool: { min: 0, max: 5 }
-    })
-    connectionCache.set(cacheKey, instance)
-  }
-
-  return connectionCache.get(cacheKey)
+  return pool.getOrCreate(cacheKey, () => ({
+    client: 'sqlite3',
+    connection: { filename: config.database },
+    useNullAsDefault: true,
+    pool: { min: 0, max: 5 }
+  }))
 }
 
 async function executeQuery (input) {
@@ -85,10 +79,7 @@ async function introspect (connection) {
 }
 
 async function destroyAll () {
-  for (const instance of connectionCache.values()) {
-    await instance.destroy()
-  }
-  connectionCache.clear()
+  await pool.destroyAll()
 }
 
 module.exports = { executeQuery, introspect, destroyAll }
