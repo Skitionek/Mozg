@@ -170,3 +170,39 @@ describe('executeKnexQuery: a failing relation', () => {
     assert.match(result.data[0].bad.error, /relation fetch failed/)
   })
 })
+
+describe('executeKnexQuery: a relation naming another catalog', () => {
+  test('a top-level catalog-tagged relation is not treated as a local join', async () => {
+    // Given a relation naming a catalog rather than a local table
+    const result = await executeKnexQuery(getKnexInstance, {
+      connection: {},
+      from: 'authors',
+      where: { name: 'Ada' },
+      relations: [{ entity: '/users', foreignKey: 'id', alias: 'external', type: 'hasMany', catalog: 'nosuchcatalog' }]
+    })
+
+    // Then it is resolved as a cross-catalog relation (reported as an unknown
+    // catalog here), not attempted as `db('/users')`, which would throw a
+    // generic SQL error instead of a legible one
+    assert.match(result.data[0].external.error, /Unknown catalog/)
+  })
+
+  test('a catalog-tagged relation nested inside a same-source relation is still routed correctly', async () => {
+    // Given a same-source hasMany relation whose own nested relation names
+    // another catalog
+    const result = await executeKnexQuery(getKnexInstance, {
+      connection: {},
+      from: 'authors',
+      where: { name: 'Ada' },
+      relations: [{
+        entity: 'books', localKey: 'id', foreignKey: 'author_id', type: 'hasMany', alias: 'books',
+        relations: [{ entity: '/x', foreignKey: 'id', alias: 'external', type: 'hasMany', catalog: 'nosuchcatalog' }]
+      }]
+    })
+
+    // Then the nested relation is still recognised as cross-catalog at its own
+    // depth, rather than being handed to db('/x') as if it were a local table
+    const book = result.data[0].books[0]
+    assert.match(book.external.error, /Unknown catalog/)
+  })
+})
