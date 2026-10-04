@@ -37,7 +37,7 @@
  */
 
 const connector = require('./database/connector')
-const { fetchRelation: fetchRelationRows } = require('./database/relations')
+const { fetchRelation: fetchRelationRows, connectionForCatalog } = require('./database/relations')
 const { redactCredentials } = require('./errors')
 
 /**
@@ -48,7 +48,7 @@ const { redactCredentials } = require('./errors')
  * `connector.executeQuery` so every driver is supported.
  */
 async function fetchRelation (connection, row, rel) {
-  const target = rel.catalog ? connector.connectionForCatalog(rel.catalog) : connection
+  const target = rel.catalog ? connectionForCatalog(rel.catalog) : connection
   return fetchRelationRows((input) => connector.executeQuery(input), target, row, rel)
 }
 
