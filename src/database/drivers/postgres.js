@@ -28,7 +28,11 @@ const connectionCache = new Map()
 
 function getKnexInstance (connection) {
   const { host, port, database, user, password } = connection
-  const cacheKey = JSON.stringify({ host, port, database, user })
+  // password is part of the key, unlike the mesh-adapter's connection cache:
+  // two requests naming the same host/user but a different password must not
+  // share a pool, or the second caller's wrong password would silently ride
+  // on the first caller's already-authenticated connection.
+  const cacheKey = JSON.stringify({ host, port, database, user, password })
 
   if (!connectionCache.has(cacheKey)) {
     const instance = knex({
@@ -118,5 +122,6 @@ module.exports = {
   executeQuery,
   introspect,
   buildTables,
+  getKnexInstance,
   destroyAll
 }

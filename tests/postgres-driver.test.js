@@ -1,6 +1,6 @@
 'use strict'
 
-const { test, describe } = require('node:test')
+const { test, describe, afterEach } = require('node:test')
 const assert = require('node:assert/strict')
 const { buildTables } = require('../src/database/drivers/postgres')
 
@@ -49,5 +49,39 @@ describe('postgres driver: buildTables', () => {
 
     // Then the type is reported as unknown rather than null
     assert.equal(tables[0].columns[0].type, 'unknown')
+  })
+})
+
+describe('postgres driver: connection pooling', () => {
+  const { getKnexInstance, destroyAll } = require('../src/database/drivers/postgres')
+
+  afterEach(async () => {
+    await destroyAll()
+  })
+
+  test('reuses one pool for the same connection', () => {
+    // Given the same connection requested twice
+    const connection = { host: 'db.example', port: 5432, database: 'app', user: 'reader', password: 'secret' }
+
+    // When a knex instance is requested both times
+    const first = getKnexInstance(connection)
+    const second = getKnexInstance(connection)
+
+    // Then the same pooled instance is returned
+    assert.equal(first, second)
+  })
+
+  test('does not reuse a pool across different passwords', () => {
+    // Given two connections identical except for the password
+    const correct = { host: 'db.example', port: 5432, database: 'app', user: 'reader', password: 'right' }
+    const wrong = { host: 'db.example', port: 5432, database: 'app', user: 'reader', password: 'wrong' }
+
+    // When a knex instance is requested for each
+    const first = getKnexInstance(correct)
+    const second = getKnexInstance(wrong)
+
+    // Then they do not share a pool — a caller with the wrong password must
+    // not ride on another caller's already-authenticated connection
+    assert.notEqual(first, second)
   })
 })
