@@ -23,7 +23,8 @@
  */
 function getDriver (driverName) {
   switch (driverName) {
-    // Postgres: mesh handler for queries, information_schema for discovery
+    // Postgres: both query and introspection go through knex directly,
+    // reading pg_catalog — see src/database/drivers/postgres.js for why
     // (Postgraphile's introspection needs privileges read-only roles lack).
     case 'postgres':
       return require('./drivers/postgres')
