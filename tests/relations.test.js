@@ -2,7 +2,7 @@
 
 const { test, describe } = require('node:test')
 const assert = require('node:assert/strict')
-const { fetchRelation } = require('../src/database/relations')
+const { fetchRelation, resolveCrossCatalogRelation } = require('../src/database/relations')
 
 /** Record the queries a relation issues and answer them from a fixed table. */
 function recordingExecutor (rowsByEntity) {
@@ -84,5 +84,69 @@ describe('fetchRelation: hasMany and hasOne', () => {
 
     // Then a single record is returned
     assert.equal(related.id, 10)
+  })
+})
+
+describe('fetchRelation: targeting kegg', () => {
+  test('uses _pathSuffix instead of the generic foreign-key filter', async () => {
+    // Given a connection whose driver is kegg, which has no where-filter
+    // semantics of its own
+    const { executeQuery, calls } = recordingExecutor({ '/get': [{ entry: 'map01100' }] })
+    const row = { entry_id: 'map01100' }
+
+    // When resolving a belongsTo relation against it
+    await fetchRelation(executeQuery, { driver: 'kegg' }, row,
+      { entity: '/get', foreignKey: 'entry_id', type: 'belongsTo' })
+
+    // Then the query uses _pathSuffix, not the generic ownerKey filter
+    assert.deepEqual(calls[0].where, { _pathSuffix: 'map01100' })
+  })
+
+  test('uses _pathSuffix for hasMany too', async () => {
+    // Given the same kegg connection
+    const { executeQuery, calls } = recordingExecutor({ '/link/pathway': [{ target_id: 'x' }] })
+    const row = { id: 'C00031' }
+
+    // When resolving a hasMany relation against it
+    await fetchRelation(executeQuery, { driver: 'kegg' }, row,
+      { entity: '/link/pathway', localKey: 'id', foreignKey: 'entry_id', type: 'hasMany' })
+
+    // Then it is still _pathSuffix, never the declared foreignKey name
+    assert.deepEqual(calls[0].where, { _pathSuffix: 'C00031' })
+  })
+})
+
+describe('resolveCrossCatalogRelation', () => {
+  test('resolves across every row and writes the result under the alias', async () => {
+    // Given two parent rows and a relation targeting the jsonplaceholder catalog
+    const calls = []
+    const executeQuery = async (input) => {
+      calls.push(input)
+      return { data: [{ name: `user-${input.where.id}` }], count: 1 }
+    }
+    const rows = [{ userId: 1 }, { userId: 2 }]
+
+    // When the relation is resolved
+    await resolveCrossCatalogRelation(executeQuery, rows,
+      { entity: '/users', foreignKey: 'userId', ownerKey: 'id', type: 'belongsTo', alias: 'author', catalog: 'jsonplaceholder' })
+
+    // Then each row got its own lookup, resolved against jsonplaceholder's connection
+    assert.equal(rows[0].author.name, 'user-1')
+    assert.equal(rows[1].author.name, 'user-2')
+    assert.equal(calls[0].connection.driver, 'rest')
+  })
+
+  test('reports every row with the same error when the catalog name is unknown', async () => {
+    // Given a relation naming a catalog that does not exist
+    const rows = [{ id: 1 }, { id: 2 }]
+
+    // When it is resolved
+    await resolveCrossCatalogRelation(async () => ({ data: [] }), rows,
+      { entity: '/x', foreignKey: 'id', alias: 'c', catalog: 'nosuchcatalog' })
+
+    // Then both rows carry the same explanatory error, rather than one
+    // silently resolving and the other crashing the whole query
+    assert.match(rows[0].c.error, /Unknown catalog/)
+    assert.match(rows[1].c.error, /Unknown catalog/)
   })
 })
