@@ -21,10 +21,9 @@
  * select from.
  */
 
-const knex = require('knex')
-const { executeKnexQuery } = require('./knex-query')
+const { executeKnexQuery, createConnectionCache } = require('./knex-query')
 
-const connectionCache = new Map()
+const pool = createConnectionCache()
 
 function getKnexInstance (connection) {
   const { host, port, database, user, password } = connection
@@ -34,22 +33,17 @@ function getKnexInstance (connection) {
   // on the first caller's already-authenticated connection.
   const cacheKey = JSON.stringify({ host, port, database, user, password })
 
-  if (!connectionCache.has(cacheKey)) {
-    const instance = knex({
-      client: 'pg',
-      connection: {
-        host: host || 'localhost',
-        port: port || 5432,
-        database,
-        user,
-        password: password || ''
-      },
-      pool: { min: 0, max: 5 }
-    })
-    connectionCache.set(cacheKey, instance)
-  }
-
-  return connectionCache.get(cacheKey)
+  return pool.getOrCreate(cacheKey, () => ({
+    client: 'pg',
+    connection: {
+      host: host || 'localhost',
+      port: port || 5432,
+      database,
+      user,
+      password: password || ''
+    },
+    pool: { min: 0, max: 5 }
+  }))
 }
 
 /** Qualify a table name with its schema unless it lives in `public`. */
@@ -108,10 +102,7 @@ async function introspect (connection) {
 }
 
 async function destroyAll () {
-  for (const instance of connectionCache.values()) {
-    await instance.destroy()
-  }
-  connectionCache.clear()
+  await pool.destroyAll()
 }
 
 async function executeQuery (input) {

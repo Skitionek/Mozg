@@ -1,12 +1,40 @@
 'use strict'
 
+const knex = require('knex')
+
 /**
- * Generic knex-backed query execution and relation loading.
+ * Generic knex-backed query execution, relation loading, and connection
+ * pooling.
  *
  * Shared by every driver that talks to a SQL database through knex (sqlite3,
- * postgres) — only connection acquisition and introspection differ between
- * them, so that part lives once here instead of twice.
+ * postgres) — only the knex config each one builds, and how it introspects,
+ * differ between them, so everything else lives once here instead of twice.
  */
+
+/**
+ * A cache of lazily-created knex instances, keyed however the caller likes
+ * (a file path for sqlite3, a JSON-encoded connection for postgres).
+ */
+function createConnectionCache () {
+  const cache = new Map()
+
+  /** Return the cached instance for `cacheKey`, building one on first use. */
+  function getOrCreate (cacheKey, buildKnexConfig) {
+    if (!cache.has(cacheKey)) {
+      cache.set(cacheKey, knex(buildKnexConfig()))
+    }
+    return cache.get(cacheKey)
+  }
+
+  async function destroyAll () {
+    for (const instance of cache.values()) {
+      await instance.destroy()
+    }
+    cache.clear()
+  }
+
+  return { getOrCreate, destroyAll }
+}
 
 async function executeKnexQuery (getKnexInstance, input) {
   const { connection, from, select, where, relations, limit, offset, orderBy, orderDirection } = input
@@ -102,4 +130,4 @@ async function loadKnexRelations (db, rows, relations) {
   }
 }
 
-module.exports = { executeKnexQuery, loadKnexRelations }
+module.exports = { executeKnexQuery, loadKnexRelations, createConnectionCache }

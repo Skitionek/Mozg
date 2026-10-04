@@ -206,3 +206,52 @@ describe('executeKnexQuery: a relation naming another catalog', () => {
     assert.match(book.external.error, /Unknown catalog/)
   })
 })
+
+describe('createConnectionCache', () => {
+  const { createConnectionCache } = require('../src/database/drivers/knex-query')
+
+  test('builds an instance once and reuses it for the same key', () => {
+    // Given a cache and a config builder that counts how often it runs
+    const cache = createConnectionCache()
+    let builds = 0
+    const build = () => { builds++; return { client: 'sqlite3', connection: { filename: ':memory:' }, useNullAsDefault: true } }
+
+    // When the same key is requested twice
+    const first = cache.getOrCreate('a', build)
+    const second = cache.getOrCreate('a', build)
+
+    // Then the config is only built once, and both calls return it
+    assert.equal(builds, 1)
+    assert.equal(first, second)
+  })
+
+  test('builds a separate instance per distinct key', async () => {
+    // Given a cache
+    const cache = createConnectionCache()
+    const build = () => ({ client: 'sqlite3', connection: { filename: ':memory:' }, useNullAsDefault: true })
+
+    // When two different keys are requested
+    const a = cache.getOrCreate('a', build)
+    const b = cache.getOrCreate('b', build)
+
+    // Then they are independent instances
+    assert.notEqual(a, b)
+    await cache.destroyAll()
+  })
+
+  test('destroyAll closes every cached instance and clears the cache', async () => {
+    // Given a cache with one instance in it
+    const cache = createConnectionCache()
+    const build = () => ({ client: 'sqlite3', connection: { filename: ':memory:' }, useNullAsDefault: true })
+    const instance = cache.getOrCreate('a', build)
+
+    // When destroyAll runs
+    await cache.destroyAll()
+
+    // Then the instance is destroyed and a new request builds a fresh one
+    assert.rejects(() => instance.raw('select 1'))
+    let rebuilt = false
+    cache.getOrCreate('a', () => { rebuilt = true; return build() })
+    assert.equal(rebuilt, true)
+  })
+})
