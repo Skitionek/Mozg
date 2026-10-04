@@ -66,4 +66,31 @@ describe('probe: classifying a failure', () => {
     // Then it is reported ok
     assert.equal(result.status, 'ok')
   })
+
+  test('an empty body is broken even with a 200 status', async () => {
+    // Given an endpoint that answers 200 with nothing in the body
+    const restore = stubFetch({ ok: true, status: 200, headers: { get: () => null }, text: async () => '' })
+
+    // When it is probed
+    const result = await probe(ENTRY)
+    restore()
+
+    // Then it is reported as the catalog's problem, not skipped as ok
+    assert.equal(result.status, 'broken')
+  })
+
+  test('a 200 serving an HTML page is broken, not ok', async () => {
+    // Given an endpoint that has moved to a maintenance or error page but
+    // still answers 200 (a common failure mode for these public APIs)
+    const headers = { get: (name) => (name === 'content-type' ? 'text/html; charset=utf-8' : null) }
+    const restore = stubFetch({ ok: true, status: 200, headers, text: async () => '<html>Service moved</html>' })
+
+    // When it is probed
+    const result = await probe(ENTRY)
+    restore()
+
+    // Then it is reported as broken rather than ok — none of the catalog's
+    // entries legitimately serve HTML as their data
+    assert.equal(result.status, 'broken')
+  })
 })
