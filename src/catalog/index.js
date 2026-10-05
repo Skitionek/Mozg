@@ -96,9 +96,8 @@ const REGISTRY = {
  */
 function getCatalog (name) {
   if (name) {
-    const loader = REGISTRY[name]
-    if (!loader) throw new Error(`Unknown catalog: ${name}`)
-    return [loader()]
+    if (!Object.hasOwn(REGISTRY, name)) throw new Error(`Unknown catalog: ${name}`)
+    return [REGISTRY[name]()]
   }
   return Object.values(REGISTRY).map(load => load())
 }
