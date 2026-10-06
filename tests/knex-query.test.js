@@ -115,7 +115,11 @@ describe('executeKnexQuery: hasMany / hasOne', () => {
       from: 'authors',
       where: { name: 'Ada' },
       relations: [{
-        entity: 'books', localKey: 'id', foreignKey: 'author_id', type: 'hasMany', alias: 'books',
+        entity: 'books',
+        localKey: 'id',
+        foreignKey: 'author_id',
+        type: 'hasMany',
+        alias: 'books',
         relations: [{ entity: 'profiles', localKey: 'author_id', foreignKey: 'author_id', type: 'hasOne', alias: 'authorProfile' }]
       }]
     })
@@ -195,7 +199,11 @@ describe('executeKnexQuery: a relation naming another catalog', () => {
       from: 'authors',
       where: { name: 'Ada' },
       relations: [{
-        entity: 'books', localKey: 'id', foreignKey: 'author_id', type: 'hasMany', alias: 'books',
+        entity: 'books',
+        localKey: 'id',
+        foreignKey: 'author_id',
+        type: 'hasMany',
+        alias: 'books',
         relations: [{ entity: '/x', foreignKey: 'id', alias: 'external', type: 'hasMany', catalog: 'nosuchcatalog' }]
       }]
     })
