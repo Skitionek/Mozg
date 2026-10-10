@@ -17,3 +17,13 @@ REPOSITORY_GRYPE_DISABLE_ERRORS: true # those are handled by dependabot
 
 # Exclude JSONC files (which support comments) from strict JSON linting
 JSON_JSONLINT_FILTER_REGEX_EXCLUDE: "(devcontainer\\.json|\\.vscode/)"
+
+# Keep kingfisher out of secretlint's own allowlist. The fake connection
+# strings in .secretlintrc.json exist so secretlint ignores the matching
+# fixtures in tests/errors.test.js and tests/stream.test.js, which assert that
+# redactCredentials strips passwords out of driver error messages. kingfisher
+# reads the allowlist entry itself as a live MongoDB URI. Scoped to that one
+# file so kingfisher keeps failing the build on a secret anywhere else.
+REPOSITORY_KINGFISHER_ARGUMENTS:
+  - --exclude
+  - .secretlintrc.json
