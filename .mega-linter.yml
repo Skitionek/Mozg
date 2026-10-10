@@ -29,9 +29,15 @@ JSON_JSONLINT_FILTER_REGEX_EXCLUDE: "(devcontainer\\.json|\\.vscode/)"
 #   - src/catalog/rnacentral.js and paper/mozg.tex carry RNAcentral's public
 #     read-only password, which cannot be reworded without breaking the
 #     catalog; REPOSITORY_GITLEAKS_DISABLE_ERRORS above names the same two.
+#   - megalinter-reports is MegaLinter's own output directory, written
+#     earlier in the same run. cspell quotes the .secretlintrc.json line into
+#     SPELL_CSPELL-WARNING.log, and kingfisher then reads that log, so
+#     excluding the source file alone is not enough on a full-codebase run.
 # Scoped to these paths so kingfisher still fails the build on a secret
 # anywhere else, and the MongoDB URI rule stays enabled.
 REPOSITORY_KINGFISHER_ARGUMENTS:
+  - --exclude
+  - megalinter-reports
   - --exclude
   - .secretlintrc.json
   - --exclude
