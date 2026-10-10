@@ -17,3 +17,28 @@ REPOSITORY_GRYPE_DISABLE_ERRORS: true # those are handled by dependabot
 
 # Exclude JSONC files (which support comments) from strict JSON linting
 JSON_JSONLINT_FILTER_REGEX_EXCLUDE: "(devcontainer\\.json|\\.vscode/)"
+
+# Keep kingfisher off the files that deliberately carry credential-shaped
+# strings. kingfisher reports one finding per run, so these were enumerated
+# from the tree rather than one red CI round at a time:
+#   - .secretlintrc.json is secretlint's own allows list, whose entries exist
+#     so secretlint ignores the fixtures below.
+#   - tests/errors.test.js and tests/stream.test.js assert that
+#     redactCredentials strips passwords out of driver error messages, so they
+#     must contain realistic URIs to be worth anything.
+#   - src/catalog/rnacentral.js and paper/mozg.tex carry RNAcentral's public
+#     read-only password, which cannot be reworded without breaking the
+#     catalog; REPOSITORY_GITLEAKS_DISABLE_ERRORS above names the same two.
+# Scoped to these paths so kingfisher still fails the build on a secret
+# anywhere else, and the MongoDB URI rule stays enabled.
+REPOSITORY_KINGFISHER_ARGUMENTS:
+  - --exclude
+  - .secretlintrc.json
+  - --exclude
+  - tests/errors.test.js
+  - --exclude
+  - tests/stream.test.js
+  - --exclude
+  - src/catalog/rnacentral.js
+  - --exclude
+  - paper/mozg.tex
