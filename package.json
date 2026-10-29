@@ -18,7 +18,7 @@
     "@graphql-mesh/store": "^0.107.1",
     "@graphql-mesh/thrift": "^0.109.3",
     "@graphql-mesh/utils": "^0.107.1",
-    "arangojs": "^10.5.0",
+    "arangojs": "^10.6.0",
     "fast-xml-parser": "^5.11.2",
     "graphql": "^17.0.2",
     "graphql-yoga": "^6.0.1",
