@@ -37,7 +37,7 @@
  *             | (record, params) => ({ … }),
  *     paginate: { limit: 'size', offset: 'offset', page: 'page', pageBase: 0, max: 500 },
  *     emptyStatus: [404],                    // statuses that mean "no records"
- *     resolve: async (params, ctx) => records, // escape hatch for multi-step lookups
+ *     resolve: async (params, ctx) => records | { records, serverOffset },  // multi-step lookups
  *     example: { accession: 'P04637' },
  *     relations: [ … ]
  *   }
@@ -345,7 +345,13 @@ async function fetchRecords (entry, entity, params, { limit, offset, connection 
     if (entry.auth && entry.auth.required && !apiKeyFor(connection, entry)) {
       throw new Error(`Source "${entry.name}" requires an API key — pass apiKeys: { "${entry.name}": "…" }`)
     }
-    return { records: (await entity.resolve(params, ctx)) || [], serverOffset: 0 }
+    // A resolve hook returns the records, or { records, serverOffset } when it
+    // already skipped `offset` records upstream (so they are not skipped twice).
+    const result = await entity.resolve(params, ctx)
+    if (result && !Array.isArray(result) && Array.isArray(result.records)) {
+      return { records: result.records, serverOffset: result.serverOffset || 0 }
+    }
+    return { records: result || [], serverOffset: 0 }
   }
 
   const req = buildRequest(entry, entity, params, { limit, offset, connection })

@@ -1,52 +1,86 @@
 'use strict'
 
 /**
- * GenBank – NCBI annotated nucleotide sequence database.
- * Reference: https://www.ncbi.nlm.nih.gov/genbank/
- * API docs:  https://www.ncbi.nlm.nih.gov/books/NBK25497/
+ * GenBank / RefSeq sequence records (NCBI Nucleotide and Protein databases),
+ * via NCBI E-utilities.
+ * API docs: https://www.ncbi.nlm.nih.gov/books/NBK25499/
  *
- * No credentials required. Pass an api_key for higher rate limits.
- * All requests must include retmode=json.
- * Pass db=nuccore in where to target the nucleotide sequence database.
- *
- * Sequence accession format: AB123456, NM_001234, NC_000001, etc.
- *
- * Example search: where: { db: "nuccore", term: "BRCA1[Gene Name] AND Homo sapiens[Organism]", retmode: "json" }
- * Example fetch:  where: { db: "nuccore", id: "NG_005905", retmode: "json" }
- *
- * Relationship map:
- *  - /esearch.fcgi  →  /esummary.fcgi  (idlist → id, hasMany)
- *  - /esummary.fcgi →  /elink.fcgi     (UID  → id, hasMany cross-refs)
+ * Accessions work directly (NM_000546, NP_000537.3, MN908947); search uses
+ * Entrez query syntax.  Shares NCBI's rate limit (3 req/s, 10 with
+ * apiKeys: { genbank: "…" }).
  */
+
+const { eutils } = require('./ncbi')
+
+const { EUTILS, esearch, esummary, idList } = eutils
+
+const MOLECULE_DBS = new Set(['nuccore', 'protein'])
+
+function moleculeDb (params) {
+  const db = params.db || 'nuccore'
+  if (!MOLECULE_DBS.has(db)) throw new Error(`genbank: db must be nuccore or protein, got "${db}"`)
+  return db
+}
+
+const SEQUENCE_FIELDS = {
+  accession: 'caption',
+  accessionVersion: 'accessionversion',
+  gi: 'uid',
+  title: 'title',
+  length: 'slen',
+  moleculeType: 'biomol',
+  topology: 'topology',
+  sourceDb: 'sourcedb',
+  organism: 'organism',
+  taxonId: 'taxid',
+  strain: 'strain',
+  createDate: 'createdate',
+  updateDate: 'updatedate'
+}
+
+const SEQUENCE_RELATIONS = [
+  { alias: 'taxonomy', description: 'The source organism (NCBI Taxonomy)', catalog: 'ncbi-gene', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+]
+
+const DB_PARAM = { description: 'nuccore (nucleotide, default) or protein', default: 'nuccore' }
+
 module.exports = {
   name: 'genbank',
-  label: 'GenBank (REST)',
-  description: 'NCBI GenBank nucleotide sequence database. Search and retrieve annotated DNA/RNA sequences. Use db=nuccore in where params. Accessions follow the format AB123456 or NM_001234.',
-  driver: 'rest',
-  connection: {
-    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
-  },
+  label: 'GenBank / RefSeq sequences',
+  description: 'Nucleotide and protein sequence records from GenBank, RefSeq, EMBL and DDBJ (INSDC) via NCBI E-utilities: accession, title, length, molecule type, organism and dates.',
+  category: 'Genes & genomes',
+  homepage: 'https://www.ncbi.nlm.nih.gov/genbank/',
+  docs: 'https://www.ncbi.nlm.nih.gov/books/NBK25499/',
+  license: 'No restrictions on use of GenBank data (NCBI policy); submitters may claim patent/copyright on some sequences',
+  driver: 'api',
+  ...EUTILS,
   entities: [
     {
-      // Use where: { db: "nuccore", term: "…", retmode: "json" }
-      name: '/esearch.fcgi',
-      columns: ['count', 'retmax', 'retstart', 'idlist', 'translationset', 'querytranslation'],
-      relations: [
-        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'summaries' },
-        { entity: '/search', foreignKey: 'idlist', type: 'hasMany', alias: 'emblSequences', catalog: 'embl-ebi' }
-      ]
+      name: 'sequence',
+      description: 'One sequence record by accession (or GI), or several',
+      params: {
+        accession: { required: true, description: 'Accession(.version) or GI, e.g. NM_000546.6, or a list of them' },
+        db: DB_PARAM
+      },
+      resolve: (params, ctx) => esummary(ctx, moleculeDb(params), idList(params.accession)),
+      fields: SEQUENCE_FIELDS,
+      example: { accession: 'NM_000546.6' },
+      relations: SEQUENCE_RELATIONS
     },
     {
-      // Use where: { db: "nuccore", id: "<uid>", retmode: "json" }
-      name: '/esummary.fcgi',
-      columns: ['result', 'uids'],
-      relations: []
-    },
-    {
-      // Use where: { dbfrom: "nuccore", db: "pubmed", id: "<uid>", retmode: "json" }
-      name: '/elink.fcgi',
-      columns: ['linksets'],
-      relations: []
+      name: 'sequences',
+      description: 'Sequence records matching an Entrez query',
+      params: {
+        term: { required: true, description: 'Entrez query, e.g. "TP53[gene] AND human[orgn] AND refseq[filter] AND biomol_mrna[prop]"' },
+        db: DB_PARAM
+      },
+      resolve: async (params, ctx) => {
+        const db = moleculeDb(params)
+        return esummary(ctx, db, await esearch(ctx, db, params.term))
+      },
+      fields: SEQUENCE_FIELDS,
+      example: { term: 'TP53[gene] AND human[orgn] AND refseq[filter] AND biomol_mrna[prop]' },
+      relations: SEQUENCE_RELATIONS
     }
   ]
 }

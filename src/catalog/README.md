@@ -81,7 +81,9 @@ records untouched.
 several (NCBI's search-then-summarise, for instance).  `ctx.request(pathOrUrl,
 { query, format, method, body })` goes through the same throttled, retrying
 client and resolves to the parsed body; `ctx.limit`/`ctx.offset` are the
-caller's paging.  `fields` and `rows`-free mapping still apply to what it returns.
+caller's paging.  Return the records, or `{ records, serverOffset }` when the
+hook already skipped `offset` records upstream.  `fields` still applies to
+what it returns.
 
 ### Relations
 
@@ -93,7 +95,8 @@ caller's paging.  `fields` and `rows`-free mapping still apply to what it return
   entity: 'bestStructures',
   localKey: 'uniprotAccession',           // field on this entity's rows
   foreignKey: 'uniprotAccession',         // param on the target entity
-  type: 'hasMany'                         // or hasOne (first row only)
+  type: 'hasMany',                        // or hasOne (first row only)
+  limit: 25                               // optional cap on related rows per parent
 }
 ```
 
