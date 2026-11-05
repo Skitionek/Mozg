@@ -46,3 +46,26 @@ jobs:
                --test-coverage-branches=90 \
                --test-coverage-functions=70 \
                --test tests/*.test.js
+
+  docker:
+    name: Docker image builds and serves /healthz
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t mozg:ci .
+
+      - name: Start container and wait for /healthz
+        run: |
+          docker run -d --name mozg -p 4000:4000 mozg:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:4000/healthz; then exit 0; fi
+            sleep 1
+          done
+          docker logs mozg
+          exit 1

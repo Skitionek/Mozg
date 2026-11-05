@@ -13,10 +13,26 @@ Key files:
 - `src/schema.js` – GraphQL type definitions and resolvers
 - `src/database/registry.js` – driver resolution (single source of truth)
 - `src/database/connector.js` – query execution router
+- `src/database/sources.js` – `source` / `include` / `apiKeys` expansion into explicit connections and relations
+- `src/database/relations.js` – the one relation resolver every driver shares
+- `src/database/http.js` – outbound HTTP: timeouts, retries, per-host rate limits, de-duplication
+- `src/database/drivers/api.js` – declarative driver for catalog-described HTTP APIs (the life-science sources)
+- `src/database/catalog-lint.js` – static checks that catalog entries and relations can resolve
 - `src/database/introspect.js` – introspection router
-- `src/database/drivers/` – per-driver implementations (sql, neo4j, arango, biocyc, rest)
+- `src/database/drivers/` – per-driver implementations (sql, neo4j, arango, biocyc, rest, kegg, api)
+- `src/catalog/` – one file per source; see `src/catalog/README.md` for the `api` entry format and conventions
+- `scripts/verify-sources.js` – live verification of every api source and relation
 - `src/ontology/` – OWL ontology ingestion (Turtle, RDF/XML, OWL/XML, Manchester)
 - `public/index.html` – browser query-builder UI
+
+## Adding or changing a life-science source
+
+1. Follow `src/catalog/README.md`: canonical identifier names (`uniprotAccession`,
+   `ensemblGeneId`, …), an `example` on every entity, relations whose `foreignKey`
+   is a parameter of the target entity.
+2. Inspect real responses before writing `fields`; never guess a response shape.
+3. `node scripts/verify-sources.js <name>` must pass, `npm test` must pass, and
+   `npm run docs:sources` regenerates `docs/sources.md`.
 
 ## Code style
 

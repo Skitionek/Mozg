@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+paper
+tests
+*.db
+catalog-health.json
+source-verification.json
+megalinter-reports

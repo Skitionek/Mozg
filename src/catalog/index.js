@@ -7,7 +7,6 @@ const REGISTRY = {
   // ── SQL ──────────────────────────────────────────────────────────────────
   blog: () => require('./blog'),
   chinook: () => require('./chinook'),
-  rnacentral: () => require('./rnacentral'),
   rfam: () => require('./rfam'),
   // ── Graph ────────────────────────────────────────────────────────────────
   'neo4j-movies': () => require('./neo4j-movies'),
@@ -20,29 +19,63 @@ const REGISTRY = {
   // ── REST – science & space ───────────────────────────────────────────────
   nasa: () => require('./nasa'),
   spacex: () => require('./spacex'),
-  // ── Bioinformatics – NCBI family ─────────────────────────────────────────
-  ncbi: () => require('./ncbi'),
+  // ── Life science: genes & genomes ────────────────────────────────────────
+  ensembl: () => require('./ensembl'),
+  'ncbi-gene': () => require('./ncbi-gene'),
+  hgnc: () => require('./hgnc'),
+  mygene: () => require('./mygene'),
+  alliance: () => require('./alliance'),
+  flybase: () => require('./flybase'),
   genbank: () => require('./genbank'),
-  pubmed: () => require('./pubmed'),
-  refseq: () => require('./refseq'),
-  geo: () => require('./geo'),
-  // ── Bioinformatics – protein & structure ─────────────────────────────────
+  ncbi: () => require('./ncbi'),
+  // ── Life science: proteins & structures ──────────────────────────────────
   uniprot: () => require('./uniprot'),
   pdb: () => require('./pdb'),
+  pdbe: () => require('./pdbe'),
+  alphafold: () => require('./alphafold'),
   interpro: () => require('./interpro'),
-  brenda: () => require('./brenda'),
-  hmdb: () => require('./hmdb'),
+  rnacentral: () => require('./rnacentral'),
+  pride: () => require('./pride'),
+  // ── Life science: interactions & pathways ────────────────────────────────
   'string-db': () => require('./string-db'),
-  // ── Bioinformatics – genome browsers & annotation ────────────────────────
-  ensembl: () => require('./ensembl'),
+  intact: () => require('./intact'),
   reactome: () => require('./reactome'),
+  rhea: () => require('./rhea'),
   kegg: () => require('./kegg'),
-  // ── Bioinformatics – nucleotide archives ─────────────────────────────────
-  'embl-ebi': () => require('./embl-ebi'),
-  // ── Bioinformatics – model organism databases ─────────────────────────────
-  flybase: () => require('./flybase'),
-  wormbase: () => require('./wormbase'),
-  zfin: () => require('./zfin'),
+  regulondb: () => require('./regulondb'),
+  // ── Life science: function & ontologies ──────────────────────────────────
+  quickgo: () => require('./quickgo'),
+  geneontology: () => require('./geneontology'),
+  ols: () => require('./ols'),
+  hpo: () => require('./hpo'),
+  mesh: () => require('./mesh'),
+  // ── Life science: chemistry & drugs ──────────────────────────────────────
+  chembl: () => require('./chembl'),
+  pubchem: () => require('./pubchem'),
+  chebi: () => require('./chebi'),
+  lipidmaps: () => require('./lipidmaps'),
+  rxnorm: () => require('./rxnorm'),
+  openfda: () => require('./openfda'),
+  dgidb: () => require('./dgidb'),
+  // ── Life science: disease & variants ─────────────────────────────────────
+  opentargets: () => require('./opentargets'),
+  monarch: () => require('./monarch'),
+  gwas: () => require('./gwas'),
+  clinvar: () => require('./clinvar'),
+  myvariant: () => require('./myvariant'),
+  gnomad: () => require('./gnomad'),
+  civic: () => require('./civic'),
+  // ── Life science: clinical ───────────────────────────────────────────────
+  clinicaltrials: () => require('./clinicaltrials'),
+  // ── Life science: literature ─────────────────────────────────────────────
+  europepmc: () => require('./europepmc'),
+  pubmed: () => require('./pubmed'),
+  // ── Life science: expression & samples ───────────────────────────────────
+  gtex: () => require('./gtex'),
+  proteinatlas: () => require('./proteinatlas'),
+  geo: () => require('./geo'),
+  ena: () => require('./ena'),
+  biosamples: () => require('./biosamples'),
   // ── BioCyc – free databases ──────────────────────────────────────────────
   'biocyc-metacyc': () => require('./biocyc-metacyc'),
   'biocyc-ecocyc': () => require('./biocyc-ecocyc'),
@@ -64,12 +97,6 @@ const REGISTRY = {
   'biocyc-drosocyc': () => require('./biocyc-drosocyc'),
   'biocyc-borrcyc': () => require('./biocyc-borrcyc'),
   'biocyc-campycyc': () => require('./biocyc-campycyc'),
-  // ── Bioinformatics – chemical ontologies ─────────────────────────────────
-  chebi: () => require('./chebi'),
-  geneontology: () => require('./geneontology'),
-  // ── Bioinformatics – biomedical vocabularies ──────────────────────────────
-  mesh: () => require('./mesh'),
-  regulondb: () => require('./regulondb'),
   // ── REST – commerce & finance ────────────────────────────────────────────
   coingecko: () => require('./coingecko'),
   fakestore: () => require('./fakestore'),
@@ -103,6 +130,22 @@ function getCatalog (name) {
 }
 
 /**
+ * Register a catalog entry at runtime — for embedding Mozg with private
+ * sources, and for tests.  Names are restricted to lower-case slugs so a
+ * caller cannot reach Object.prototype through the registry.
+ * @param {object} entry  a catalog entry (same shape as the files here)
+ * @returns {Function} call it to unregister the entry again
+ */
+function registerCatalog (entry) {
+  if (!entry || typeof entry.name !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(entry.name)) {
+    throw new Error('A catalog entry needs a lower-case slug name, e.g. "my-source"')
+  }
+  if (Object.hasOwn(REGISTRY, entry.name)) throw new Error(`Catalog entry "${entry.name}" is already registered`)
+  REGISTRY[entry.name] = () => entry
+  return () => { delete REGISTRY[entry.name] }
+}
+
+/**
  * Return the names of all registered catalog entries without loading them.
  * @returns {string[]}
  */
@@ -133,4 +176,4 @@ function findCatalogsByDatabase (database) {
     })
 }
 
-module.exports = { getCatalog, listCatalog, findCatalogsByDatabase }
+module.exports = { getCatalog, listCatalog, findCatalogsByDatabase, registerCatalog }

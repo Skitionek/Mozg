@@ -1,6 +1,7 @@
 'use strict'
 
 const { introspectFromCatalog } = require('../catalog-schema')
+const http = require('../http')
 
 /**
  * KEGG driver – Kyoto Encyclopedia of Genes and Genomes REST API adapter.
@@ -254,15 +255,19 @@ async function executeQuery (input) {
 
   const url = `${base}${fullPath}`
 
-  const res = await globalThis.fetch(url, {
-    headers: { Accept: 'text/plain, */*' }
+  // KEGG asks clients for no more than 3 requests a second.  Going through
+  // the shared client also gives every KEGG call a timeout and retries on
+  // transient failures; a 404 means "no such entry", which is no rows.
+  const { body: text, status } = await http.request(url, {
+    headers: { Accept: 'text/plain, */*' },
+    format: 'text',
+    rateLimit: { requestsPerSecond: 3, maxConcurrent: 3 },
+    allowStatus: [404]
+  }).catch((err) => {
+    throw new Error(`KEGG fetch failed: ${err.message}`)
   })
+  if (status === 404 || text == null) return { data: [], count: 0 }
 
-  if (!res.ok) {
-    throw new Error(`KEGG fetch failed: ${res.status} ${res.statusText} — ${url}`)
-  }
-
-  const text = await res.text()
   let rows = parseResponse(text, fullPath)
 
   rows = applySelect(rows, select)

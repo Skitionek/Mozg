@@ -38,6 +38,7 @@
 
 const connector = require('./database/connector')
 const { fetchRelation: fetchRelationRows, connectionForCatalog } = require('./database/relations')
+const { normalizeQueryInput } = require('./database/sources')
 const { redactCredentials } = require('./errors')
 
 /**
@@ -48,7 +49,7 @@ const { redactCredentials } = require('./errors')
  * `connector.executeQuery` so every driver is supported.
  */
 async function fetchRelation (connection, row, rel) {
-  const target = rel.catalog ? connectionForCatalog(rel.catalog) : connection
+  const target = rel.catalog ? connectionForCatalog(rel.catalog, connection.apiKeys) : connection
   return fetchRelationRows((input) => connector.executeQuery(input), target, row, rel)
 }
 
@@ -59,7 +60,10 @@ async function fetchRelation (connection, row, rel) {
  * @param {object} input  - QueryInput (same shape accepted by the /graphql query field)
  * @param {import('node:http').ServerResponse} res
  */
-async function streamQuery (input, res) {
+async function streamQuery (rawInput, res) {
+  // Expand `source` / `include` up front so the per-relation fan-out below
+  // sees the same explicit relations the GraphQL path would.
+  const input = normalizeQueryInput(rawInput)
   let nextId = 1
   const next = () => `$${nextId++}`
 
@@ -149,7 +153,10 @@ const MAX_BODY_BYTES = 1024 * 1024
 // `getDriver` rejects an unrecognised driver name — that is the caller's
 // mistake, not a server fault, so it should not read as a 500.
 function statusForError (err) {
-  return /^Unknown driver:/.test(err.message) ? 400 : 500
+  return /^(Unknown driver:|Unknown catalog:|Unknown entity |Unknown include |A query needs |include needs )/.test(err.message) ||
+    / does not accept | requires where\./.test(err.message)
+    ? 400
+    : 500
 }
 
 /**
@@ -203,9 +210,9 @@ function handleStreamRequest (req, res) {
       return
     }
 
-    if (!input || typeof input !== 'object' || !input.connection || !input.from) {
+    if (!input || typeof input !== 'object' || !(input.connection || input.source) || !input.from) {
       res.writeHead(400, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: 'Request body must include connection and from fields' }))
+      res.end(JSON.stringify({ error: 'Request body must include from and either source or connection' }))
       return
     }
 

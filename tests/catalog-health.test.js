@@ -94,3 +94,40 @@ describe('probe: classifying a failure', () => {
     assert.equal(result.status, 'broken')
   })
 })
+
+describe('probe: api sources', () => {
+  const { registerCatalog } = require('../src/catalog')
+  const http = require('../src/database/http')
+
+  const API_ENTRY = {
+    name: 'health-api',
+    label: 'Health api',
+    driver: 'api',
+    connection: { database: 'https://health.example' },
+    entities: [
+      { name: 'good', description: 'ok', path: '/good/{id}', params: { id: {} }, fields: { id: 'id' }, example: { id: '1' } },
+      { name: 'gone', description: 'moved', path: '/gone/{id}', params: { id: {} }, fields: { id: 'id' }, example: { id: '1' } }
+    ]
+  }
+
+  test('runs every entity example and reports the entry broken when one returns nothing', async () => {
+    // Given an api source where one entity's endpoint has moved (404 → no rows)
+    const unregister = registerCatalog(API_ENTRY)
+    http.reset()
+    const restore = stubFetch(null)
+    globalThis.fetch = async (url) => {
+      const found = url.startsWith('https://health.example/good/')
+      return { ok: found, status: found ? 200 : 404, headers: { get: () => 'application/json' }, text: async () => (found ? '{"id":"1"}' : '') }
+    }
+
+    // When it is probed
+    const result = await probe(API_ENTRY)
+    restore()
+    unregister()
+
+    // Then the entry is broken and the report names the entity at fault
+    assert.equal(result.status, 'broken')
+    assert.match(result.error, /^gone: example .* returned no rows/)
+    assert.equal(result.entities.good, 'ok')
+  })
+})

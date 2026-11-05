@@ -2,6 +2,7 @@
 
 const { executeQuery } = require('./database/connector')
 const { introspectDatabase } = require('./database/introspect')
+const { connectionForSource, entityColumns, entityParams } = require('./database/sources')
 
 // ---------------------------------------------------------------------------
 // JSON scalar
@@ -51,15 +52,17 @@ const typeDefs = /* GraphQL */ `
 
     """
     Introspect the schema of a database to discover tables and columns.
+    Pass either a connection, or the name of a catalog source.
     """
-    introspect(connection: ConnectionInput!): DatabaseSchema!
+    introspect(connection: ConnectionInput, source: String): DatabaseSchema!
 
     """
     Return pre-defined database catalog entries.
     When name is supplied only that entry is returned; omit to list all entries.
+    Filter by category (e.g. "Genes & genomes") or driver (e.g. api).
     Catalog files are loaded lazily on first access.
     """
-    catalog(name: String): [CatalogEntry!]!
+    catalog(name: String, category: String, driver: Driver): [CatalogEntry!]!
 
     """
     Parse an OWL ontology and return the GraphQL schema that would be generated
@@ -81,9 +84,14 @@ const typeDefs = /* GraphQL */ `
   }
 
   input QueryInput {
-    """Database connection credentials"""
-    connection: ConnectionInput!
-    """The entity (table) to query"""
+    """
+    Name of a catalog source to query (e.g. "uniprot", "ensembl", "chembl").
+    Supplies the connection, so connection can be omitted.  See the catalog query.
+    """
+    source: String
+    """Database connection credentials (required unless source is given; fields given here override the source's)"""
+    connection: ConnectionInput
+    """The entity (table, label, path, or catalog entity name) to query"""
     from: String!
     """Columns to select (defaults to all)"""
     select: [String!]
@@ -91,6 +99,16 @@ const typeDefs = /* GraphQL */ `
     where: JSON
     """Related entities to include"""
     relations: [RelationInput!]
+    """
+    Catalog-declared relations to include, by alias — e.g. ["structures", "pathways.events"].
+    Dots follow relations into the related entity, across sources where needed.
+    Requires a catalog source.
+    """
+    include: [String!]
+    """API keys by source name, e.g. { ncbi: "…", openfda: "…" }; applied to the queried source and every related one"""
+    apiKeys: JSON
+    """Return records exactly as the source sent them instead of the catalog's normalized fields (api sources)"""
+    raw: Boolean
     """Maximum number of rows to return"""
     limit: Int
     """Number of rows to skip"""
@@ -138,6 +156,9 @@ const typeDefs = /* GraphQL */ `
     arango
     """BioCyc biological databases (legacy custom driver)"""
     biocyc
+    """HTTP API described by a catalog entry (the life-science sources): request shape,
+       response unwrapping, field names and cross-source relations all come from the catalog"""
+    api
     """Plain REST API without an OpenAPI specification (legacy custom driver)"""
     rest
     """KEGG REST API (rest.kegg.jp); converts text/plain TSV and flat-file responses to JSON"""
@@ -329,12 +350,22 @@ const typeDefs = /* GraphQL */ `
 
   """A pre-defined database with known schema and relationships"""
   type CatalogEntry {
-    """Unique identifier used in the catalog(name:) query"""
+    """Unique identifier used in the catalog(name:) query and as QueryInput.source"""
     name: String!
     """Human-readable display name"""
     label: String!
     """Short description of the database"""
     description: String
+    """Grouping used by the UI and docs, e.g. Proteins & structures"""
+    category: String
+    """Project home page"""
+    homepage: String
+    """API documentation"""
+    docs: String
+    """Data licence or terms of use"""
+    license: String
+    """How the source authenticates, when it does (api sources)"""
+    auth: CatalogAuth
     """Driver required to connect"""
     driver: Driver!
     """Default connection parameters (credentials are public demo values where applicable)"""
@@ -356,13 +387,41 @@ const typeDefs = /* GraphQL */ `
     headers: JSON
   }
 
+  """How an api source takes an API key"""
+  type CatalogAuth {
+    """True when the source cannot be queried without a key"""
+    required: Boolean!
+    """Query parameter that carries the key"""
+    param: String
+    """Header that carries the key"""
+    header: String
+    """Where to obtain a key"""
+    signup: String
+  }
+
   """A table, node label, or API path defined in a catalog entry"""
   type CatalogEntity {
     name: String!
+    """What one row of this entity is"""
+    description: String
     """Known column / property / field names"""
     columns: [String!]!
+    """Parameters accepted in where (api sources)"""
+    params: [CatalogParam!]!
+    """A where value known to return rows — a ready-made starting point"""
+    example: JSON
     """Pre-defined relations to other entities"""
     relations: [CatalogRelation!]!
+  }
+
+  """A parameter an api entity accepts in where"""
+  type CatalogParam {
+    name: String!
+    """path, query, or filter (applied by Mozg after fetching)"""
+    in: String!
+    required: Boolean!
+    description: String
+    example: JSON
   }
 
   """A pre-defined relationship within a catalog entity"""
@@ -370,9 +429,12 @@ const typeDefs = /* GraphQL */ `
     entity: String!
     foreignKey: String!
     localKey: String
+    """Name to use in QueryInput.include"""
     alias: String
     catalog: String
     type: RelationType!
+    """What following this relation yields"""
+    description: String
   }
 `
 
@@ -387,13 +449,27 @@ const resolvers = {
   },
   Query: {
     query: (_parent, { input }) => executeQuery(input),
-    introspect: (_parent, { connection }) => introspectDatabase(connection),
+    introspect: (_parent, { connection, source }) => {
+      if (source) return introspectDatabase({ ...connectionForSource(source), ...(connection || {}), source })
+      if (!connection) throw new Error('introspect needs a connection or a source')
+      return introspectDatabase(connection)
+    },
     // Catalog is lazy-required so the files are only loaded when the resolver runs
-    catalog: (_parent, { name }) => require('./catalog').getCatalog(name),
+    catalog: (_parent, { name, category, driver }) => require('./catalog').getCatalog(name)
+      .filter((entry) => !category || entry.category === category)
+      .filter((entry) => !driver || entry.driver === driver),
     generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input)
   },
   Mutation: {
     ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input)
+  },
+  CatalogAuth: {
+    required: (auth) => Boolean(auth.required)
+  },
+  CatalogEntity: {
+    columns: (entity) => entityColumns(entity),
+    params: (entity) => entityParams(entity),
+    relations: (entity) => entity.relations || []
   }
 }
 
