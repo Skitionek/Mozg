@@ -60,9 +60,10 @@ function searchQuery (params) {
   if (params.symbol) terms.push(`gene_exact:${params.symbol}`)
   if (params.ensemblGeneId) terms.push(`xref:ensembl-${params.ensemblGeneId}`)
   if (params.ncbiGeneId) terms.push(`xref:geneid-${params.ncbiGeneId}`)
+  if (params.stringId) terms.push(`xref:string-${params.stringId}`)
   if (params.taxonId) terms.push(`organism_id:${params.taxonId}`)
   if (params.reviewed != null) terms.push(`reviewed:${params.reviewed}`)
-  if (terms.length === 0) throw new Error('uniprot/proteins needs at least one of query, symbol, ensemblGeneId, ncbiGeneId or taxonId')
+  if (terms.length === 0) throw new Error('uniprot/proteins needs at least one of query, symbol, ensemblGeneId, ncbiGeneId, stringId or taxonId')
   return { query: terms.join(' AND '), format: 'json' }
 }
 
@@ -116,6 +117,7 @@ module.exports = {
         taxonId: { description: 'NCBI taxonomy id of the organism, e.g. 9606' },
         ensemblGeneId: { description: 'Proteins cross-referenced to this Ensembl gene' },
         ncbiGeneId: { description: 'Proteins cross-referenced to this NCBI gene' },
+        stringId: { description: 'Proteins cross-referenced to this STRING id, e.g. 9606.ENSP00000269305' },
         reviewed: { description: 'true for Swiss-Prot only, false for TrEMBL only' },
         query: { description: 'Raw UniProt query syntax, ANDed with the above — https://www.uniprot.org/help/query-fields' }
       },
