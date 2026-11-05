@@ -1,71 +1,178 @@
 'use strict'
 
 /**
- * STRING – protein-protein interaction database.
- * Reference: https://string-db.org/
- * API docs:  https://string-db.org/cgi/help?sessionId=&subpage=api
+ * STRING — known and predicted protein–protein associations, with evidence
+ * channels scored separately, and functional enrichment of protein sets.
+ * API docs: https://string-db.org/help/api/
  *
- * No credentials required for research/academic use.
- * Rate limit: 1 req/sec recommended (higher sustained use requires API key).
- *
- * Species are identified by NCBI taxonomy IDs (e.g. 9606 for Homo sapiens).
- * Proteins can be queried using gene symbols, UniProt IDs or STRING IDs.
- *
- * Key where parameters:
- *  - identifiers: protein name or comma-separated list
- *  - species:     NCBI taxon ID (default 9606)
- *  - required_score: min interaction score 0–1000 (default 400)
- *  - network_type: functional|physical
- *  - caller_identity: your app/email (recommended)
- *
- * Relationship map:
- *  - /get_string_ids  →  /network        (stringId → identifiers, hasMany interactions)
- *  - /network         →  /interaction_partners  (stringId, hasMany partners)
- *  - /get_string_ids  →  /enrichment     (stringId list, functional enrichment)
+ * STRING asks API clients to identify themselves (caller_identity) and to
+ * wait about a second between requests.  Identifiers may be gene symbols,
+ * UniProt accessions or STRING ids; species is an NCBI taxonomy id.
  */
+
+// STRING separates identifiers with carriage returns; accept arrays or
+// comma/whitespace-separated strings and normalise.
+const identifierList = (value) => String(value).split(/[\s,]+/).filter(Boolean).join('\r')
+
+const SCORES = {
+  score: 'score',
+  experimentalScore: 'escore',
+  databaseScore: 'dscore',
+  textminingScore: 'tscore',
+  coexpressionScore: 'ascore',
+  neighborhoodScore: 'nscore',
+  fusionScore: 'fscore',
+  cooccurrenceScore: 'pscore'
+}
+
+// Interaction rows: A is the queried protein for partners, either side for networks.
+const INTERACTION_FIELDS = {
+  stringId: 'stringId_A',
+  symbol: 'preferredName_A',
+  partnerStringId: 'stringId_B',
+  partnerSymbol: 'preferredName_B',
+  taxonId: (r) => (r.ncbiTaxonId != null ? Number(r.ncbiTaxonId) : null),
+  ...SCORES
+}
+
+// "Not found" arrives as a 404 or as a single { Error } record.
+const records = (body) => (Array.isArray(body) ? body.filter((r) => r && !r.Error) : [])
+
+const TAXON = { description: 'NCBI taxonomy id of the species, e.g. 9606 (human), 10090 (mouse)', default: 9606 }
+
 module.exports = {
   name: 'string-db',
-  label: 'STRING (REST)',
-  description: 'STRING protein-protein interaction database covering 14 000+ organisms. Provides functional and physical interaction networks with confidence scores, interaction partners and functional enrichment. Use species=9606 for human.',
-  driver: 'rest',
+  label: 'STRING',
+  description: 'STRING protein–protein association networks for 12,000+ organisms: physical and functional interactions scored per evidence channel (experiments, databases, co-expression, text mining…), plus functional enrichment of gene sets.',
+  category: 'Interactions & pathways',
+  homepage: 'https://string-db.org',
+  docs: 'https://string-db.org/help/api/',
+  license: 'CC BY 4.0',
+  driver: 'api',
   connection: {
-    database: 'https://string-db.org/api/json'
+    database: 'https://string-db.org/api/json',
+    headers: { Accept: 'application/json' }
   },
-  // Health-probe hint: get_string_ids requires identifiers.
-  probe: { params: { identifiers: 'TP53' } },
+  query: { caller_identity: 'mozg' },
+  rateLimit: { requestsPerSecond: 1, maxConcurrent: 1 },
   entities: [
     {
-      // Map gene names to STRING IDs: /get_string_ids?identifiers=TP53&species=9606
-      name: '/get_string_ids',
-      columns: ['stringId', 'ncbiTaxonId', 'taxonName', 'preferredName', 'annotation'],
+      name: 'ids',
+      description: 'Resolve a protein name, gene symbol or UniProt accession to its STRING identity',
+      path: '/get_string_ids',
+      params: {
+        identifier: { name: 'identifiers', description: 'Gene symbol, protein name or UniProt accession, e.g. TP53' },
+        taxonId: TAXON
+      },
+      query: (params) => ({ identifiers: params.identifier, species: params.taxonId, limit: 1 }),
+      rows: records,
+      fields: {
+        stringId: 'stringId',
+        symbol: 'preferredName',
+        taxonId: 'ncbiTaxonId',
+        organism: 'taxonName',
+        annotation: 'annotation',
+        query: 'queryItem'
+      },
+      example: { identifier: 'TP53', taxonId: 9606 },
       relations: [
-        { entity: '/interaction_partners', foreignKey: 'stringId', type: 'hasMany', alias: 'interactionPartners' },
-        { entity: '/enrichment', foreignKey: 'stringId', type: 'hasMany', alias: 'enrichment' },
-        { entity: '/uniprotkb/search', foreignKey: 'identifier', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' }
+        { alias: 'partners', description: 'Highest-scoring interaction partners', entity: 'partners', localKey: 'stringId', foreignKey: 'identifier', type: 'hasMany' },
+        { alias: 'protein', description: 'The reviewed UniProtKB entry cross-referenced to this STRING protein', catalog: 'uniprot', entity: 'proteins', localKey: 'stringId', foreignKey: 'query', where: { reviewed: true }, type: 'hasOne' }
       ]
     },
     {
-      // Interaction network: /network?identifiers=TP53%0dBRCA1&species=9606
-      name: '/network',
-      columns: ['stringId_A', 'stringId_B', 'preferredName_A', 'preferredName_B', 'ncbiTaxonId', 'score', 'nscore', 'fscore', 'pscore', 'ascore', 'escore', 'dscore', 'tscore'],
+      name: 'partners',
+      description: 'Interaction partners of one protein, best-scoring first (STRING returns the top 10 unless limit is given)',
+      path: '/interaction_partners',
+      params: {
+        identifier: { description: 'Gene symbol, UniProt accession or STRING id, e.g. TP53' },
+        taxonId: TAXON,
+        requiredScore: { description: 'Minimum combined score, 0–1000 (STRING default 400)' },
+        networkType: { description: 'functional (default) or physical' }
+      },
+      query: (params) => ({
+        identifiers: params.identifier,
+        species: params.taxonId,
+        required_score: params.requiredScore,
+        network_type: params.networkType
+      }),
+      rows: records,
+      fields: INTERACTION_FIELDS,
+      paginate: { limit: 'limit' },
+      example: { identifier: 'TP53', taxonId: 9606 },
+      relations: [
+        { alias: 'partner', description: 'The reviewed UniProtKB entry for the partner protein', catalog: 'uniprot', entity: 'proteins', localKey: 'partnerStringId', foreignKey: 'query', where: { reviewed: true }, type: 'hasOne' }
+      ]
+    },
+    {
+      name: 'network',
+      description: 'All interactions among a set of proteins',
+      path: '/network',
+      params: {
+        identifiers: { description: 'Two or more symbols / accessions / STRING ids, as a list or comma-separated, e.g. ["TP53", "MDM2", "CDKN1A"]', join: ',' },
+        taxonId: TAXON,
+        requiredScore: { description: 'Minimum combined score, 0–1000' },
+        networkType: { description: 'functional (default) or physical' }
+      },
+      query: (params) => ({
+        identifiers: identifierList(params.identifiers),
+        species: params.taxonId,
+        required_score: params.requiredScore,
+        network_type: params.networkType
+      }),
+      rows: records,
+      fields: INTERACTION_FIELDS,
+      example: { identifiers: ['TP53', 'MDM2', 'CDKN1A'], taxonId: 9606 },
       relations: []
     },
     {
-      // Interaction partners of a single protein: /interaction_partners?identifiers=TP53&species=9606
-      name: '/interaction_partners',
-      columns: ['stringId_A', 'stringId_B', 'preferredName_A', 'preferredName_B', 'ncbiTaxonId', 'score', 'nscore', 'fscore', 'pscore', 'ascore', 'escore', 'dscore', 'tscore'],
-      relations: []
+      name: 'enrichment',
+      description: 'Functional enrichment (GO, KEGG, Reactome, Pfam, …) of a set of proteins',
+      path: '/enrichment',
+      params: {
+        identifiers: { description: 'Protein set as a list or comma-separated, e.g. ["TP53", "MDM2", "CDKN1A", "BAX"]', join: ',' },
+        taxonId: TAXON
+      },
+      query: (params) => ({ identifiers: identifierList(params.identifiers), species: params.taxonId }),
+      rows: records,
+      fields: {
+        category: 'category',
+        term: 'term',
+        description: 'description',
+        geneCount: 'number_of_genes',
+        backgroundGeneCount: 'number_of_genes_in_background',
+        pValue: 'p_value',
+        fdr: 'fdr',
+        genes: 'preferredNames',
+        taxonId: 'ncbiTaxonId',
+        goId: (r) => (/^GO:\d+$/.test(r.term) ? r.term : null),
+        reactomeId: (r) => (/^HSA-\d+$/.test(r.term) ? `R-${r.term}` : (/^R-[A-Z]{3}-\d+$/.test(r.term) ? r.term : null))
+      },
+      example: { identifiers: ['TP53', 'MDM2', 'CDKN1A', 'BAX'], taxonId: 9606 },
+      relations: [
+        { alias: 'goTerm', description: 'The enriched GO term (QuickGO), for GO categories', catalog: 'quickgo', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+      ]
     },
     {
-      // Functional enrichment: /enrichment?identifiers=TP53%0dBRCA1&species=9606
-      name: '/enrichment',
-      columns: ['category', 'term', 'number_of_genes', 'number_of_genes_in_background', 'ncbiTaxonId', 'inputGenes', 'preferredNames', 'p_value', 'fdr', 'description'],
-      relations: []
-    },
-    {
-      // PPI enrichment stats: /ppi_enrichment?identifiers=TP53%0dBRCA1&species=9606
-      name: '/ppi_enrichment',
-      columns: ['number_of_nodes', 'number_of_edges', 'average_node_degree', 'local_clustering_coefficient', 'expected_number_of_edges', 'p_value'],
+      name: 'ppiEnrichment',
+      description: 'Whether a protein set has more interactions among itself than expected by chance',
+      path: '/ppi_enrichment',
+      params: {
+        identifiers: { description: 'Protein set as a list or comma-separated', join: ',' },
+        taxonId: TAXON,
+        requiredScore: { description: 'Minimum combined score, 0–1000' }
+      },
+      query: (params) => ({ identifiers: identifierList(params.identifiers), species: params.taxonId, required_score: params.requiredScore }),
+      rows: records,
+      fields: {
+        nodeCount: 'number_of_nodes',
+        edgeCount: 'number_of_edges',
+        expectedEdgeCount: 'expected_number_of_edges',
+        averageNodeDegree: 'average_node_degree',
+        clusteringCoefficient: 'local_clustering_coefficient',
+        pValue: 'p_value'
+      },
+      example: { identifiers: ['TP53', 'MDM2', 'CDKN1A'], taxonId: 9606 },
       relations: []
     }
   ]
