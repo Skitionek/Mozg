@@ -271,6 +271,7 @@ describe('api driver: requests', () => {
       const body = JSON.parse(init.body)
       assert.equal(init.method, 'POST')
       assert.deepEqual(body.variables, { id: 'X1' })
+      assert.equal(u.searchParams.get('id'), null, 'variables are not echoed into the URL')
       return json(200, { data: { thing: { id: 'X1', label: 'one' } } })
     })
     const { data } = await executeQuery({ source: 'test-proteins', from: 'graph', where: { id: 'X1' } })

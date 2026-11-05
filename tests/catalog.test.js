@@ -3,6 +3,15 @@
 const { test, describe } = require('node:test')
 const assert = require('node:assert/strict')
 const { getCatalog, listCatalog } = require('../src/catalog/index')
+const { entityColumns, entityParams } = require('../src/database/sources')
+
+/** The relation on `source/entity` that targets `catalog/target`, if any. */
+function link (source, entity, catalog, target) {
+  const [entry] = getCatalog(source)
+  const e = entry.entities.find((x) => x.name === entity)
+  assert.ok(e, `${source}/${entity} should exist`)
+  return (e.relations || []).find((r) => (r.catalog || source) === catalog && (!target || r.entity === target))
+}
 
 describe('catalog', () => {
   test('listCatalog returns an array of name strings', () => {
@@ -47,13 +56,15 @@ describe('catalog', () => {
     }
   })
 
-  test('every catalog entity has name, columns array, and relations array', () => {
+  test('every catalog entity has a name, known columns, and relations (if any) as an array', () => {
     const entries = getCatalog()
     for (const entry of entries) {
       for (const entity of entry.entities) {
         assert.ok(entity.name, `${entry.name}/${entity.name}: name is required`)
-        assert.ok(Array.isArray(entity.columns), `${entry.name}/${entity.name}: columns must be an array`)
-        assert.ok(Array.isArray(entity.relations), `${entry.name}/${entity.name}: relations must be an array`)
+        // api entities derive their columns from `fields`
+        assert.ok(entityColumns(entity).length > 0 || entry.driver !== 'api', `${entry.name}/${entity.name}: needs columns or fields`)
+        assert.ok(Array.isArray(entry.driver === 'api' ? entityColumns(entity) : entity.columns), `${entry.name}/${entity.name}: columns must be an array`)
+        assert.ok(entity.relations == null || Array.isArray(entity.relations), `${entry.name}/${entity.name}: relations must be an array`)
       }
     }
   })
@@ -62,7 +73,7 @@ describe('catalog', () => {
     const entries = getCatalog()
     for (const entry of entries) {
       for (const entity of entry.entities) {
-        for (const rel of entity.relations) {
+        for (const rel of entity.relations || []) {
           assert.ok(rel.entity, `relation in ${entry.name}/${entity.name}: entity is required`)
           assert.ok(rel.foreignKey, `relation in ${entry.name}/${entity.name}: foreignKey is required`)
           assert.ok(rel.type, `relation in ${entry.name}/${entity.name}: type is required`)
@@ -137,10 +148,11 @@ describe('catalog', () => {
     assert.ok(rel, '/posts should have a hasMany relation to /comments')
   })
 
-  test('rnacentral has postgres driver and public connection host', () => {
+  test('rnacentral is served by the RNAcentral REST API', () => {
     const [entry] = getCatalog('rnacentral')
-    assert.equal(entry.driver, 'postgres')
-    assert.ok(entry.connection.host, 'connection.host should be set')
+    assert.equal(entry.driver, 'api')
+    assert.match(entry.connection.database, /^https:\/\/rnacentral\.org\//)
+    assert.ok(entry.entities.find((e) => e.name === 'rna'), 'rna entity should exist')
   })
 
   test('neo4j-movies has neo4j driver with scheme set', () => {
@@ -149,38 +161,32 @@ describe('catalog', () => {
     assert.ok(entry.connection.scheme, 'connection.scheme should be set')
   })
 
-  // Cross-catalog relation spot-checks
-  test('uniprot /uniprotkb/search has cross-catalog relation to pdb', () => {
-    const [entry] = getCatalog('uniprot')
-    const entity = entry.entities.find(e => e.name === '/uniprotkb/search')
-    const rel = entity.relations.find(r => r.catalog === 'pdb')
-    assert.ok(rel, 'uniprot /uniprotkb/search should have a cross-catalog relation to pdb')
-    assert.equal(rel.entity, '/entry')
+  // Cross-source relation spot-checks: the joins the life-science graph relies on
+  test('a UniProt protein links to its structures, predicted model, domains and pathways', () => {
+    assert.ok(link('uniprot', 'protein', 'pdbe', 'bestStructures'), 'structures via PDBe SIFTS')
+    assert.ok(link('uniprot', 'protein', 'alphafold', 'prediction'), 'AlphaFold model')
+    assert.ok(link('uniprot', 'protein', 'interpro', 'proteinEntries'), 'InterPro domains')
+    assert.ok(link('uniprot', 'protein', 'reactome', 'pathwaysForProtein'), 'Reactome pathways')
   })
 
-  test('ensembl /lookup/id has cross-catalog relations to uniprot and reactome', () => {
-    const [entry] = getCatalog('ensembl')
-    const entity = entry.entities.find(e => e.name === '/lookup/id')
-    const uniprotRel = entity.relations.find(r => r.catalog === 'uniprot')
-    const reactomeRel = entity.relations.find(r => r.catalog === 'reactome')
-    assert.ok(uniprotRel, 'ensembl /lookup/id should link to uniprot')
-    assert.ok(reactomeRel, 'ensembl /lookup/id should link to reactome')
+  test('PDBe best structures lead on to the RCSB entry', () => {
+    const rel = link('pdbe', 'bestStructures', 'pdb', 'entry')
+    assert.ok(rel)
+    assert.equal(rel.foreignKey, 'pdbId')
   })
 
-  test('flybase /api/v1.0/gene/orthologs has cross-catalog relations to wormbase and zfin', () => {
-    const [entry] = getCatalog('flybase')
-    const entity = entry.entities.find(e => e.name === '/api/v1.0/gene/orthologs')
-    const wbRel = entity.relations.find(r => r.catalog === 'wormbase')
-    const zfinRel = entity.relations.find(r => r.catalog === 'zfin')
-    assert.ok(wbRel, 'flybase orthologs should link to wormbase')
-    assert.ok(zfinRel, 'flybase orthologs should link to zfin')
+  test('ChEMBL molecules and PubChem compounds join by InChIKey', () => {
+    assert.equal(link('chembl', 'molecule', 'pubchem').foreignKey, 'inchiKey')
+    assert.equal(link('pubchem', 'compound', 'chembl').foreignKey, 'inchiKey')
   })
 
-  test('kegg /list/enzyme has cross-catalog relation to uniprot', () => {
-    const [entry] = getCatalog('kegg')
-    const entity = entry.entities.find(e => e.name === '/list/enzyme')
-    const rel = entity.relations.find(r => r.catalog === 'uniprot')
-    assert.ok(rel, 'kegg /list/enzyme should cross-link to uniprot')
+  test('kegg converts compounds to ChEBI, its working link out', () => {
+    assert.ok(link('kegg', '/conv/chebi', 'chebi', 'compound'))
+  })
+
+  test('PubMed and Europe PMC link both ways by PMID', () => {
+    assert.equal(link('pubmed', 'article', 'europepmc', 'article').foreignKey, 'pmid')
+    assert.equal(link('europepmc', 'article', 'pubmed', 'article').foreignKey, 'pmid')
   })
 
   test('every cross-catalog relation references a valid catalog name', () => {
@@ -200,41 +206,34 @@ describe('catalog', () => {
     }
   })
 
-  // ── New lifelike-integration entries ───────────────────────────────────
+  // ── Ontology and vocabulary sources ────────────────────────────────────
 
-  test('chebi has rest driver and OLS4 connection', () => {
+  test('chebi uses the ChEBI 2.0 API and returns structure identifiers', () => {
     const [entry] = getCatalog('chebi')
-    assert.equal(entry.driver, 'rest')
-    assert.ok(entry.connection.database.includes('ols4'), 'connection.database should reference ols4')
-    const terms = entry.entities.find(e => e.name === '/terms')
-    assert.ok(terms, '/terms entity should exist')
-    assert.ok(terms.columns.includes('iri'), '/terms should have iri column')
+    assert.equal(entry.driver, 'api')
+    assert.match(entry.connection.database, /ebi\.ac\.uk\/chebi/)
+    const compound = entry.entities.find((e) => e.name === 'compound')
+    for (const field of ['chebiId', 'name', 'formula', 'inchiKey', 'smiles', 'mass']) {
+      assert.ok(entityColumns(compound).includes(field), `compound should carry ${field}`)
+    }
   })
 
-  test('geneontology has rest driver and GOC API connection', () => {
+  test('geneontology looks up a term by goId', () => {
     const [entry] = getCatalog('geneontology')
-    assert.equal(entry.driver, 'rest')
-    assert.ok(entry.connection.database.includes('geneontology.org'), 'connection.database should point to geneontology.org')
-    const term = entry.entities.find(e => e.name === '/ontology/term')
-    assert.ok(term, '/ontology/term entity should exist')
-    assert.ok(term.columns.includes('id'), '/ontology/term should have id column')
+    const term = entry.entities.find((e) => e.name === 'term')
+    assert.deepEqual(entityParams(term).filter((p) => p.required).map((p) => p.name), ['goId'])
   })
 
-  test('mesh has rest driver and NLM connection', () => {
+  test('mesh looks up a descriptor by meshId', () => {
     const [entry] = getCatalog('mesh')
-    assert.equal(entry.driver, 'rest')
-    assert.ok(entry.connection.database.includes('nlm.nih.gov'), 'connection.database should point to nlm.nih.gov')
-    const descriptor = entry.entities.find(e => e.name === '/lookup/descriptor')
-    assert.ok(descriptor, '/lookup/descriptor entity should exist')
-    assert.ok(descriptor.columns.includes('ui'), '/lookup/descriptor should have ui column')
+    assert.match(entry.connection.database, /nlm\.nih\.gov/)
+    assert.ok(entityParams(entry.entities.find((e) => e.name === 'descriptor')).some((p) => p.name === 'meshId'))
   })
 
-  test('regulondb has rest driver and CCUS connection', () => {
+  test('regulondb searches genes through its GraphQL API', () => {
     const [entry] = getCatalog('regulondb')
-    assert.equal(entry.driver, 'rest')
-    assert.ok(entry.connection.database.includes('regulondb'), 'connection.database should point to regulondb')
-    const genes = entry.entities.find(e => e.name === '/genes')
-    assert.ok(genes, '/genes entity should exist')
-    assert.ok(genes.columns.includes('gene_id'), '/genes should have gene_id column')
+    assert.equal(entry.driver, 'api')
+    const genes = entry.entities.find((e) => e.name === 'genes')
+    assert.ok(genes && genes.graphql, 'genes should be a GraphQL entity')
   })
 })

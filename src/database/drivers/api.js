@@ -221,7 +221,9 @@ function buildRequest (entry, entity, params, { limit, offset, connection }) {
     ...(entry.query || {}),
     ...(typeof entity.query === 'function' ? entity.query(params) : (entity.query || {}))
   }
-  if (typeof entity.query !== 'function') {
+  // Parameters become query-string entries unless the entity computes its own
+  // query string, or sends them in a body (GraphQL variables, POST JSON).
+  if (typeof entity.query !== 'function' && !entity.graphql && !entity.body) {
     for (const [name, spec] of Object.entries(declared)) {
       if (pathParams(entity.path).includes(name) || params[name] == null) continue
       if ((spec.in || 'query') !== 'query') continue
