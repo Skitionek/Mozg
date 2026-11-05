@@ -2,8 +2,12 @@
 
 const registry = require('./registry')
 const { resolveCrossCatalogRelation } = require('./relations')
+const { normalizeQueryInput } = require('./sources')
 
-async function executeQuery (input) {
+async function executeQuery (rawInput) {
+  // `source` / `include` are shorthand for a catalog connection and catalog
+  // relations; expand them first so every driver sees the explicit form.
+  const input = normalizeQueryInput(rawInput)
   const driver = registry.getDriver(input.connection.driver)
 
   const relations = input.relations || []
@@ -12,9 +16,8 @@ async function executeQuery (input) {
 
   const result = await driver.executeQuery({ ...input, relations: sameSource })
 
-  for (const rel of crossCatalog) {
-    await resolveCrossCatalogRelation(executeQuery, result.data, rel)
-  }
+  const options = { apiKeys: input.connection.apiKeys }
+  await Promise.all(crossCatalog.map((rel) => resolveCrossCatalogRelation(executeQuery, result.data, rel, options)))
 
   return result
 }

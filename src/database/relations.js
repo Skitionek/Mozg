@@ -69,10 +69,9 @@ async function fetchRelation (executeQuery, connection, row, rel) {
  * Look up the connection template a catalog entry publishes, so a relation
  * can point at a source other than the one the parent query ran against.
  */
-function connectionForCatalog (catalogName) {
-  const { getCatalog } = require('../catalog')
-  const [entry] = getCatalog(catalogName)
-  return { ...entry.connection, driver: entry.driver }
+function connectionForCatalog (catalogName, apiKeys) {
+  const { connectionForSource } = require('./sources')
+  return connectionForSource(catalogName, apiKeys)
 }
 
 /**
@@ -96,8 +95,10 @@ function connectionForCatalog (catalogName) {
  * @param {Function} executeQuery
  * @param {object[]} rows
  * @param {object} rel  a relation definition with `rel.catalog` set
+ * @param {object} [options]
+ * @param {object} [options.apiKeys]  per-source API keys to carry into the target source
  */
-async function resolveCrossCatalogRelation (executeQuery, rows, rel) {
+async function resolveCrossCatalogRelation (executeQuery, rows, rel, options = {}) {
   if (!rows || rows.length === 0) return
 
   const resultKey = rel.alias || rel.entity
@@ -107,7 +108,7 @@ async function resolveCrossCatalogRelation (executeQuery, rows, rel) {
 
   let connection
   try {
-    connection = connectionForCatalog(rel.catalog)
+    connection = connectionForCatalog(rel.catalog, options.apiKeys)
   } catch (err) {
     const errObj = describeFailure(err)
     for (const row of rows) row[resultKey] = errObj

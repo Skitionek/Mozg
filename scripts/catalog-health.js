@@ -15,6 +15,11 @@
  * Entries whose list endpoint needs query parameters or extra headers declare
  * them in a `probe` block on the catalog entry.
  *
+ * `api` entries describe their own requests, so they are probed by running
+ * every entity's declared example through the real query path instead
+ * (scripts/verify-sources.js); the entry is ok only when every example
+ * returns rows.
+ *
  * Results are written to --output <file> (default: catalog-health.json).
  * The script exits 0 even when some checks fail so CI records the report
  * as an artifact without blocking the workflow.
@@ -36,7 +41,27 @@ const PROBE_USER_AGENT = 'mozg-catalog-health/1.0 (+https://github.com/Skitionek
 const outputArg = process.argv.indexOf('--output')
 const outputFile = outputArg !== -1 ? process.argv[outputArg + 1] : 'catalog-health.json'
 
+/**
+ * Probe an `api` entry by running each entity's example.  Broken (4xx, empty
+ * example, field mapping that matches nothing) outranks unavailable (5xx,
+ * timeouts), which outranks ok.
+ */
+async function probeApi (entry) {
+  const { verifySource } = require('./verify-sources')
+  const results = await verifySource(entry, { relations: false })
+  const failing = results.filter((r) => r.status !== 'ok')
+  const entities = Object.fromEntries(results.map((r) => [r.entity, r.status === 'ok' ? 'ok' : `${r.status}: ${r.error}`]))
+  if (failing.some((r) => r.status === 'broken' || r.status === 'empty')) {
+    const first = failing.find((r) => r.status === 'broken' || r.status === 'empty')
+    return { status: 'broken', error: `${first.entity}: ${first.error}`, entities }
+  }
+  if (failing.length > 0) return { status: 'unavailable', error: `${failing[0].entity}: ${failing[0].error}`, entities }
+  return { status: 'ok', entities }
+}
+
 async function probe (entry) {
+  if (entry.driver === 'api') return probeApi(entry)
+
   if (SKIP_DRIVERS.has(entry.driver)) {
     return { status: 'skipped', reason: `driver=${entry.driver} requires credentials` }
   }
@@ -162,7 +187,7 @@ async function main () {
 
   const broken = report.results.filter((r) => r.status === 'broken')
   if (broken.length > 0) {
-    console.error('\nThese entries describe an endpoint that answered 4xx — the catalog is wrong about them:')
+    console.error('\nThese entries describe an endpoint that answered 4xx or returned nothing — the catalog is wrong about them:')
     for (const r of broken) console.error(`  ${r.name}: ${r.httpStatus || r.error} ${r.url}`)
   }
 

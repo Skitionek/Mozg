@@ -17,6 +17,7 @@
  */
 function introspectFromCatalog (connection) {
   const { findCatalogsByDatabase } = require('../catalog')
+  const { entityColumns } = require('./sources')
   const entries = findCatalogsByDatabase(connection && connection.database)
 
   const tablesByName = new Map()
@@ -27,7 +28,7 @@ function introspectFromCatalog (connection) {
 
       tablesByName.set(entity.name, {
         name: entity.name,
-        columns: entity.columns.map((column) => ({
+        columns: entityColumns(entity).map((column) => ({
           name: column,
           type: 'unknown',
           nullable: true,

@@ -1,7 +1,7 @@
 name: Integration Tests (Weekly)
 
 # Runs weekly to validate that the catalog's public endpoints are still
-# reachable.  Entries needing credentials are skipped; the rest are probed and
+# reachable and that the life-science sources still connect to each other.  Entries needing credentials are skipped; the rest are probed and
 # classified as ok, broken (4xx — the catalog is wrong) or unavailable
 # (5xx/network — their server is down).  Results are uploaded as an artifact so
 # catalog staleness can be tracked over time.
@@ -52,6 +52,43 @@ jobs:
         with:
           name: catalog-health-${{ github.run_id }}
           path: catalog-health.json
+          retention-days: 90
+          if-no-files-found: warn
+
+  source-relations:
+    name: Life-science sources and their relations
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify every api source and follow every relation
+        # Runs each entity's declared example against the live API, then
+        # follows every catalog relation from the first row.  Fails when an
+        # example returns nothing or a relation errors with a 4xx — both mean
+        # an upstream changed shape and the catalog needs updating.  Upstream
+        # downtime (5xx, timeouts) is reported but never fails the job.
+        run: node scripts/verify-sources.js --json source-verification.json
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-verification-${{ github.run_id }}
+          path: source-verification.json
           retention-days: 90
           if-no-files-found: warn
 

@@ -51,6 +51,11 @@ function getDriver (driverName) {
     case 'biocyc':
       return require('./drivers/biocyc')
 
+    // Catalog-described HTTP APIs (the life-science sources): each entity's
+    // request, response shape and field mapping come from its catalog entry
+    case 'api':
+      return require('./drivers/api')
+
     // Plain REST without an OpenAPI spec (use `openapi` for spec-backed REST)
     case 'rest':
       return require('./drivers/rest')

@@ -537,6 +537,15 @@
         <button class="btn btn-secondary btn-sm" onclick="applyCatalog()">⚡ Apply to Form</button>
       </div>
     </div>
+    <div id="source-mode" class="hidden" style="margin-top:.5rem">
+      <div class="relation-chip">
+        <span>Source <strong id="source-mode-name"></strong> — no connection needed</span>
+        <button class="remove-btn" onclick="clearSource(); generateQuery()" title="Back to a manual connection">×</button>
+      </div>
+      <div id="source-params-hint" style="font-size:.72rem;color:var(--muted);margin:.35rem 0 .2rem"></div>
+      <label>Include related data</label>
+      <div id="include-list" style="max-height:14rem;overflow:auto"></div>
+    </div>
 
     <!-- Examples dropdown -->
     <div class="section-title">Examples</div>
@@ -875,7 +884,7 @@
     generateQuery();
   }
 
-  document.getElementById('conn-driver').addEventListener('change', updateDriverUI);
+  document.getElementById('conn-driver').addEventListener('change', () => { clearSource(); updateDriverUI(); });
 
   // Fire once on load
   updateDriverUI();
@@ -991,7 +1000,9 @@
     const orderBy   = document.getElementById('q-order-by').value.trim();
     const orderDir  = document.getElementById('q-order-dir').value;
 
-    let input = `connection: ${connToGQL(conn)}\n    from: ${JSON.stringify(from)}`;
+    let input = currentSource
+      ? `source: ${JSON.stringify(currentSource)}\n    from: ${JSON.stringify(from)}`
+      : `connection: ${connToGQL(conn)}\n    from: ${JSON.stringify(from)}`;
 
     if (selectRaw) {
       const cols = selectRaw.split(',').map(s => JSON.stringify(s.trim())).join(', ');
@@ -1009,6 +1020,9 @@
     if (relations.length > 0) {
       const rels = relations.map(r => `      ${relToGQL(r)}`).join('\n');
       input += `\n    relations: [\n${rels}\n    ]`;
+    }
+    if (currentSource && includes.length > 0) {
+      input += `\n    include: [${includes.map(i => JSON.stringify(i)).join(', ')}]`;
     }
 
     const gql = `{\n  query(input: {\n    ${input}\n  }) {\n    count\n    data\n  }\n}`;
@@ -1059,7 +1073,8 @@
     const orderBy   = document.getElementById('q-order-by').value.trim();
     const orderDir  = document.getElementById('q-order-dir').value;
 
-    const input = { connection: conn, from };
+    const input = currentSource ? { source: currentSource, from } : { connection: conn, from };
+    if (currentSource && includes.length > 0) input.include = [...includes];
     if (selectRaw) input.select = selectRaw.split(',').map(s => s.trim()).filter(Boolean);
     if (whereRaw)  { try { input.where = JSON.parse(whereRaw); } catch (e) { toast(`Where clause: ${e.message}`, 'error'); } }
     if (limit)     input.limit  = parseInt(limit, 10);
@@ -1468,11 +1483,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: `{
           catalog {
-            name label description driver
+            name label description driver category
             connection { host port database user password scheme }
             entities {
-              name columns
-              relations { entity foreignKey localKey alias type }
+              name description columns example
+              params { name required description }
+              relations { entity foreignKey localKey alias type catalog description }
             }
           }
         }` }),
@@ -1481,11 +1497,25 @@
       if (json.data && json.data.catalog) {
         catalogData = json.data.catalog;
         const sel = document.getElementById('catalog-select');
+        // Life-science sources grouped by category first, then everything else.
+        const groups = new Map();
         for (const entry of catalogData) {
-          const opt = document.createElement('option');
-          opt.value = entry.name;
-          opt.textContent = entry.label + (entry.description ? ` – ${entry.description.slice(0, CATALOG_DESC_PREVIEW)}` : '');
-          sel.appendChild(opt);
+          const key = entry.category || 'Other databases & APIs';
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(entry);
+        }
+        const order = [...groups.keys()].sort((a, b) =>
+          (a === 'Other databases & APIs') - (b === 'Other databases & APIs') || a.localeCompare(b));
+        for (const key of order) {
+          const og = document.createElement('optgroup');
+          og.label = key;
+          for (const entry of groups.get(key).sort((a, b) => a.label.localeCompare(b.label))) {
+            const opt = document.createElement('option');
+            opt.value = entry.name;
+            opt.textContent = entry.label + (entry.description ? ` – ${entry.description.slice(0, CATALOG_DESC_PREVIEW)}` : '');
+            og.appendChild(opt);
+          }
+          sel.appendChild(og);
         }
       }
     } catch { /* catalog loading is not critical */ }
@@ -1501,16 +1531,75 @@
     for (const entity of selectedCatalogEntry.entities) {
       const opt = document.createElement('option');
       opt.value = entity.name;
-      const preview = entity.columns.slice(0, 3).join(', ') + (entity.columns.length > 3 ? ', …' : '');
-      opt.textContent = entity.name + (preview ? ` (${preview})` : '');
+      const preview = entity.description
+        || entity.columns.slice(0, 3).join(', ') + (entity.columns.length > 3 ? ', …' : '');
+      opt.textContent = entity.name + (preview ? ` — ${preview}` : '');
       entitySel.appendChild(opt);
     }
   });
+
+  // ── Catalog source mode ──────────────────────────────────────
+  // An `api` catalog entry is queried by name (`source:`), with its entity's
+  // example as a starting `where` and its relations offered as `include`s.
+  let currentSource = null;
+  let includes = [];
+
+  function clearSource() {
+    currentSource = null;
+    includes = [];
+    document.getElementById('source-mode').classList.add('hidden');
+  }
+
+  function renderIncludes(entry, entity) {
+    const list = document.getElementById('include-list');
+    const rels = entity.relations || [];
+    if (rels.length === 0) {
+      list.innerHTML = '<div style="font-size:.72rem;color:var(--muted)">This entity declares no relations.</div>';
+      return;
+    }
+    list.innerHTML = rels.map((r, i) => `
+      <label style="display:flex;gap:.4rem;align-items:flex-start;margin:.25rem 0;font-weight:normal;cursor:pointer">
+        <input type="checkbox" data-alias="${escapeHTML(r.alias)}" id="inc-${i}" style="width:auto;margin-top:.15rem" />
+        <span><strong>${escapeHTML(r.alias)}</strong>
+          <span style="color:var(--muted)">→ ${escapeHTML((r.catalog || entry.name) + '/' + r.entity)}</span><br />
+          <span style="font-size:.72rem;color:var(--muted)">${escapeHTML(r.description || '')}</span></span>
+      </label>`).join('');
+    list.querySelectorAll('input[type=checkbox]').forEach((cb) => cb.addEventListener('change', () => {
+      includes = [...list.querySelectorAll('input:checked')].map((x) => x.dataset.alias);
+      generateQuery();
+    }));
+  }
+
+  function applySource(entry, entity) {
+    currentSource = entry.name;
+    includes = [];
+    relations.length = 0;
+    renderRelations();
+    document.getElementById('source-mode-name').textContent = entry.name;
+    document.getElementById('source-mode').classList.remove('hidden');
+    document.getElementById('q-from').value = entity.name;
+    document.getElementById('q-select').value = '';
+    document.getElementById('q-where').value = entity.example ? JSON.stringify(entity.example) : '';
+    document.getElementById('q-limit').value = '10';
+    const params = (entity.params || []).map((p) => p.name + (p.required ? '*' : '')).join(', ');
+    document.getElementById('source-params-hint').textContent =
+      (entity.description ? entity.description + '. ' : '') + (params ? `Where accepts: ${params}` : '');
+    renderIncludes(entry, entity);
+    generateQuery();
+    toast(`Querying ${entry.label} / ${entity.name}`, 'success');
+  }
 
   function applyCatalog() {
     if (!selectedCatalogEntry) return;
     const entry = selectedCatalogEntry;
     const entityName = document.getElementById('catalog-entity-select').value;
+
+    if (entry.driver === 'api') {
+      const entity = entry.entities.find(e => e.name === entityName) || entry.entities[0];
+      if (entity) applySource(entry, entity);
+      return;
+    }
+    clearSource();
 
     // Apply connection fields
     document.getElementById('conn-driver').value = entry.driver;
