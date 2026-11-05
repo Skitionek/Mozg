@@ -77,7 +77,7 @@ module.exports = {
       example: { identifier: 'TP53', taxonId: 9606 },
       relations: [
         { alias: 'partners', description: 'Highest-scoring interaction partners', entity: 'partners', localKey: 'stringId', foreignKey: 'identifier', type: 'hasMany' },
-        { alias: 'protein', description: 'The reviewed UniProtKB entry cross-referenced to this STRING protein', catalog: 'uniprot', entity: 'proteins', localKey: 'stringId', foreignKey: 'query', where: { reviewed: true }, type: 'hasOne' }
+        { alias: 'protein', description: 'The reviewed UniProtKB entry cross-referenced to this STRING protein', catalog: 'uniprot', entity: 'proteins', localKey: 'stringId', foreignKey: 'stringId', where: { reviewed: true }, type: 'hasOne' }
       ]
     },
     {
@@ -101,7 +101,7 @@ module.exports = {
       paginate: { limit: 'limit' },
       example: { identifier: 'TP53', taxonId: 9606 },
       relations: [
-        { alias: 'partner', description: 'The reviewed UniProtKB entry for the partner protein', catalog: 'uniprot', entity: 'proteins', localKey: 'partnerStringId', foreignKey: 'query', where: { reviewed: true }, type: 'hasOne' }
+        { alias: 'partner', description: 'The reviewed UniProtKB entry for the partner protein', catalog: 'uniprot', entity: 'proteins', localKey: 'partnerStringId', foreignKey: 'stringId', where: { reviewed: true }, type: 'hasOne' }
       ]
     },
     {
