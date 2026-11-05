@@ -12,6 +12,8 @@
 
 const MAX_PAGE = 500
 
+// An absent filter must be left out of `variables`, not sent as null: CIViC reads
+// an explicit null as "match items whose value is null".
 async function graphql (ctx, query, variables) {
   const body = await ctx.request('/graphql', { method: 'POST', body: { query, variables } })
   const errors = body && Array.isArray(body.errors) && body.errors.length ? body.errors.map((e) => e.message).join('; ') : null
@@ -61,7 +63,6 @@ const VARIANT_SELECTION = `
     alleleRegistryId clinvarIds hgvsDescriptions maneSelectTranscript variantAliases
     singleVariantMolecularProfileId
     variantTypes { name }
-    myVariantInfo { myVariantInfoId }
     coordinates { chromosome start stop referenceBases variantBases referenceBuild }
   }
 `
@@ -79,8 +80,16 @@ const VARIANT_FIELDS = {
   proteinChange: (r) => ((r.hgvsDescriptions || []).find((h) => /^NP_[^:]+:p\./.test(h)) || '').replace(/^[^:]+:/, '') || null,
   maneSelectTranscript: 'maneSelectTranscript',
   variantTypes: 'variantTypes[].name',
-  // MyVariant.info id: HGVS genomic on GRCh37, the build CIViC coordinates use
-  myvariantHgvs: 'myVariantInfo.myVariantInfoId',
+  // MyVariant.info id (HGVS genomic, GRCh37) for single-nucleotide variants.  Built
+  // from the coordinates: CIViC's own myVariantInfo field calls out to MyVariant
+  // per variant and makes listing a gene's variants ~80× slower.
+  myvariantHgvs: (r) => {
+    const c = r.coordinates || {}
+    return c.referenceBuild === 'GRCH37' && c.chromosome && c.start != null && c.start === c.stop &&
+      /^[ACGT]$/.test(c.referenceBases || '') && /^[ACGT]$/.test(c.variantBases || '')
+      ? `chr${c.chromosome}:g.${c.start}${c.referenceBases}>${c.variantBases}`
+      : null
+  },
   chromosome: 'coordinates.chromosome',
   start: 'coordinates.start',
   end: 'coordinates.stop',
@@ -162,7 +171,7 @@ module.exports = {
       resolve: async (p, ctx) => {
         const data = await graphql(ctx, `query($symbol: String!, $first: Int!, $name: String) {
           gene(entrezSymbol: $symbol) { name variants(first: $first, name: $name) { nodes { ${VARIANT_SELECTION} } } }
-        }`, { symbol: p.symbol, first: pageSize(ctx), name: p.name || null })
+        }`, { symbol: p.symbol, first: pageSize(ctx), name: p.name || undefined })
         if (!data.gene) return []
         return data.gene.variants.nodes.map((v) => ({ ...v, symbol: data.gene.name }))
       },
@@ -199,7 +208,7 @@ module.exports = {
           evidenceItems(variantId: $id, first: $first, status: ACCEPTED, evidenceType: $type, sortBy: { column: EVIDENCE_RATING, direction: DESC }) {
             nodes { ${EVIDENCE_SELECTION} }
           }
-        }`, { id: Number(p.civicVariantId), first: pageSize(ctx), type: p.evidenceType || null })
+        }`, { id: Number(p.civicVariantId), first: pageSize(ctx), type: p.evidenceType || undefined })
         return (data.evidenceItems && data.evidenceItems.nodes) || []
       },
       fields: EVIDENCE_FIELDS,
@@ -219,7 +228,7 @@ module.exports = {
           evidenceItems(molecularProfileName: $name, first: $first, status: ACCEPTED, evidenceType: $type, sortBy: { column: EVIDENCE_RATING, direction: DESC }) {
             nodes { ${EVIDENCE_SELECTION} }
           }
-        }`, { name: p.symbol, first: pageSize(ctx), type: p.evidenceType || null })
+        }`, { name: p.symbol, first: pageSize(ctx), type: p.evidenceType || undefined })
         // The API matches profile names by substring; keep profiles that name this gene as a word.
         const word = new RegExp(`(^|[^A-Za-z0-9])${String(p.symbol).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9]|$)`, 'i')
         return ((data.evidenceItems && data.evidenceItems.nodes) || []).filter((e) => e.molecularProfile && word.test(e.molecularProfile.name))

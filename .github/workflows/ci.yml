@@ -40,8 +40,13 @@ jobs:
 
       - name: Test with coverage (Node 22+)
         if: ${{ matrix.node-version == '22' }}
+        # src/catalog is excluded: its files describe external APIs, and their
+        # field-mapping functions only run against real responses.  They are
+        # covered by tests/catalog-relations.test.js (static lint, above) and
+        # by the live verification in integration.yml, not by unit tests.
         run: |
           node --experimental-test-coverage \
+               --test-coverage-exclude='src/catalog/**' \
                --test-coverage-lines=80 \
                --test-coverage-branches=90 \
                --test-coverage-functions=70 \

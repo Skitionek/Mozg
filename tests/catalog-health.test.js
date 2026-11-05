@@ -130,4 +130,25 @@ describe('probe: api sources', () => {
     assert.match(result.error, /^gone: example .* returned no rows/)
     assert.equal(result.entities.good, 'ok')
   })
+
+  test('is unavailable when an upstream is down and nothing is broken, ok when all answer', async () => {
+    const unregister = registerCatalog({ ...API_ENTRY, name: 'health-api-2', entities: [API_ENTRY.entities[0]] })
+    http.reset()
+    const restore = stubFetch(null)
+    let down = true
+    globalThis.fetch = async () => (down
+      ? { ok: false, status: 503, statusText: 'Unavailable', headers: { get: () => null }, text: async () => 'busy' }
+      : { ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => '{"id":"1"}' })
+
+    const entry = { ...API_ENTRY, name: 'health-api-2', entities: [API_ENTRY.entities[0]] }
+    const unavailable = await probe(entry)
+    down = false
+    http.reset()
+    const ok = await probe(entry)
+    restore()
+    unregister()
+
+    assert.equal(unavailable.status, 'unavailable')
+    assert.equal(ok.status, 'ok')
+  })
 })
