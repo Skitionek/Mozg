@@ -1,85 +1,105 @@
 'use strict'
 
 /**
- * Gene Ontology (GO) – controlled vocabulary for gene product attributes.
- * Reference: https://geneontology.org/
- * API docs:  https://api.geneontology.org/api/
+ * Gene Ontology Consortium API — GO terms and the GO annotations the
+ * consortium aggregates from every model organism database (CC BY 4.0).
+ * API docs: https://api.geneontology.org/api
  *
- * No credentials required. The GOC API provides JSON REST endpoints for
- * GO terms (biological_process, molecular_function, cellular_component)
- * and gene/protein annotations.
- *
- * Key where parameters:
- *  - /search/entity: q (required), category, start, rows, highlight_class
- *  - /ontology/term/{id}: GO identifier (e.g. GO:0008150)
- *  - /ontology/term/{id}/children: GO identifier
- *  - /bioentity/function/{id}: GO identifier, rows, start, evidence
- *  - /bioentity/gene/{id}/function: CURIE (e.g. UniProtKB:P04637)
- *
- * Example queries:
- *  Search GO terms: from "/search/entity" where: { q: "apoptosis", category: "ontology_class", rows: "10" }
- *  Fetch GO term:   from "/ontology/term/GO:0006915"
- *  Genes for term:  from "/bioentity/function/GO:0006915" where: { rows: "25" }
- *
- * Relationship map:
- *  - /search/entity  →  /ontology/term/{id}  (id → id, belongsTo full record)
- *  - /ontology/term/{id}  →  /ontology/term/{id}/children  (id, hasMany children)
- *  - /search/entity  →  /esummary.fcgi  (id → id, hasMany NCBI records, catalog: ncbi)
- *  - /ontology/term/{id}  →  /terms  (label → search, hasMany ChEBI compounds, catalog: chebi)
+ * Unlike QuickGO (UniProt-centred), annotation subjects here are whichever
+ * identifier the contributing database uses: UniProtKB:…, MGI:…, ZFIN:…,
+ * FB:…, WB:…, SGD:…  Gene products are addressed by that CURIE.
  */
+
+const ASSOCIATION_FIELDS = {
+  geneId: 'subject.id',
+  symbol: 'subject.label',
+  uniprotAccession: (r) => {
+    const id = r.subject && r.subject.id
+    return id && id.startsWith('UniProtKB:') ? id.slice('UniProtKB:'.length).replace(/-\d+$/, '') : null
+  },
+  taxonId: (r) => {
+    const id = r.subject && r.subject.taxon && r.subject.taxon.id
+    return id ? Number(String(id).replace('NCBITaxon:', '')) : null
+  },
+  organism: 'subject.taxon.label',
+  goId: 'object.id',
+  goName: 'object.label',
+  aspect: 'object.category[0]',
+  negated: 'negated',
+  evidence: 'evidence_types[0].label',
+  evidenceCode: 'evidence_types[0].id',
+  providedBy: 'provided_by[0]',
+  references: 'publications[].id'
+}
+
 module.exports = {
   name: 'geneontology',
-  label: 'Gene Ontology (REST)',
-  description: 'Gene Ontology Consortium controlled vocabulary for biological processes, molecular functions and cellular components. Use where.q to search terms. Use GO:XXXXXXX identifiers for term lookups and gene annotation queries.',
-  driver: 'rest',
+  label: 'Gene Ontology (GO Consortium)',
+  description: 'The GO Consortium\'s API: Gene Ontology terms and the functional annotations contributed by UniProt and every model organism database (MGI, RGD, ZFIN, FlyBase, WormBase, SGD, …).',
+  category: 'Function & ontologies',
+  homepage: 'https://geneontology.org',
+  docs: 'https://api.geneontology.org/api',
+  license: 'CC BY 4.0',
+  driver: 'api',
   connection: {
     database: 'https://api.geneontology.org/api',
-    headers: {
-      Accept: 'application/json'
-    }
+    headers: { Accept: 'application/json' }
   },
-  // Health-probe hint: the bioentity endpoint requires a GO id.
-  probe: { entity: '/bioentity/function/GO:0008150' },
+  rateLimit: { requestsPerSecond: 5, maxConcurrent: 3 },
   entities: [
     {
-      // Full-text search: where: { q: "apoptosis", category: "ontology_class", rows: "10" }
-      // category options: ontology_class, bioentity, annotation, general
-      name: '/search/entity',
-      columns: ['id', 'label', 'category', 'definition', 'synonym', 'taxon', 'highlight'],
+      name: 'term',
+      description: 'One GO term with its definition, synonyms and cross-references',
+      path: '/ontology/term/{goId}',
+      params: {
+        goId: { description: 'GO term id, e.g. GO:0006915' }
+      },
+      fields: {
+        goId: 'goid',
+        name: 'label',
+        definition: 'definition',
+        synonyms: 'synonyms',
+        alternativeIds: 'alternativeIds',
+        xrefs: 'xrefs',
+        subsets: 'subsets',
+        comment: (r) => r.comment || null
+      },
+      example: { goId: 'GO:0006915' },
       relations: [
-        { entity: '/ontology/term', foreignKey: 'id', type: 'belongsTo', alias: 'term' }
+        { alias: 'genes', description: 'Gene products annotated to this term, across all contributing databases', entity: 'genesForTerm', localKey: 'goId', foreignKey: 'goId', type: 'hasMany' },
+        { alias: 'quickgo', description: 'The same term in QuickGO, with aspect and hierarchy', catalog: 'quickgo', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
       ]
     },
     {
-      // Fetch a specific GO term: from "/ontology/term" where: { _pathSuffix: "GO:0006915" }
-      name: '/ontology/term',
-      columns: ['id', 'label', 'definition', 'synonyms', 'namespace', 'is_obsolete', 'replaced_by', 'consider', 'alt_id', 'xrefs', 'subsets'],
+      name: 'genesForTerm',
+      description: 'Gene products annotated to a GO term (including its descendants)',
+      path: '/bioentity/function/{goId}/genes',
+      params: {
+        goId: { description: 'GO term id, e.g. GO:0006915' },
+        taxonId: { name: 'taxon', transform: (v) => (String(v).startsWith('NCBITaxon:') ? v : `NCBITaxon:${v}`), description: 'NCBI taxonomy id to restrict to, e.g. 9606' }
+      },
+      rows: 'associations',
+      fields: ASSOCIATION_FIELDS,
+      paginate: { limit: 'rows', offset: 'start', max: 1000 },
+      example: { goId: 'GO:0006915', taxonId: 9606 },
       relations: [
-        { entity: '/ontology/term/children', foreignKey: 'id', type: 'hasMany', alias: 'children' },
-        { entity: '/bioentity/function', foreignKey: 'id', type: 'hasMany', alias: 'annotatedGenes' },
-        { entity: '/terms', foreignKey: 'label', type: 'hasMany', alias: 'chebiCompounds', catalog: 'chebi' }
+        { alias: 'protein', description: 'The UniProt entry, for UniProtKB subjects', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
+        { alias: 'functions', description: 'Every GO annotation of this gene product', entity: 'functionsForGene', localKey: 'geneId', foreignKey: 'geneId', type: 'hasMany' }
       ]
     },
     {
-      // Children of a GO term: from "/ontology/term/children" where: { _pathSuffix: "GO:0006915" }
-      name: '/ontology/term/children',
-      columns: ['id', 'label', 'definition', 'synonyms', 'namespace'],
-      relations: []
-    },
-    {
-      // Genes/proteins annotated with a GO term: from "/bioentity/function" where: { _pathSuffix: "GO:0006915", rows: "25" }
-      name: '/bioentity/function',
-      columns: ['id', 'label', 'taxon', 'taxon_label', 'qualifier', 'evidence', 'reference', 'assigned_by'],
+      name: 'functionsForGene',
+      description: 'GO annotations of one gene or gene product, by the contributing database\'s CURIE',
+      path: '/bioentity/gene/{geneId}/function',
+      params: {
+        geneId: { description: 'Gene CURIE, e.g. UniProtKB:P04637, HGNC:11998, MGI:98834, ZFIN:ZDB-GENE-990415-270' }
+      },
+      rows: 'associations',
+      fields: ASSOCIATION_FIELDS,
+      paginate: { limit: 'rows', offset: 'start', max: 1000 },
+      example: { geneId: 'UniProtKB:P04637' },
       relations: [
-        { entity: '/uniprotkb/search', foreignKey: 'id', type: 'hasMany', alias: 'uniprotEntries', catalog: 'uniprot' }
-      ]
-    },
-    {
-      // GO annotations for a specific gene: from "/bioentity/gene/function" where: { _pathSuffix: "UniProtKB:P04637" }
-      name: '/bioentity/gene/function',
-      columns: ['id', 'label', 'qualifier', 'evidence', 'reference', 'term', 'term_label', 'assigned_by'],
-      relations: [
-        { entity: '/ontology/term', foreignKey: 'term', type: 'belongsTo', alias: 'goTerm' }
+        { alias: 'term', description: 'The annotated GO term', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
       ]
     }
   ]

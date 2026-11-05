@@ -1,103 +1,201 @@
 'use strict'
 
 /**
- * RegulonDB – bacterial gene regulation database (E. coli K-12).
- * Reference: https://regulondb.ccg.unam.mx/
- * API docs:  https://regulondb.ccg.unam.mx/manual/webservices/webservices.jsp
+ * RegulonDB — the reference database of transcriptional regulation in
+ * Escherichia coli K-12: genes, transcription factors, their regulons and the
+ * regulatory interactions between them (CCG-UNAM; free for academic use).
+ * API: GraphQL at https://regulondb.ccg.unam.mx/graphql
  *
- * No credentials required for read access.
- * Returns JSON for most endpoints (pass format=JSON or Accept: application/json).
- *
- * RegulonDB contains regulatory networks of E. coli K-12: genes, operons,
- * promoters, transcription factors, transcription units, terminators, and
- * regulatory interactions.
- *
- * Key where parameters (most endpoints accept):
- *  - activeConformation: true|false
- *  - format: JSON
- *  - tool: name of your application (recommended)
- *
- * Example queries:
- *  All genes:        from "/genes"
- *  All operons:      from "/operons"
- *  All TFs:         from "/transcriptionfactors"
- *  Gene interactions: from "/geneinteraction"
- *
- * Relationship map:
- *  - /genes           →  /operons          (operon_id → operon_id, belongsTo operon)
- *  - /genes           →  /esummary.fcgi    (gene_id → id, hasMany NCBI gene records, catalog: ncbi)
- *  - /genes           →  /uniprotkb/search (gene_name → query, hasMany UniProt proteins, catalog: uniprot)
- *  - /operons         →  /promoters        (operon_id, hasMany promoters)
- *  - /transcriptionfactors  →  /tfbs      (tf_id → tf_id, hasMany binding sites)
+ * RegulonDB ids look like RDBECOLIGNC00050 (gene araC) and RDBECOLITFC00064
+ * (the AraC regulon).  A gene's regulators are regulons, so the two join both
+ * ways: gene → its regulators → the genes each of those regulates.
  */
+
+const GENE_SELECTION = `
+  _id
+  gene { _id bnumber name leftEndPosition rightEndPosition strand synonyms
+         externalCrossReferences { externalCrossReferenceName objectId } }
+  products { name regulonId externalCrossReferences { externalCrossReferenceName objectId } }
+  regulation { regulators { _id name function } }
+`
+
+const REGULON_SELECTION = `
+  _id
+  regulator { _id name abbreviatedName synonyms family sensingClass connectivityClass confidenceLevel
+              encodedBy { genes { _id name } } }
+  summary { genes { total } regulatoryInteractions { total } }
+  regulates { genes { _id name function } }
+`
+
+const genesQuery = `query ($search: String, $limit: Int) {
+  getGenesBy(search: $search, limit: $limit) { data { ${GENE_SELECTION} } }
+}`
+
+const regulonsQuery = `query ($search: String, $limit: Int) {
+  getRegulonBy(search: $search, limit: $limit) { data { ${REGULON_SELECTION} } }
+}`
+
+const xref = (refs, name) => ((refs || []).find((x) => x.externalCrossReferenceName === name) || {}).objectId || null
+
+const GENE_FIELDS = {
+  regulondbGeneId: '_id',
+  bnumber: 'gene.bnumber',
+  symbol: 'gene.name',
+  synonyms: 'gene.synonyms',
+  leftEnd: 'gene.leftEndPosition',
+  rightEnd: 'gene.rightEndPosition',
+  strand: 'gene.strand',
+  productName: 'products[0].name',
+  uniprotAccession: (r) => xref(r.products && r.products[0] && r.products[0].externalCrossReferences, 'UNIPROT'),
+  stringId: (r) => xref(r.gene && r.gene.externalCrossReferences, 'STRING'),
+  ecocycId: (r) => xref(r.gene && r.gene.externalCrossReferences, 'ECOCYC'),
+  regulonId: 'products[0].regulonId',
+  regulatorNames: 'regulation.regulators[].name'
+}
+
+const GENE_RELATIONS = [
+  { alias: 'regulators', description: 'Transcription factors regulating this gene, with their effect', entity: 'geneRegulators', localKey: 'regulondbGeneId', foreignKey: 'regulondbGeneId', type: 'hasMany' },
+  { alias: 'regulon', description: 'The regulon this gene\'s product heads, when it is a transcription factor', entity: 'regulon', localKey: 'regulonId', foreignKey: 'regulonId', type: 'hasOne' },
+  { alias: 'protein', description: 'The UniProt entry of the gene product', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
+]
+
+const REGULON_FIELDS = {
+  regulonId: '_id',
+  name: 'regulator.name',
+  abbreviatedName: 'regulator.abbreviatedName',
+  synonyms: 'regulator.synonyms',
+  family: 'regulator.family',
+  sensingClass: 'regulator.sensingClass',
+  connectivityClass: 'regulator.connectivityClass',
+  confidenceLevel: 'regulator.confidenceLevel',
+  encodingGeneId: 'regulator.encodedBy.genes[0]._id',
+  encodingGeneSymbol: 'regulator.encodedBy.genes[0].name',
+  regulatedGeneCount: 'summary.genes.total',
+  regulatoryInteractionCount: 'summary.regulatoryInteractions.total'
+}
+
+const REGULON_RELATIONS = [
+  { alias: 'regulatedGenes', description: 'Genes this regulator regulates, with its effect on each', entity: 'regulatedGenes', localKey: 'regulonId', foreignKey: 'regulonId', type: 'hasMany' },
+  { alias: 'encodingGene', description: 'The gene encoding this transcription factor', entity: 'gene', localKey: 'encodingGeneId', foreignKey: 'regulondbGeneId', type: 'hasOne' }
+]
+
+// getGenesBy / getRegulonBy are fuzzy searches; an id lookup keeps only the exact match.
+const exactId = (path, param) => (body, params) => (path(body) || []).filter((r) => r._id === params[param])
+
 module.exports = {
   name: 'regulondb',
-  label: 'RegulonDB (REST)',
-  description: 'RegulonDB — E. coli K-12 transcription regulatory network database. Contains experimentally validated genes, operons, promoters, transcription factors, binding sites, regulatory interactions and sigmulon data. Pass format=JSON in where.',
-  driver: 'rest',
+  label: 'RegulonDB',
+  description: 'Reference database of transcriptional regulation in Escherichia coli K-12: genes, transcription factors, regulons and regulatory interactions, manually curated from the literature.',
+  category: 'Interactions & pathways',
+  homepage: 'https://regulondb.ccg.unam.mx',
+  docs: 'https://regulondb.ccg.unam.mx/manual/help/graphql',
+  license: 'Free for academic use — https://regulondb.ccg.unam.mx/manual/aboutUs/terms-conditions',
+  driver: 'api',
   connection: {
-    database: 'https://regulondb.ccg.unam.mx/webresources',
-    headers: {
-      Accept: 'application/json'
-    }
+    database: 'https://regulondb.ccg.unam.mx',
+    headers: { Accept: 'application/json' }
   },
+  rateLimit: { requestsPerSecond: 3, maxConcurrent: 2 },
+  timeoutMs: 60_000,
   entities: [
     {
-      // List all genes: where: { format: "JSON" }
-      name: '/genes',
-      columns: ['gene_id', 'gene_name', 'gene_posleft', 'gene_posright', 'gene_strand', 'gene_sequence', 'operon_id', 'gene_note', 'external_db_id'],
+      name: 'genes',
+      description: 'E. coli K-12 genes matching a name, synonym, b-number or text',
+      path: '/graphql',
+      query: () => ({}), // parameters travel as GraphQL variables, not in the URL
+      params: {
+        search: { required: true, description: 'Gene name, b-number or text, e.g. araC or b0064' }
+      },
+      graphql: { query: genesQuery, variables: (params) => ({ search: String(params.search), limit: 100 }) },
+      rows: 'data.getGenesBy.data',
+      fields: GENE_FIELDS,
+      example: { search: 'araC' },
+      relations: GENE_RELATIONS
+    },
+    {
+      name: 'gene',
+      description: 'One E. coli K-12 gene by RegulonDB id',
+      path: '/graphql',
+      query: () => ({}), // parameters travel as GraphQL variables, not in the URL
+      params: {
+        regulondbGeneId: { required: true, description: 'RegulonDB gene id, e.g. RDBECOLIGNC00050' }
+      },
+      graphql: { query: genesQuery, variables: (params) => ({ search: params.regulondbGeneId, limit: 5 }) },
+      rows: exactId((b) => b && b.data && b.data.getGenesBy && b.data.getGenesBy.data, 'regulondbGeneId'),
+      fields: GENE_FIELDS,
+      example: { regulondbGeneId: 'RDBECOLIGNC00050' },
+      relations: GENE_RELATIONS
+    },
+    {
+      name: 'geneRegulators',
+      description: 'Transcription factors regulating a gene, and the effect of each',
+      path: '/graphql',
+      query: () => ({}), // parameters travel as GraphQL variables, not in the URL
+      params: {
+        regulondbGeneId: { required: true, description: 'RegulonDB gene id, e.g. RDBECOLIGNC00050' }
+      },
+      graphql: { query: genesQuery, variables: (params) => ({ search: params.regulondbGeneId, limit: 5 }) },
+      rows: (body, params) => exactId((b) => b && b.data && b.data.getGenesBy && b.data.getGenesBy.data, 'regulondbGeneId')(body, params)
+        .flatMap((g) => (g.regulation && g.regulation.regulators) || []),
+      fields: {
+        regulonId: '_id',
+        name: 'name',
+        function: 'function'
+      },
+      example: { regulondbGeneId: 'RDBECOLIGNC00050' },
       relations: [
-        { entity: '/operons', foreignKey: 'operon_id', type: 'belongsTo', alias: 'operon' },
-        { entity: '/esummary.fcgi', foreignKey: 'gene_id', type: 'hasMany', alias: 'ncbiGeneInfo', catalog: 'ncbi' },
-        { entity: '/uniprotkb/search', foreignKey: 'gene_name', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' }
+        { alias: 'regulon', description: 'The regulator\'s regulon in full', entity: 'regulon', localKey: 'regulonId', foreignKey: 'regulonId', type: 'hasOne' }
       ]
     },
     {
-      // List all operons: where: { format: "JSON" }
-      name: '/operons',
-      columns: ['operon_id', 'operon_name', 'operon_posleft', 'operon_posright', 'operon_strand', 'operon_effect', 'operon_evidence'],
+      name: 'regulons',
+      description: 'Regulons (a transcription factor and everything it regulates) matching a name or text',
+      path: '/graphql',
+      query: () => ({}), // parameters travel as GraphQL variables, not in the URL
+      params: {
+        search: { required: true, description: 'Regulator name or text, e.g. AraC or CRP' }
+      },
+      graphql: { query: regulonsQuery, variables: (params) => ({ search: String(params.search), limit: 100 }) },
+      rows: 'data.getRegulonBy.data',
+      fields: REGULON_FIELDS,
+      example: { search: 'AraC' },
+      relations: REGULON_RELATIONS
+    },
+    {
+      name: 'regulon',
+      description: 'One regulon by RegulonDB id',
+      path: '/graphql',
+      query: () => ({}), // parameters travel as GraphQL variables, not in the URL
+      params: {
+        regulonId: { required: true, description: 'RegulonDB regulon id, e.g. RDBECOLITFC00064' }
+      },
+      graphql: { query: regulonsQuery, variables: (params) => ({ search: params.regulonId, limit: 5 }) },
+      rows: exactId((b) => b && b.data && b.data.getRegulonBy && b.data.getRegulonBy.data, 'regulonId'),
+      fields: REGULON_FIELDS,
+      example: { regulonId: 'RDBECOLITFC00064' },
+      relations: REGULON_RELATIONS
+    },
+    {
+      name: 'regulatedGenes',
+      description: 'Genes a regulon\'s transcription factor regulates, with its effect on each',
+      path: '/graphql',
+      query: () => ({}), // parameters travel as GraphQL variables, not in the URL
+      params: {
+        regulonId: { required: true, description: 'RegulonDB regulon id, e.g. RDBECOLITFC00064' },
+        function: { in: 'filter', field: 'function', description: 'Keep one effect: activator, repressor or dual' }
+      },
+      graphql: { query: regulonsQuery, variables: (params) => ({ search: params.regulonId, limit: 5 }) },
+      rows: (body, params) => exactId((b) => b && b.data && b.data.getRegulonBy && b.data.getRegulonBy.data, 'regulonId')(body, params)
+        .flatMap((r) => (r.regulates && r.regulates.genes) || []),
+      fields: {
+        regulondbGeneId: '_id',
+        symbol: 'name',
+        function: 'function'
+      },
+      example: { regulonId: 'RDBECOLITFC00064' },
       relations: [
-        { entity: '/promoters', foreignKey: 'operon_id', type: 'hasMany', alias: 'promoters' },
-        { entity: '/genes', foreignKey: 'operon_id', type: 'hasMany', alias: 'genes' }
+        { alias: 'gene', description: 'The regulated gene in full', entity: 'gene', localKey: 'regulondbGeneId', foreignKey: 'regulondbGeneId', type: 'hasOne' }
       ]
-    },
-    {
-      // List all promoters: where: { format: "JSON" }
-      name: '/promoters',
-      columns: ['promoter_id', 'promoter_name', 'promoter_strand', 'pos_1', 'sigma_factor', 'promoter_sequence', 'promoter_note', 'promoter_evidence'],
-      relations: []
-    },
-    {
-      // List all transcription factors: where: { format: "JSON" }
-      name: '/transcriptionfactors',
-      columns: ['tf_id', 'tf_name', 'tf_type', 'tf_family', 'gene_id', 'gene_name', 'site_length', 'symmetry', 'tf_note'],
-      relations: [
-        { entity: '/tfbs', foreignKey: 'tf_id', type: 'hasMany', alias: 'bindingSites' },
-        { entity: '/uniprotkb/search', foreignKey: 'tf_name', type: 'hasMany', alias: 'uniprotProteins', catalog: 'uniprot' }
-      ]
-    },
-    {
-      // Transcription factor binding sites: where: { format: "JSON" }
-      name: '/tfbs',
-      columns: ['tfbs_id', 'tf_id', 'tf_name', 'tfbs_posleft', 'tfbs_posright', 'tfbs_strand', 'tfbs_sequence', 'tfbs_effect', 'tfbs_evidence'],
-      relations: [
-        { entity: '/transcriptionfactors', foreignKey: 'tf_id', type: 'belongsTo', alias: 'transcriptionFactor' }
-      ]
-    },
-    {
-      // Gene–gene regulatory interactions: where: { format: "JSON" }
-      name: '/geneinteraction',
-      columns: ['regulator_gene_id', 'regulator_gene_name', 'regulated_gene_id', 'regulated_gene_name', 'effect', 'evidence', 'regulatory_mechanism'],
-      relations: [
-        { entity: '/genes', foreignKey: 'regulator_gene_id', type: 'belongsTo', alias: 'regulatorGene' },
-        { entity: '/genes', foreignKey: 'regulated_gene_id', type: 'belongsTo', alias: 'regulatedGene' }
-      ]
-    },
-    {
-      // Network (graph) of regulatory interactions: where: { format: "JSON" }
-      name: '/network',
-      columns: ['node_id', 'node_name', 'node_type', 'edge_id', 'source_id', 'target_id', 'effect', 'evidence'],
-      relations: []
     }
   ]
 }

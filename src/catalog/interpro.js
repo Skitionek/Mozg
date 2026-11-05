@@ -1,79 +1,124 @@
 'use strict'
 
 /**
- * InterPro – protein families, domains and functional sites database.
- * Reference: https://www.ebi.ac.uk/interpro/
- * API docs:  https://www.ebi.ac.uk/interpro/api/doc/
+ * InterPro — protein families, domains and functional sites, integrating
+ * Pfam, PROSITE, PANTHER, CDD, SMART and other member databases.
+ * API docs: https://github.com/ProteinsWebTeam/interpro7-api/tree/master/docs
  *
- * No credentials required. All data freely available.
- *
- * InterPro accessions: IPR000001 (9-digit zero-padded integer with IPR prefix)
- * UniProtKB accession: P00533 (Swiss-Prot) or A0A000XXX (TrEMBL)
- * PDB ID: 1TUP (4-character)
- *
- * Key where parameters:
- *  - page_size: number of results per page (max 200)
- *  - cursor:    pagination cursor from previous response
- *  - search:    keyword search
- *  - type:      entry type filter (family, domain, homologous_superfamily, …)
- *
- * Relationship map:
- *  - /entry/InterPro  →  /protein/UniProt  (accession → entry accession, hasMany)
- *  - /protein/UniProt →  /entry/InterPro   (protein accession → accession, hasMany)
- *  - /protein/UniProt →  /structure/PDB    (protein → PDB structures, hasMany)
+ * An empty result is answered with 204 No Content.
  */
+
+const upper = (v) => (v == null ? v : String(v).toUpperCase())
+
+const stripHtml = (text) => (text == null ? null : String(text).replace(/<[^>]+>/g, '').replace(/\[\[cite:[^\]]+\]\]/g, '').replace(/\s+/g, ' ').trim())
+
+const locations = (r) => ((r.proteins && r.proteins[0] && r.proteins[0].entry_protein_locations) || [])
+  .flatMap((loc) => (loc.fragments || []).map((f) => ({ start: f.start, end: f.end })))
+
+const memberSignatures = (members) => Object.entries(members || {})
+  .flatMap(([db, sigs]) => Object.keys(sigs || {}).map((acc) => `${db}:${acc}`))
+
 module.exports = {
   name: 'interpro',
-  label: 'InterPro (REST)',
-  description: 'EBI InterPro protein families, domains and functional sites. Integrates 13 member databases (Pfam, PANTHER, PRINTS, HAMAP, …). Free JSON API. Accessions: IPR000001 (entries), P00533/A0A000 (UniProt), 1TUP (PDB).',
-  driver: 'rest',
+  label: 'InterPro',
+  description: 'InterPro classifies proteins into families and predicts domains and important sites, integrating 13 member databases (Pfam, PROSITE, PANTHER, CDD, SMART, …) with GO annotations.',
+  category: 'Proteins & structures',
+  homepage: 'https://www.ebi.ac.uk/interpro/',
+  docs: 'https://github.com/ProteinsWebTeam/interpro7-api/tree/master/docs',
+  license: 'CC0 1.0',
+  driver: 'api',
   connection: {
     database: 'https://www.ebi.ac.uk/interpro/api',
-    headers: {
-      Accept: 'application/json'
-    }
+    headers: { Accept: 'application/json' }
   },
+  rateLimit: { requestsPerSecond: 5, maxConcurrent: 3 },
+  timeoutMs: 45_000,
   entities: [
     {
-      // All entries: /entry/all/?format=json
-      name: '/entry/all',
-      columns: ['accession', 'name', 'type', 'integrated', 'member_databases', 'go_terms', 'description', 'literature', 'overlaps_with'],
+      name: 'proteinEntries',
+      description: 'InterPro (or member-database) entries matched on one UniProt protein, with match positions',
+      path: '/entry/{sourceDatabase}/protein/uniprot/{uniprotAccession}',
+      params: {
+        uniprotAccession: { description: 'UniProtKB accession, e.g. P04637', transform: upper },
+        sourceDatabase: { default: 'interpro', description: 'interpro (default), or a member database: pfam, prosite, panther, cdd, smart, cathgene3d, …' }
+      },
+      // One page holds every entry for practically any protein.
+      query: { page_size: 200 },
+      rows: 'results',
+      fields: {
+        accession: 'metadata.accession',
+        interproId: (r) => (r.metadata.source_database === 'interpro' ? r.metadata.accession : r.metadata.integrated),
+        sourceDatabase: 'metadata.source_database',
+        name: 'metadata.name',
+        type: 'metadata.type',
+        uniprotAccession: (r, params) => upper(params.uniprotAccession),
+        start: (r) => (locations(r)[0] || {}).start || null,
+        end: (r) => (locations(r)[0] || {}).end || null,
+        locations,
+        goIds: 'metadata.go_terms[].identifier',
+        memberSignatures: (r) => memberSignatures(r.metadata.member_databases)
+      },
+      paginate: { limit: 'page_size', max: 200 },
+      example: { uniprotAccession: 'P04637' },
       relations: [
-        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' }
+        { alias: 'entry', description: 'Full InterPro entry (description, GO terms, literature)', entity: 'entry', localKey: 'interproId', foreignKey: 'interproId', type: 'hasOne' },
+        { alias: 'protein', description: 'The UniProtKB entry', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
       ]
     },
     {
-      // Entries from a specific member database: /entry/pfam
-      name: '/entry/pfam',
-      columns: ['accession', 'name', 'type', 'integrated', 'short_name', 'source_database'],
+      name: 'entry',
+      description: 'One InterPro entry (family, domain, repeat or site)',
+      path: '/entry/interpro/{interproId}',
+      params: {
+        interproId: { description: 'InterPro accession, e.g. IPR011615', transform: upper }
+      },
+      rows: 'metadata',
+      fields: {
+        interproId: 'accession',
+        name: 'name.name',
+        shortName: 'name.short',
+        type: 'type',
+        description: (r) => stripHtml(r.description && r.description[0] && (r.description[0].text || r.description[0])),
+        goIds: 'go_terms[].identifier',
+        goTerms: 'go_terms[].name',
+        memberSignatures: (r) => memberSignatures(r.member_databases),
+        parentId: (r) => (r.hierarchy && r.hierarchy.accession !== r.accession ? r.hierarchy.accession : null),
+        overlapsWith: 'overlaps_with[].accession',
+        proteinCount: 'counters.proteins',
+        structureCount: 'counters.structures',
+        representativePdbId: (r) => (r.representative_structure && r.representative_structure.accession ? upper(r.representative_structure.accession) : null),
+        pmids: (r) => Object.values(r.literature || {}).map((ref) => ref.PMID).filter(Boolean).map(String)
+      },
+      example: { interproId: 'IPR011615' },
       relations: [
-        { entity: '/protein/UniProt', foreignKey: 'accession', type: 'hasMany', alias: 'proteins' }
+        { alias: 'reviewedProteins', description: 'Swiss-Prot proteins containing this entry', entity: 'reviewedProteins', localKey: 'interproId', foreignKey: 'interproId', type: 'hasMany' },
+        { alias: 'representativeStructure', description: 'Representative PDB structure', catalog: 'pdb', entity: 'entry', localKey: 'representativePdbId', foreignKey: 'pdbId', type: 'hasOne' }
       ]
     },
     {
-      // Proteins with InterPro annotations: /protein/UniProt/
-      name: '/protein/UniProt',
-      columns: ['accession', 'name', 'source_organism', 'length', 'sequence', 'in_alphafold', 'is_reviewed', 'ida_id'],
+      name: 'reviewedProteins',
+      description: 'Reviewed (Swiss-Prot) proteins that contain an InterPro entry',
+      path: '/protein/reviewed/entry/interpro/{interproId}',
+      params: {
+        interproId: { description: 'InterPro accession, e.g. IPR011615', transform: upper }
+      },
+      rows: 'results',
+      fields: {
+        uniprotAccession: (r) => upper(r.metadata.accession),
+        name: 'metadata.name',
+        symbol: 'metadata.gene',
+        length: 'metadata.length',
+        taxonId: (r) => (r.metadata.source_organism && r.metadata.source_organism.taxId ? Number(r.metadata.source_organism.taxId) : null),
+        organism: 'metadata.source_organism.scientificName',
+        interproId: (r, params) => upper(params.interproId),
+        start: 'entries[0].entry_protein_locations[0].fragments[0].start',
+        end: 'entries[0].entry_protein_locations[0].fragments[0].end'
+      },
+      paginate: { limit: 'page_size', max: 200 },
+      example: { interproId: 'IPR011615' },
       relations: [
-        { entity: '/entry/all', foreignKey: 'accession', type: 'hasMany', alias: 'entries' },
-        { entity: '/structure/PDB', foreignKey: 'accession', type: 'hasMany', alias: 'structures' },
-        { entity: '/uniprotkb/search', foreignKey: 'accession', type: 'belongsTo', alias: 'uniprotEntry', catalog: 'uniprot' }
-      ]
-    },
-    {
-      // Structures with InterPro annotations: /structure/PDB/
-      name: '/structure/PDB',
-      columns: ['accession', 'name', 'experiment_type', 'release_date', 'chains'],
-      relations: [
-        { entity: '/entry', foreignKey: 'accession', type: 'belongsTo', alias: 'pdbEntry', catalog: 'pdb' }
-      ]
-    },
-    {
-      // Taxonomy nodes with InterPro annotations: /taxonomy/uniprot/
-      name: '/taxonomy/uniprot',
-      columns: ['accession', 'name', 'rank', 'lineage', 'children', 'proteins', 'entries'],
-      relations: [
-        { entity: '/protein/UniProt', foreignKey: 'taxId', type: 'hasMany', alias: 'proteins' }
+        { alias: 'protein', description: 'The UniProtKB entry', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
+        { alias: 'alphafold', description: 'AlphaFold prediction for the protein', catalog: 'alphafold', entity: 'prediction', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
       ]
     }
   ]
