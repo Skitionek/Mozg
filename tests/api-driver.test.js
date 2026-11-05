@@ -82,6 +82,16 @@ const PROTEINS = {
       fields: { id: 'id', label: 'label' }
     },
     {
+      name: 'paged',
+      description: 'resolve that pages upstream',
+      params: { term: {} },
+      resolve: async (params, ctx) => {
+        const items = await ctx.request('/paged', { query: { start: ctx.offset || 0, max: ctx.limit } })
+        return { records: items, serverOffset: ctx.offset || 0 }
+      },
+      fields: { id: 'id' }
+    },
+    {
       name: 'twoStep',
       description: 'search then summarise',
       params: { term: {} },
@@ -283,6 +293,16 @@ describe('api driver: requests', () => {
 })
 
 describe('api driver: paging and ordering', () => {
+  test('a resolve hook that pages upstream is not skipped twice', async () => {
+    route(/\/paged$/, (u) => {
+      const start = Number(u.searchParams.get('start'))
+      return json(200, [{ id: start }, { id: start + 1 }])
+    })
+    const { data } = await executeQuery({ source: 'test-proteins', from: 'paged', where: { term: 'x' }, limit: 2, offset: 6 })
+    assert.deepEqual(data.map((r) => r.id), [6, 7])
+  })
+
+
   const many = Array.from({ length: 10 }, (_, i) => ({ acc: `P${i}`, kind: 'k', score: 10 - i }))
 
   test('passes limit and offset to an API that supports both', async () => {
@@ -337,6 +357,18 @@ describe('api driver: relations and include', () => {
     // Then each is resolved through the catalog's join keys
     assert.deepEqual(data[0].features, [{ type: 'domain', start: 94 }])
     assert.deepEqual(data[0].gene, { geneId: '7157', symbol: 'TP53' })
+  })
+
+  test('a relation limit caps the related rows per parent', async () => {
+    route(/proteins\.test\/api\/protein\/P04637$/, () => json(200, P53))
+    route(/\/protein\/P04637\/features$/, () => json(200, { P04637: [{ type: 'a' }, { type: 'b' }, { type: 'c' }] }))
+    const { data } = await executeQuery({
+      source: 'test-proteins',
+      from: 'protein',
+      where: { uniprotAccession: 'P04637' },
+      relations: [{ entity: 'features', foreignKey: 'uniprotAccession', localKey: 'uniprotAccession', alias: 'features', limit: 2 }]
+    })
+    assert.deepEqual(data[0].features.map((f) => f.type), ['a', 'b'])
   })
 
   test('a relation needing a missing API key fails in place, not for the whole query', async () => {

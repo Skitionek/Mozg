@@ -45,7 +45,9 @@ function lookup (name) {
 }
 
 function classify (err) {
-  if (/^Unknown catalog: /.test(err.message)) return 'pending'
+  // A source that is unregistered, or registered but not written yet, is
+  // someone else's work in progress rather than a defect in this entry.
+  if (/^Unknown catalog: |Cannot find module '\.\/[^']+'/.test(err.message)) return 'pending'
   if (err instanceof HttpError && err.transient) return 'unavailable'
   return 'broken'
 }

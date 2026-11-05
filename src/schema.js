@@ -208,6 +208,8 @@ const typeDefs = /* GraphQL */ `
     select: [String!]
     """Filter conditions for the related entity"""
     where: JSON
+    """Maximum related rows per parent row (hasMany)"""
+    limit: Int
     """Nested relations on the related entity"""
     relations: [RelationInput!]
   }
@@ -435,6 +437,8 @@ const typeDefs = /* GraphQL */ `
     type: RelationType!
     """What following this relation yields"""
     description: String
+    """Cap on related rows per parent row, when the catalog sets one"""
+    limit: Int
   }
 `
 

@@ -1,56 +1,82 @@
 'use strict'
 
 /**
- * GEO – NCBI Gene Expression Omnibus.
- * Reference: https://www.ncbi.nlm.nih.gov/geo/
- * API docs:  https://www.ncbi.nlm.nih.gov/books/NBK25497/
+ * GEO — NCBI Gene Expression Omnibus: functional genomics datasets (series,
+ * curated datasets, platforms and samples), via NCBI E-utilities (db=gds).
+ * API docs: https://www.ncbi.nlm.nih.gov/geo/info/geo_paccess.html
  *
- * No credentials required. An api_key raises the rate limit to 10 req/sec.
- * Uses NCBI E-utilities with db=gds (GEO DataSets) or db=geo (GEO Profiles).
- * All requests should include retmode=json.
- *
- * GEO accession formats:
- *  - GSE123456  – GEO Series (experiment)
- *  - GSM123456  – GEO Sample
- *  - GDS123456  – GEO DataSet (curated)
- *  - GPL123456  – GEO Platform
- *
- * Example search: where: { db: "gds", term: "breast cancer", retmode: "json", retmax: "20" }
- * Example fetch:  where: { db: "gds", id: "200000001", retmode: "json" }
- *
- * Relationship map:
- *  - /esearch.fcgi  →  /esummary.fcgi  (idlist → id, hasMany)
+ * Shares NCBI's rate limit (3 req/s, 10 with apiKeys: { geo: "…" }).
  */
+
+const { eutils } = require('./ncbi')
+
+const { EUTILS, esearch, esummary } = eutils
+
+const prefixed = (prefix, value) => (value ? `${prefix}${value}` : null)
+
+const DATASET_FIELDS = {
+  accession: 'accession',
+  title: 'title',
+  summary: 'summary',
+  organism: 'taxon',
+  type: 'gdstype',
+  entryType: 'entrytype',
+  platform: (r) => prefixed('GPL', String(r.gpl || '').split(';')[0]),
+  series: (r) => prefixed('GSE', String(r.gse || '').split(';')[0]),
+  sampleCount: 'n_samples',
+  publicationDate: 'pdat',
+  pmids: (r) => (r.pubmedids || []).map(String),
+  bioproject: 'bioproject',
+  supplementaryFiles: 'suppfile',
+  ftpLink: 'ftplink'
+}
+
+const DATASET_RELATIONS = [
+  { alias: 'publications', description: 'PubMed citations describing this dataset', catalog: 'pubmed', entity: 'article', localKey: 'pmids', foreignKey: 'pmid', type: 'hasMany' }
+]
+
 module.exports = {
   name: 'geo',
-  label: 'GEO – Gene Expression Omnibus (REST)',
-  description: 'NCBI Gene Expression Omnibus — public repository of high-throughput functional genomic data (microarray, RNA-seq, ChIP-seq). Use db=gds and retmode=json in where params. Accessions: GSE (series), GSM (sample), GDS (dataset), GPL (platform).',
-  driver: 'rest',
-  connection: {
-    database: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
-  },
+  label: 'GEO – Gene Expression Omnibus',
+  description: 'NCBI Gene Expression Omnibus: microarray and sequencing-based functional genomics series (GSE), curated datasets (GDS), platforms and samples, searchable with Entrez query syntax and linked to their publications.',
+  category: 'Expression & samples',
+  homepage: 'https://www.ncbi.nlm.nih.gov/geo/',
+  docs: 'https://www.ncbi.nlm.nih.gov/geo/info/geo_paccess.html',
+  license: 'Free to use; submitters may hold rights to some data (NCBI policy)',
+  driver: 'api',
+  ...EUTILS,
   entities: [
     {
-      // Use where: { db: "gds", term: "…", retmode: "json" }
-      name: '/esearch.fcgi',
-      columns: ['count', 'retmax', 'retstart', 'idlist', 'translationset', 'querytranslation'],
-      relations: [
-        { entity: '/esummary.fcgi', foreignKey: 'idlist', type: 'hasMany', alias: 'datasets' }
-      ]
+      name: 'datasets',
+      description: 'GEO records (series, datasets, platforms, samples) matching a query',
+      params: {
+        term: { required: true, description: 'Entrez GDS query, e.g. "TP53 AND gse[ETYP] AND Homo sapiens[ORGN]" — https://www.ncbi.nlm.nih.gov/geo/info/qqtutorial.html' },
+        entryType: { description: 'Restrict to gse, gds, gpl or gsm' }
+      },
+      resolve: async (params, ctx) => {
+        const term = params.entryType ? `(${params.term}) AND ${params.entryType}[ETYP]` : params.term
+        return esummary(ctx, 'gds', await esearch(ctx, 'gds', term))
+      },
+      fields: DATASET_FIELDS,
+      example: { term: 'TP53 AND Homo sapiens[ORGN]', entryType: 'gse' },
+      relations: DATASET_RELATIONS
     },
     {
-      // Use where: { db: "gds", id: "<uid>", retmode: "json" }
-      name: '/esummary.fcgi',
-      columns: ['result', 'uids'],
-      relations: [
-        { entity: '/esearch.fcgi', foreignKey: 'pubmed_id', type: 'hasOne', alias: 'pubmedArticle', catalog: 'pubmed' }
-      ]
-    },
-    {
-      // Use where: { dbfrom: "gds", db: "sra", id: "<uid>", retmode: "json" }
-      name: '/elink.fcgi',
-      columns: ['linksets'],
-      relations: []
+      name: 'dataset',
+      description: 'One GEO record by accession (GSE, GDS, GPL or GSM)',
+      params: {
+        accession: { required: true, description: 'GEO accession, e.g. GSE2034' }
+      },
+      resolve: async (params, ctx) => {
+        // An accession search also matches the record's samples and platforms;
+        // keep only the record that carries the accession itself.
+        const wantedAccession = String(params.accession).toUpperCase()
+        const ids = await esearch(ctx, 'gds', `${wantedAccession}[ACCN]`, { retmax: 50 })
+        return (await esummary(ctx, 'gds', ids)).filter((doc) => String(doc.accession).toUpperCase() === wantedAccession)
+      },
+      fields: DATASET_FIELDS,
+      example: { accession: 'GSE2034' },
+      relations: DATASET_RELATIONS
     }
   ]
 }

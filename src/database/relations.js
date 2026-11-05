@@ -24,6 +24,7 @@ async function fetchRelation (executeQuery, connection, row, rel) {
     type = 'hasMany',
     select,
     where,
+    limit,
     relations: nested
   } = rel
 
@@ -43,6 +44,8 @@ async function fetchRelation (executeQuery, connection, row, rel) {
       from: entity,
       select,
       where: { ...(where || {}), [matchKey || foreignKey]: parentId },
+      // hasOne only ever uses the first row, so never fetch more than that.
+      limit: type === 'hasOne' ? 1 : limit,
       relations: nested
     })
     return type === 'hasMany' ? data : (data[0] ?? null)
@@ -57,6 +60,7 @@ async function fetchRelation (executeQuery, connection, row, rel) {
       from: entity,
       select,
       where: { ...(where || {}), [matchKey || ownerKey]: foreignValue },
+      limit: 1,
       relations: nested
     })
     return data[0] ?? null
