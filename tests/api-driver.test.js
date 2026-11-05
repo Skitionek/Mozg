@@ -430,3 +430,224 @@ describe('api driver: field paths', () => {
     assert.equal(getPath(rec, 'x|y|z'), 'zed')
   })
 })
+
+describe('api driver: formats, auth and introspection', () => {
+  const FORMATS = {
+    name: 'test-formats',
+    label: 'Formats',
+    driver: 'api',
+    connection: { database: 'https://formats.test', headers: { 'X-Base': '1' } },
+    auth: { header: 'Authorization', prefix: 'Token ' },
+    rateLimit: { requestsPerSecond: 1000 },
+    rateLimitWithKey: { requestsPerSecond: 2000 },
+    entities: [
+      { name: 'xmlThing', description: 'xml', path: '/xml', params: {}, format: 'xml', rows: 'root.item', fields: { id: '@id', label: 'label' } },
+      { name: 'textThing', description: 'text', path: '/text', params: {}, format: 'text', parse: (text) => text.trim().split('\n').map((line) => ({ line })), fields: { line: 'line' } },
+      { name: 'textNoParse', description: 'text without parser', path: '/text', params: {}, format: 'text', fields: { line: 'line' } },
+      { name: 'paged', description: 'page-numbered', path: '/paged', params: {}, paginate: { page: 'page', pageBase: 1, limit: 'pageSize' }, fields: { id: 'id' } },
+      { name: 'posted', description: 'json body', path: '/post', method: 'POST', params: { term: {} }, body: (p) => ({ q: p.term }), fields: { id: 'id', name: 'name' } },
+      {
+        name: 'withBadRelation',
+        description: 'same-source relation that fails',
+        path: '/xml',
+        params: {},
+        format: 'xml',
+        rows: 'root.item',
+        fields: { id: '@id', label: 'label' },
+        relations: [{ alias: 'broken', entity: 'posted', localKey: 'id', foreignKey: 'nope', type: 'hasMany' }]
+      }
+    ]
+  }
+
+  let unregisterFormats
+  before(() => { unregisterFormats = registerCatalog(FORMATS) })
+  after(() => unregisterFormats())
+
+  test('parses XML and maps attributes', async () => {
+    route(/formats\.test\/xml$/, () => json(200, '<root><item id="a"><label>Alpha</label></item><item id="b"><label>Beta</label></item></root>'))
+    const { data } = await executeQuery({ source: 'test-formats', from: 'xmlThing' })
+    assert.deepEqual(data, [{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Beta' }])
+  })
+
+  test('parses text with the entity parser, and refuses text without one', async () => {
+    route(/formats\.test\/text$/, () => json(200, 'one\ntwo\n'))
+    const { data } = await executeQuery({ source: 'test-formats', from: 'textThing' })
+    assert.deepEqual(data, [{ line: 'one' }, { line: 'two' }])
+    await assert.rejects(executeQuery({ source: 'test-formats', from: 'textNoParse' }), /needs a parse\(text\) function/)
+  })
+
+  test('maps offset onto a page number when the API pages by number', async () => {
+    route(/formats\.test\/paged$/, () => json(200, [{ id: 1 }]))
+    await executeQuery({ source: 'test-formats', from: 'paged', limit: 10, offset: 20 })
+    assert.equal(requests[0].url.searchParams.get('page'), '3')
+    assert.equal(requests[0].url.searchParams.get('pageSize'), '10')
+  })
+
+  test('posts a JSON body built from the parameters', async () => {
+    route(/formats\.test\/post$/, (u, init) => {
+      assert.equal(init.method, 'POST')
+      assert.deepEqual(JSON.parse(init.body), { q: 'kinase' })
+      assert.equal(u.searchParams.get('term'), null)
+      return json(200, [{ id: 2, name: 'Zeta' }, { id: 1, name: 'alpha' }])
+    })
+    const { data } = await executeQuery({ source: 'test-formats', from: 'posted', where: { term: 'kinase' }, orderBy: 'name', orderDirection: 'desc', select: ['name'] })
+    assert.deepEqual(data, [{ name: 'Zeta' }, { name: 'alpha' }])
+  })
+
+  test('sends a key from connection.user in the declared header, with its prefix', async () => {
+    route(/formats\.test\/paged$/, (u, init) => {
+      assert.equal(init.headers.Authorization, 'Token abc')
+      assert.equal(init.headers['X-Base'], '1', 'catalog connection headers are sent')
+      return json(200, [{ id: 1 }])
+    })
+    await executeQuery({ source: 'test-formats', connection: { user: 'abc' }, from: 'paged' })
+  })
+
+  test('reports a failing same-source relation in place', async () => {
+    route(/formats\.test\/xml$/, () => json(200, '<root><item id="a"><label>Alpha</label></item></root>'))
+    const { data } = await executeQuery({ source: 'test-formats', from: 'withBadRelation', include: ['broken'] })
+    assert.equal(data[0].id, 'a')
+    assert.match(data[0].broken.error, /relation broken failed: .*does not accept "nope"/)
+  })
+
+  test('introspects a source into tables and columns', async () => {
+    const { introspect } = require('../src/database/drivers/api')
+    const schema = await introspect({ driver: 'api', source: 'test-formats' })
+    const posted = schema.tables.find((t) => t.name === 'posted')
+    assert.deepEqual(posted.columns.map((c) => c.name), ['id', 'name'])
+  })
+
+  test('a connection that matches no source is refused with guidance', async () => {
+    await assert.rejects(
+      executeQuery({ connection: { driver: 'api', database: 'https://nowhere.test' }, from: 'x' }),
+      /needs a catalog source/
+    )
+  })
+
+  test('a non-api catalog entry cannot be run by the api driver', async () => {
+    const { executeQuery: runApi } = require('../src/database/drivers/api')
+    await assert.rejects(runApi({ connection: { driver: 'api', source: 'blog' }, from: 'users' }), /uses the sqlite3 driver, not api/)
+  })
+
+  test('a malformed path token is treated as a plain key', () => {
+    assert.equal(getPath({ 'a]b': 1 }, 'a]b'), 1)
+  })
+})
+
+describe('api driver: edge cases', () => {
+  const EDGES = {
+    name: 'test-edges',
+    label: 'Edges',
+    driver: 'api',
+    connection: { database: 'https://edges.test/' },
+    emptyStatus: [404, 400],
+    auth: { param: 'key', required: true },
+    entities: [
+      {
+        name: 'listy',
+        description: 'arrays, transforms, defaults',
+        path: '/list/{ids}',
+        params: {
+          ids: { join: ';' },
+          upper: { transform: (v) => String(v).toUpperCase() },
+          tag: { in: 'filter', field: 'tags' }
+        },
+        headers: { 'X-Entity': 'e' },
+        paginate: { limit: 'n', default: 7 },
+        rows: (body) => body.single,
+        fields: (r) => ({ id: r.id, tags: r.tags, score: r.score }),
+        columns: ['id', 'tags', 'score']
+      },
+      {
+        name: 'partial',
+        description: 'graphql with partial errors',
+        path: '/gql',
+        params: {},
+        graphql: { query: '{ a b }' },
+        rows: 'data.a',
+        fields: { a: 'x' }
+      },
+      {
+        name: 'tsvCustom',
+        description: 'tsv with own parser',
+        path: '/tsv',
+        params: {},
+        format: 'tsv',
+        parse: (text) => text.split('\n').filter(Boolean).map((l) => ({ v: l })),
+        fields: { v: 'v' }
+      },
+      {
+        name: 'absolute',
+        description: 'resolve reaching another URL',
+        params: {},
+        resolve: async (params, ctx) => [await ctx.request('https://other.test/x', { query: { q: 1 } })],
+        fields: { ok: 'ok' }
+      }
+    ]
+  }
+
+  let unregisterEdges
+  before(() => { unregisterEdges = registerCatalog(EDGES) })
+  after(() => unregisterEdges())
+
+  const KEYS = { apiKeys: { 'test-edges': 'K' } }
+
+  test('joins array path values, applies transforms and default page size, filters on array fields', async () => {
+    route(/edges\.test\/list\//, (u, init) => {
+      assert.equal(init.headers['X-Entity'], 'e')
+      return json(200, { single: [{ id: 1, tags: ['A', 'b'], score: 2 }, { id: 2, tags: ['c'], score: null }] })
+    })
+    const { data } = await executeQuery({ source: 'test-edges', from: 'listy', where: { ids: ['x', 'y'], upper: 'abc', tag: 'a' }, offset: 0, ...KEYS })
+    const u = requests[0].url
+    assert.equal(u.pathname, '/list/x%3By')
+    assert.equal(u.searchParams.get('upper'), 'ABC')
+    assert.equal(u.searchParams.get('key'), 'K')
+    assert.deepEqual(data.map((r) => r.id), [1])
+  })
+
+  test('a rows function returning one object yields one row; returning nothing yields none', async () => {
+    route(/edges\.test\/list\//, (u) => json(200, u.pathname.endsWith('/one') ? { single: { id: 9 } } : {}))
+    assert.deepEqual((await executeQuery({ source: 'test-edges', from: 'listy', where: { ids: 'one' }, ...KEYS })).data.map((r) => r.id), [9])
+    assert.deepEqual((await executeQuery({ source: 'test-edges', from: 'listy', where: { ids: 'none' }, ...KEYS })).data, [])
+  })
+
+  test('sorts nulls last in either direction', async () => {
+    route(/edges\.test\/list\//, () => json(200, { single: [{ id: 1, score: null }, { id: 2, score: 5 }, { id: 3, score: 1 }, { id: 4, score: null }] }))
+    const asc = await executeQuery({ source: 'test-edges', from: 'listy', where: { ids: 'a' }, orderBy: 'score', ...KEYS })
+    assert.deepEqual(asc.data.map((r) => r.score), [1, 5, null, null])
+  })
+
+  test('an entry-level empty status reads as no rows', async () => {
+    route(/edges\.test\/list\//, () => json(400, 'no such id'))
+    assert.deepEqual((await executeQuery({ source: 'test-edges', from: 'listy', where: { ids: 'bad' }, ...KEYS })).data, [])
+  })
+
+  test('GraphQL errors alongside data are tolerated', async () => {
+    route(/edges\.test\/gql$/, () => json(200, { data: { a: [{ x: 1 }] }, errors: [{ message: 'b is deprecated' }] }))
+    assert.deepEqual((await executeQuery({ source: 'test-edges', from: 'partial', ...KEYS })).data, [{ a: 1 }])
+  })
+
+  test('a TSV entity may bring its own parser', async () => {
+    route(/edges\.test\/tsv$/, () => json(200, 'one\ntwo\n'))
+    assert.deepEqual((await executeQuery({ source: 'test-edges', from: 'tsvCustom', ...KEYS })).data, [{ v: 'one' }, { v: 'two' }])
+  })
+
+  test('resolve can reach an absolute URL, still carrying the key', async () => {
+    route(/other\.test\/x$/, (u) => {
+      assert.equal(u.searchParams.get('key'), 'K')
+      assert.equal(u.searchParams.get('q'), '1')
+      return json(200, { ok: true })
+    })
+    assert.deepEqual((await executeQuery({ source: 'test-edges', from: 'absolute', ...KEYS })).data, [{ ok: true }])
+  })
+
+  test('a required key is demanded before any request, for resolve entities too', async () => {
+    await assert.rejects(executeQuery({ source: 'test-edges', from: 'absolute' }), /requires an API key/)
+    await assert.rejects(executeQuery({ source: 'test-edges', from: 'partial' }), /requires an API key/)
+    assert.equal(requests.length, 0)
+  })
+
+  test('a missing required parameter without an example still names the parameter', async () => {
+    await assert.rejects(executeQuery({ source: 'test-edges', from: 'listy', ...KEYS }), /requires where\.ids$/)
+  })
+})

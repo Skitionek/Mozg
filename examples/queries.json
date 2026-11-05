@@ -162,6 +162,138 @@
     "query": "{\n  catalog {\n    name\n    label\n    description\n    driver\n    entities {\n      name\n      columns\n      relations { entity type alias foreignKey }\n    }\n  }\n}"
   },
   {
+    "name": "Life science – list connected sources",
+    "description": "Every catalog source served by the api driver, grouped by category, with its entities and their parameters.",
+    "category": "Life science",
+    "query": "{\n  catalog(driver: api) {\n    name\n    label\n    category\n    entities {\n      name\n      description\n      params { name required }\n      example\n      relations { alias catalog entity description }\n    }\n  }\n}"
+  },
+  {
+    "name": "UniProt – p53 with structures, AlphaFold model and pathways",
+    "description": "One protein joined to PDBe (experimental structures), AlphaFold DB (predicted model) and Reactome (pathways) — four databases in one query.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"uniprot\"\n    from: \"protein\"\n    where: { uniprotAccession: \"P04637\" }\n    select: [\"uniprotAccession\", \"symbol\", \"name\", \"length\", \"ensemblGeneId\"]\n    include: [\"structures\", \"alphafold\", \"pathways\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "Ensembl – gene by symbol, its proteins and tissue expression",
+    "description": "Look up TP53 in Ensembl, then follow to UniProt proteins and GTEx median expression per tissue.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"ensembl\"\n    from: \"geneBySymbol\"\n    where: { symbol: \"TP53\" }\n    include: [\"proteins\", \"expression\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "HGNC – human gene and its model-organism orthologs",
+    "description": "The approved HGNC record for TP53, with orthologs across mouse, rat, zebrafish, fly, worm and yeast from the Alliance of Genome Resources.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"hgnc\"\n    from: \"geneBySymbol\"\n    where: { symbol: \"TP53\" }\n    include: [\"orthologs\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "ChEMBL – aspirin: mechanism of action and its targets",
+    "description": "A drug's mechanisms of action, each with the ChEMBL target it acts on, plus the same structure in PubChem (joined by InChIKey).",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"chembl\"\n    from: \"molecule\"\n    where: { chemblId: \"CHEMBL25\" }\n    include: [\"mechanisms.target\", \"pubchem\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "PubChem – compound by name, linked to ChEMBL",
+    "description": "Resolve a compound name to its PubChem record and the matching ChEMBL molecule.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"pubchem\"\n    from: \"compoundByName\"\n    where: { name: \"imatinib\" }\n    include: [\"chembl\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "PubMed – search, with Europe PMC records",
+    "description": "The five most recent PubMed articles matching a query, each joined to its Europe PMC record (citation count, open-access status).",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"pubmed\"\n    from: \"articles\"\n    where: { term: \"TP53 AND apoptosis\" }\n    limit: 5\n    include: [\"europepmc\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "ClinVar – pathogenic variants in a gene",
+    "description": "Pathogenic TP53 variants from ClinVar, each joined to MyVariant.info annotations by rsId.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"clinvar\"\n    from: \"variantsForGene\"\n    where: { symbol: \"TP53\", significance: \"pathogenic\" }\n    limit: 5\n    include: [\"myvariant\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "Reactome – pathways of a protein and their sub-events",
+    "description": "Reactome pathways that include p53, each expanded to the reactions and sub-pathways it contains.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"reactome\"\n    from: \"pathwaysForProtein\"\n    where: { uniprotAccession: \"P04637\" }\n    limit: 3\n    include: [\"events\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "QuickGO – GO annotations with term definitions",
+    "description": "Biological-process annotations of p53, each with its Gene Ontology term.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"quickgo\"\n    from: \"annotations\"\n    where: { uniprotAccession: \"P04637\", aspect: \"biological_process\" }\n    limit: 5\n    include: [\"term\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "STRING – interaction partners mapped to UniProt",
+    "description": "The strongest STRING interaction partners of TP53, each resolved to its reviewed UniProt entry.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"string-db\"\n    from: \"partners\"\n    where: { identifier: \"TP53\", taxonId: 9606 }\n    limit: 5\n    include: [\"partner\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "PDB – structure, its chains and their proteins",
+    "description": "An RCSB PDB entry, its polymer entities, and the UniProt entry each chain belongs to.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"pdb\"\n    from: \"entry\"\n    where: { pdbId: \"1TUP\" }\n    include: [\"polymerEntities.protein\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "Rhea – reactions an enzyme catalyses, down to ChEBI compounds",
+    "description": "Biochemical reactions of EGFR from Rhea, with every participant resolved to its ChEBI compound.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"rhea\"\n    from: \"reactions\"\n    where: { uniprotAccession: \"P00533\" }\n    limit: 2\n    include: [\"participants.compound\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "OLS – find a disease term in MONDO",
+    "description": "Search the MONDO disease ontology through the EBI Ontology Lookup Service.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"ols\"\n    from: \"search\"\n    where: { q: \"breast carcinoma\", ontology: \"mondo\" }\n    limit: 5\n  }) { count data }\n}"
+  },
+  {
+    "name": "Open Targets – diseases associated with a gene",
+    "description": "Diseases most strongly associated with TP53 in the Open Targets Platform, each with its full disease record.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"opentargets\"\n    from: \"targetDiseases\"\n    where: { ensemblGeneId: \"ENSG00000141510\" }\n    limit: 5\n    include: [\"disease\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "Open Targets – targets for a disease, with their genes",
+    "description": "The top therapeutic targets for Marfan syndrome, each joined to its Ensembl gene.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"opentargets\"\n    from: \"diseaseTargets\"\n    where: { diseaseId: \"MONDO:0007947\" }\n    limit: 5\n    include: [\"gene\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "Open Targets – a drug and its indications",
+    "description": "Aspirin in the Open Targets Platform, with the diseases it is indicated for or being tested against.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"opentargets\"\n    from: \"drug\"\n    where: { chemblId: \"CHEMBL25\" }\n    include: [\"indications\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "GWAS Catalog – strongest associations near a gene",
+    "description": "Genome-wide significant associations mapped to APOE, strongest first, each with its study.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"gwas\"\n    from: \"associationsForGene\"\n    where: { symbol: \"APOE\" }\n    limit: 5\n    include: [\"study\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "gnomAD – loss-of-function constraint of a gene",
+    "description": "How intolerant TP53 is to loss-of-function variation in gnomAD (pLI, LOEUF), joined to its Open Targets record.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"gnomad\"\n    from: \"geneConstraint\"\n    where: { ensemblGeneId: \"ENSG00000141510\" }\n    include: [\"target\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "MyVariant.info – a variant across ClinVar, dbSNP and GWAS",
+    "description": "Aggregated annotations for one dbSNP id, with the GWAS associations reported for it.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"myvariant\"\n    from: \"variantByRsId\"\n    where: { rsId: \"rs28934578\" }\n    include: [\"gwasAssociations\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "CIViC – clinical evidence for a cancer gene",
+    "description": "Curated clinical-interpretation evidence for BRAF variants, each with its publication.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"civic\"\n    from: \"evidenceForGene\"\n    where: { symbol: \"BRAF\" }\n    limit: 5\n    include: [\"publication\"]\n  }) { count data }\n}"
+  },
+  {
+    "name": "ClinicalTrials.gov – trials of a drug for a condition",
+    "description": "Studies testing trastuzumab in breast cancer, with the Europe PMC articles that cite each trial.",
+    "category": "Life science",
+    "query": "{\n  query(input: {\n    source: \"clinicaltrials\"\n    from: \"studies\"\n    where: { condition: \"breast cancer\", intervention: \"trastuzumab\" }\n    limit: 5\n    include: [\"publications\"]\n  }) { count data }\n}"
+  },
+  {
     "name": "MySQL – Rfam: top RNA families by species count",
     "description": "Query the public Rfam MySQL database at EBI for the 10 RNA families annotated in the most species. Demonstrates the MySQL driver against a real bioinformatics database. Uses the publicly documented read-only credentials from https://rfam.org/help/database.",
     "category": "MySQL",
@@ -208,89 +340,5 @@
     "description": "Find all KEGG pathways associated with the human TP53 gene (hsa:7157) via the /link endpoint.",
     "category": "KEGG",
     "query": "{\n  query(input: {\n    connection: { driver: kegg, database: \"https://rest.kegg.jp\" }\n    from: \"/link/pathway\"\n    where: { _pathSuffix: \"hsa:7157\" }\n  }) { count data }\n}"
-  },
-  {
-    "name": "UniProt – search human insulin protein",
-    "description": "Search UniProtKB for the human insulin protein (INS_HUMAN). Returns accession, name, and organism.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://rest.uniprot.org\" }\n    from: \"/uniprotkb/search\"\n    where: { query: \"insulin AND organism_id:9606 AND reviewed:true\" }\n    limit: 5\n  }) { count data }\n}"
-  },
-  {
-    "name": "PDB – list polymer entities for a structure entry",
-    "description": "Fetch polymer entities for PDB entry 1TUP (p53 DNA-binding domain). Each entity is a unique protein chain.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://data.rcsb.org/rest/v1/core\" }\n    from: \"/polymer_entity\"\n    limit: 5\n  }) { count data }\n}"
-  },
-  {
-    "name": "InterPro – list Pfam protein families",
-    "description": "List Pfam protein family entries from InterPro. Covers conserved protein domains and families.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.ebi.ac.uk/interpro/api\" }\n    from: \"/entry/pfam\"\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "HMDB – search metabolites",
-    "description": "Search the Human Metabolome Database for metabolite entries. Returns metabolite IDs and names.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://hmdb.ca\" }\n    from: \"/metabolites.json\"\n    limit: 5\n  }) { count data }\n}"
-  },
-  {
-    "name": "STRING-DB – protein interaction network for TP53",
-    "description": "Find interaction partners for human TP53 protein in STRING-DB using the network endpoint.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://string-db.org/api/json\" }\n    from: \"/get_string_ids\"\n    where: { identifiers: \"TP53\", species: \"9606\" }\n    limit: 5\n  }) { count data }\n}"
-  },
-  {
-    "name": "Ensembl – list available species",
-    "description": "List all species available in Ensembl. Returns taxonomy IDs and common names for all supported organisms.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://rest.ensembl.org\" }\n    from: \"/info/species\"\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "Reactome – top-level human pathways",
-    "description": "Retrieve the top-level biological pathways for Homo sapiens from the Reactome database.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://reactome.org/ContentService\" }\n    from: \"/data/pathways/top/Homo sapiens\"\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "EMBL-EBI – search nucleotide sequences",
-    "description": "Search the ENA Portal API for nucleotide sequences in the INSDC archive. Returns accessions and metadata.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.ebi.ac.uk/ena/portal/api\" }\n    from: \"/search\"\n    where: { result: \"sequence\", query: \"tax_eq(9606)\" }\n    limit: 5\n  }) { count data }\n}"
-  },
-  {
-    "name": "FlyBase – search Drosophila genes",
-    "description": "Search the FlyBase Drosophila melanogaster gene database. Returns gene symbols, names, and IDs.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.flybase.org\" }\n    from: \"/api/v1.0/chado/gene\"\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "WormBase – C. elegans gene data",
-    "description": "Retrieve C. elegans gene information from WormBase REST API. Returns gene summaries and identifiers.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://wormbase.org\" }\n    from: \"/rest/widget/gene\"\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "ZFIN – zebrafish gene search",
-    "description": "Search the Zebrafish Information Network (ZFIN) for zebrafish gene markers. Returns ZFIN IDs and gene symbols.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://zfin.org/action/api\" }\n    from: \"/marker/search\"\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "PubMed – search biomedical literature",
-    "description": "Search PubMed for biomedical literature using E-utilities esearch. Returns PMIDs matching the query.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://eutils.ncbi.nlm.nih.gov/entrez/eutils\" }\n    from: \"/esearch.fcgi\"\n    where: { db: \"pubmed\", term: \"CRISPR gene editing\", retmode: \"json\" }\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "GenBank – search nucleotide sequences",
-    "description": "Search GenBank (NCBI nucleotide database) for DNA sequences using E-utilities. Returns accession IDs.",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://eutils.ncbi.nlm.nih.gov/entrez/eutils\" }\n    from: \"/esearch.fcgi\"\n    where: { db: \"nuccore\", term: \"insulin[Gene] AND Homo sapiens[Organism]\", retmode: \"json\" }\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
-    "name": "BRENDA – enzyme kinetics data",
-    "description": "Query the BRENDA enzyme database for enzyme kinetics data. Requires BRENDA credentials (email + password).",
-    "category": "Bioinformatics",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://www.brenda-enzymes.org/rest\" }\n    from: \"/enzyme\"\n    limit: 5\n  }) { count data }\n}"
   }
 ]

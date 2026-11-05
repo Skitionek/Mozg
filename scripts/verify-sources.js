@@ -139,8 +139,11 @@ function symbol (status) {
   return { ok: '✓', empty: '∅', broken: '✗', unavailable: '…', pending: '○' }[status] || '?'
 }
 
-async function main () {
-  const args = process.argv.slice(2)
+/**
+ * Run the CLI.  Returns the exit code rather than exiting, so it can be
+ * exercised in-process; `log` defaults to the console.
+ */
+async function main (args = process.argv.slice(2), log = console.log) {
   const followRelations = !args.includes('--no-relations')
   const staticOnly = args.includes('--static')
   const jsonIdx = args.indexOf('--json')
@@ -156,16 +159,16 @@ async function main () {
   const failures = []
 
   for (const entry of entries) {
-    console.log(`\n${entry.name} — ${entry.label}`)
+    log(`\n${entry.name} — ${entry.label}`)
     for (const problem of lintEntry(entry, lookup)) {
       // An unregistered target is someone else's work in progress, not this entry's fault.
       if (/is not registered/.test(problem)) {
         tally.pending++
-        console.log(`  ○ lint: ${problem}`)
+        log(`  ○ lint: ${problem}`)
       } else {
         tally.broken++
         failures.push(`lint: ${problem}`)
-        console.log(`  ✗ lint: ${problem}`)
+        log(`  ✗ lint: ${problem}`)
       }
     }
     if (staticOnly) continue
@@ -176,35 +179,35 @@ async function main () {
       const extra = r.status === 'ok'
         ? `${r.count} row(s), ${r.ms} ms${r.emptyFields.length ? `; empty: ${r.emptyFields.join(', ')}` : ''}`
         : r.error
-      console.log(`  ${symbol(r.status)} ${r.entity}  ${extra}`)
+      log(`  ${symbol(r.status)} ${r.entity}  ${extra}`)
       if (r.status === 'empty' || r.status === 'broken') failures.push(`${r.source}/${r.entity}: ${r.error}`)
       for (const rel of r.relations) {
         tally[rel.status]++
         const detail = rel.status === 'ok' ? (rel.note || `${rel.count} row(s)`) + `, ${rel.ms} ms` : rel.error
-        console.log(`      ${symbol(rel.status)} → ${rel.alias} (${rel.target})  ${detail}`)
+        log(`      ${symbol(rel.status)} → ${rel.alias} (${rel.target})  ${detail}`)
         if (rel.status === 'broken') failures.push(`${r.source}/${r.entity} → ${rel.alias}: ${rel.error}`)
       }
     }
   }
 
-  console.log(`\n${tally.ok} ok, ${tally.empty} empty, ${tally.broken} broken, ${tally.unavailable} unavailable, ${tally.pending} pending`)
+  log(`\n${tally.ok} ok, ${tally.empty} empty, ${tally.broken} broken, ${tally.unavailable} unavailable, ${tally.pending} pending`)
   if (failures.length) {
-    console.log('\nNeeds fixing in the catalog:')
-    for (const f of failures) console.log(`  ${f}`)
+    log('\nNeeds fixing in the catalog:')
+    for (const f of failures) log(`  ${f}`)
   }
 
   if (jsonFile) {
     require('node:fs').writeFileSync(jsonFile, JSON.stringify({ timestamp: new Date().toISOString(), tally, results: all }, null, 2))
   }
 
-  process.exit(failures.length ? 1 : 0)
+  return failures.length ? 1 : 0
 }
 
 if (require.main === module) {
-  main().catch((err) => {
+  main().then((code) => process.exit(code), (err) => {
     console.error('verify-sources: fatal error:', err.stack || err.message)
     process.exit(1)
   })
 }
 
-module.exports = { verifySource }
+module.exports = { verifySource, main }

@@ -171,3 +171,24 @@ describe('http.redactUrl', () => {
     assert.equal(out, 'https://x.org/a?token=***&apikey=***&my_secret=***&keep=1')
   })
 })
+
+describe('http.request: opt-in cache', () => {
+  test('serves a repeated GET from the cache until it expires', async () => {
+    // Given a short-lived cache
+    stubFetch(response(200, { n: 1 }))
+
+    // When the same URL is requested twice within the TTL, then again after it
+    await http.request('https://cache.example.org/a', { cacheTtlMs: 30 })
+    await http.request('https://cache.example.org/a', { cacheTtlMs: 30 })
+    assert.equal(calls.length, 1, 'second request served from cache')
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    await http.request('https://cache.example.org/a', { cacheTtlMs: 30 })
+
+    // Then only the expired one went upstream again
+    assert.equal(calls.length, 2)
+  })
+
+  test('redactUrl leaves an unparseable string alone', () => {
+    assert.equal(http.redactUrl('not a url'), 'not a url')
+  })
+})

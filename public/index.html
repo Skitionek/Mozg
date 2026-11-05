@@ -32,17 +32,6 @@
       flex-direction: column;
     }
 
-    /* ── WIP Banner ──────────────────────────────────────────── */
-    .wip-banner {
-      background: #7c3a00;
-      color: #ffe4b2;
-      font-size: .8rem;
-      text-align: center;
-      padding: .35rem 1rem;
-      flex-shrink: 0;
-    }
-    .wip-banner a { color: #ffc97a; }
-
     /* ── Header ─────────────────────────────────────────────── */
     header {
       background: var(--surface);
@@ -507,7 +496,6 @@
   to execute queries, or copy the generated GraphQL and paste it into your local instance.
 </div>
 
-<div class="wip-banner">⚠️ <strong>Work in Progress</strong> — This project is experimental. APIs and behaviour may change without notice.</div>
 
 <header>
   <h1><span>Mozg</span> – Cross-Database Query Interface</h1>
@@ -523,7 +511,7 @@
   <aside>
 
     <!-- Known Databases catalog -->
-    <div class="section-title" style="margin-top:0">Known Databases</div>
+    <div class="section-title" style="margin-top:0">Known Databases &amp; Sources</div>
     <select id="catalog-select">
       <option value="">— choose a known database —</option>
     </select>
@@ -820,6 +808,10 @@
 
   // ── State ────────────────────────────────────────────────────
   const relations = [];
+  // Catalog source mode (see applySource): declared up here because
+  // generateQuery() reads them during start-up.
+  let currentSource = null;
+  let includes = [];
   let knownTables = [];
   let examplesData = [];
 
@@ -935,13 +927,20 @@
     return conn;
   }
 
+  // A JSON value written as a GraphQL literal.  JSON's quoted object keys are
+  // not valid GraphQL syntax, so objects are re-emitted with bare field names.
+  function jsonToGQL(value) {
+    if (value === null || value === undefined) return 'null';
+    if (Array.isArray(value)) return `[${value.map(jsonToGQL).join(', ')}]`;
+    if (typeof value === 'object') {
+      const fields = Object.entries(value).map(([k, v]) => `${k}: ${jsonToGQL(v)}`);
+      return `{ ${fields.join(', ')} }`;
+    }
+    return JSON.stringify(value);
+  }
+
   function connToGQL(conn) {
-    const parts = Object.entries(conn).map(([k, v]) => {
-      if (typeof v === 'number') return `${k}: ${v}`;
-      if (typeof v === 'object' && v !== null) return `${k}: ${JSON.stringify(v)}`;
-      return `${k}: ${JSON.stringify(v)}`;
-    });
-    return `{ ${parts.join(', ')} }`;
+    return jsonToGQL(conn);
   }
 
   // ── Relations ────────────────────────────────────────────────
@@ -1009,7 +1008,7 @@
       input += `\n    select: [${cols}]`;
     }
     if (whereRaw) {
-      try { JSON.parse(whereRaw); input += `\n    where: ${whereRaw}`; } catch { /* ignore */ }
+      try { input += `\n    where: ${jsonToGQL(JSON.parse(whereRaw))}`; } catch { /* ignore */ }
     }
     if (limit)   input += `\n    limit: ${parseInt(limit, 10)}`;
     if (offset)  input += `\n    offset: ${parseInt(offset, 10)}`;
@@ -1541,8 +1540,6 @@
   // ── Catalog source mode ──────────────────────────────────────
   // An `api` catalog entry is queried by name (`source:`), with its entity's
   // example as a starting `where` and its relations offered as `include`s.
-  let currentSource = null;
-  let includes = [];
 
   function clearSource() {
     currentSource = null;

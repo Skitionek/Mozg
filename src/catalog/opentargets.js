@@ -191,7 +191,7 @@ module.exports = {
               rows { score datatypeScores { id score } disease { id name therapeuticAreas { name } } }
             }
           }
-        }`, { id: p.ensemblGeneId, size: pageSize(ctx), indirect: p.indirect != null ? Boolean(p.indirect) : null })
+        }`, { id: p.ensemblGeneId, size: pageSize(ctx), indirect: p.indirect != null ? Boolean(p.indirect) : undefined })
         if (!data.target) return []
         return data.target.associatedDiseases.rows.map((row) => ({ ...row, target: { id: data.target.id, approvedSymbol: data.target.approvedSymbol } }))
       },
@@ -279,7 +279,7 @@ module.exports = {
               rows { score datatypeScores { id score } target { id approvedSymbol approvedName } }
             }
           }
-        }`, { id: toOtId(p.diseaseId), size: pageSize(ctx), indirect: p.indirect != null ? Boolean(p.indirect) : null })
+        }`, { id: toOtId(p.diseaseId), size: pageSize(ctx), indirect: p.indirect != null ? Boolean(p.indirect) : undefined })
         if (!data.disease) return []
         return data.disease.associatedTargets.rows.map((row) => ({ ...row, disease: { id: data.disease.id, name: data.disease.name } }))
       },

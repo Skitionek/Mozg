@@ -68,7 +68,7 @@ function searchQuery (params) {
 }
 
 const PROTEIN_RELATIONS = [
-  { alias: 'structures', description: 'Experimental PDB structures mapped to this protein, best coverage first (PDBe SIFTS)', catalog: 'pdbe', entity: 'bestStructures', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
+  { alias: 'structures', description: 'Experimental PDB structures mapped to this protein, best coverage first (PDBe SIFTS; top 50 — query pdbe/bestStructures for all)', catalog: 'pdbe', entity: 'bestStructures', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany', limit: 50 },
   { alias: 'alphafold', description: 'AlphaFold predicted structure', catalog: 'alphafold', entity: 'prediction', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
   { alias: 'domains', description: 'InterPro families, domains and sites matched on this protein', catalog: 'interpro', entity: 'proteinEntries', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
   { alias: 'goAnnotations', description: 'Gene Ontology annotations (QuickGO)', catalog: 'quickgo', entity: 'annotations', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },

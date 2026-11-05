@@ -110,6 +110,17 @@ describe('normalizeQueryInput', () => {
     assert.equal(normalizeQueryInput(once), once)
   })
 
+  test('a plain driver connection is passed through without a catalog source', () => {
+    const out = normalizeQueryInput({ connection: { driver: 'sqlite3', database: ':memory:' }, from: 't', apiKeys: { x: 'k' } })
+    assert.equal(out.connection.source, undefined)
+    assert.deepEqual(out.connection.apiKeys, { x: 'k' })
+  })
+
+  test('an api connection identifies its source by base URL', () => {
+    const out = normalizeQueryInput({ connection: { driver: 'api', database: 'https://genes.example/' }, from: 'gene' })
+    assert.equal(out.connection.source, 'src-genes')
+  })
+
   test('apiKeys travel on the connection', () => {
     const out = normalizeQueryInput({ source: 'src-genes', from: 'gene', apiKeys: { 'src-proteins': 'k' } })
     assert.deepEqual(out.connection.apiKeys, { 'src-proteins': 'k' })

@@ -1,12 +1,10 @@
 # Mozg
 
-> ⚠️ **Work in Progress** — This project is experimental and under active development. APIs, schema, and behaviour may change without notice. Not recommended for production use.
-
-> A **"slow by design"** cross-database query layer with a single GraphQL endpoint.
+> A **"slow by design"** cross-database query layer with a single GraphQL endpoint — and a live, joined-up map of 47 public life-science databases.
 
 **Mozg** (Polish for "brain") is an experiment in thinking differently about data: instead of centralizing knowledge, it teaches systems how to connect it.
 
-At its core, Mozg is a **"slow by design" cognition layer** — a single GraphQL endpoint that doesn't store knowledge, but reasons across it. Rather than building yet another database, Mozg acts as a unifying language for describing relationships between entities that already exist: rows in PostgreSQL, nodes in Neo4j, documents in ArangoDB, pathways in BioCyc, or even resources behind REST APIs.
+At its core, Mozg is a **"slow by design" cognition layer** — a single GraphQL endpoint that doesn't store knowledge, but reasons across it. Rather than building yet another database, Mozg acts as a unifying language for describing relationships between entities that already exist: rows in PostgreSQL, nodes in Neo4j, documents in ArangoDB, pathways in BioCyc, proteins in UniProt, compounds in ChEMBL, or trials on ClinicalTrials.gov.
 
 Where most systems optimize for speed through precomputation and duplication, Mozg embraces a different trade-off: **freshness and flexibility over latency**. Every query is executed live, traversing connections across heterogeneous data sources at runtime. The result is not just data retrieval, but on-demand knowledge synthesis.
 
@@ -20,16 +18,49 @@ And because not every user wants to think in GraphQL, Mozg includes a browser-ba
 
 > In essence, Mozg is less like a database and more like a brain-shaped abstraction layer: it doesn't store memories — it connects them.
 
+```graphql
+# One protein → its structures, its predicted model, the pathways it acts in,
+# and the drug-target record of the gene that encodes it — five databases, one query.
+{
+  query(input: {
+    source: "uniprot"
+    from: "protein"
+    where: { uniprotAccession: "P04637" }
+    select: ["uniprotAccession", "symbol", "name", "ensemblGeneId"]
+    include: ["structures", "alphafold", "pathways", "target"]
+  }) { count data }
+}
+```
+
+---
+
+## Status
+
+Mozg has left the concept phase.  Some parts are production-ready; others are still maturing:
+
+| Area | Status |
+|------|--------|
+| Life-science sources (`api` driver, 47 sources) | **Stable.** Every entity's example and every relation is verified against the live APIs weekly; requests are throttled to each provider's published limits and retried on transient failures. |
+| PostgreSQL, MySQL, SQLite, Neo4j | **Stable.** Covered by unit tests; SQLite queries also run against a real database file in CI. |
+| KEGG, plain REST, Elasticsearch | **Stable.** |
+| OpenAPI, SOAP, OData, Thrift (via graphql-mesh) | **Beta.** Works, but less exercised. |
+| ArangoDB, BioCyc | **Beta.** Not exercised against live servers in CI. |
+| OWL ontology ingestion | **Experimental.** |
+
 ---
 
 ## Features
 
-- 🔌 **One endpoint** – `/graphql` queries any supported database or REST API
-- 🔑 **Credentials in the query** – connection parameters are part of the GraphQL input
-- 🔗 **Relation traversal** – `hasMany`, `hasOne`, `belongsTo` across tables / endpoints
-- 🗺 **Schema introspection** – discover tables & columns of SQL and graph databases; REST sources are described from their catalog entry
-- 🌐 **Web UI** – visual query builder at `/` with examples dropdown
+- 🔌 **One endpoint** – `/graphql` queries any supported database or API
+- 🧬 **47 life-science sources, joined up** – UniProt, Ensembl, NCBI, ChEMBL, PubChem, Open Targets, Reactome, PDB, AlphaFold, GWAS Catalog, ClinVar, ClinicalTrials.gov and more, with 660+ declared relations, 440+ of them between sources
+- 🧭 **`source` + `include`** – name a source and the relations you want; Mozg knows how to reach each source and how its records connect to the others
+- 🔑 **Credentials in the query** – connection parameters, or `apiKeys` per source, are part of the GraphQL input
+- 🔗 **Relation traversal** – `hasMany`, `hasOne`, `belongsTo` across tables, endpoints and sources
+- 🗺 **Schema introspection** – discover tables & columns of SQL and graph databases; catalog sources describe their own entities, parameters and fields
+- 🛡 **Polite, resilient HTTP** – timeouts, retries with backoff that honour `Retry-After`, per-host rate limits, request de-duplication
+- 🌐 **Web UI** – visual query builder at `/` with examples and a catalog browser
 - 🧪 **GraphiQL** – full IDE at `/graphql`
+- ⚡ **Streaming** – `POST /stream` returns progressive JSON as relations resolve
 - 🦉 **OWL ontology ingestion** – parse Turtle, RDF/XML, OWL/XML and Manchester Syntax ontologies via `ingestOntology` mutation
 
 ---
@@ -41,6 +72,13 @@ npm install
 npm start          # http://localhost:4000
 # or
 npm run dev        # restarts on file changes
+```
+
+Or with Docker:
+
+```bash
+docker build -t mozg .
+docker run -p 4000:4000 mozg
 ```
 
 ---
@@ -59,15 +97,68 @@ The Codespace will automatically:
 
 ---
 
-## Public Databases & APIs
+## Life-science sources
+
+Every source below is free to query and needs no account unless marked.  The
+full reference — each entity, its `where` parameters, output fields and
+relations — is in **[docs/sources.md](docs/sources.md)**, generated from the
+catalog.
+
+| Category | Sources |
+|----------|---------|
+| Genes & genomes | `ensembl` · `ncbi-gene` · `hgnc` · `mygene` · `alliance` (MGI, RGD, SGD, ZFIN, WormBase, FlyBase) · `flybase` · `genbank` · `ncbi` (all E-utilities databases) · `ena` |
+| Proteins & structures | `uniprot` · `pdb` · `pdbe` · `alphafold` · `interpro` · `rnacentral` |
+| Interactions & pathways | `string-db` · `intact` · `reactome` · `rhea` · `kegg` · `regulondb` |
+| Function & ontologies | `quickgo` · `geneontology` · `ols` (MONDO, EFO, HPO, GO, UBERON, CL, …) · `hpo` · `mesh` |
+| Chemistry & drugs | `chembl` · `pubchem` · `chebi` · `lipidmaps` · `rxnorm` · `openfda` · `dgidb` |
+| Disease & variants | `opentargets` · `monarch` · `gwas` · `clinvar` · `myvariant` · `gnomad` · `civic` |
+| Clinical | `clinicaltrials` |
+| Literature | `pubmed` · `europepmc` |
+| Expression & samples | `gtex` · `proteinatlas` · `geo` · `biosamples` · `pride` |
+
+### Querying a source
+
+```graphql
+{
+  query(input: {
+    source: "chembl"                          # which catalog source
+    from: "molecule"                          # which of its entities
+    where: { chemblId: "CHEMBL25" }           # the entity's parameters
+    include: ["mechanisms.target", "pubchem"] # catalog relations; dots go deeper
+    limit: 10
+  }) { count data }
+}
+```
+
+- **`where`** takes the entity's declared parameters — `catalog(name: "chembl")` lists them with an example for each.  An unknown key is an error, never a silently ignored filter.
+- **`include`** follows catalog relations by name, across sources.  `"mechanisms.target"` fetches the molecule's mechanisms, then each mechanism's target.  You can still pass explicit `relations` alongside.
+- **Identifiers have one name everywhere** — `uniprotAccession`, `ensemblGeneId`, `ncbiGeneId`, `hgncId`, `chemblId`, `pubchemCid`, `inchiKey`, `pmid`, `rsId`, `diseaseId`, … — which is what makes the joins line up.
+- **`raw: true`** returns records exactly as the source sent them, for fields the catalog does not map.
+- **`apiKeys: { ncbi: "…", openfda: "…" }`** passes optional keys that raise a provider's rate limit; keys never appear in error messages.
+- Relations are fetched per parent row and throttled per provider, so wide `include`s are slow by design — use `limit` on the parent query.
+
+The same input works on the streaming endpoint (`POST /stream` with the `QueryInput` as JSON), and the query builder at `/` lets you pick a source, an entity and the relations to include.
+
+### Adding a source
+
+A source is one file in `src/catalog/` describing its requests and records —
+no driver code.  See [`src/catalog/README.md`](src/catalog/README.md) for the
+format and conventions, then:
+
+```bash
+node scripts/verify-sources.js my-source   # runs every example and relation live
+npm test                                   # includes the catalog lint
+npm run docs:sources                       # regenerates docs/sources.md
+```
+
+---
+
+## Other databases & APIs
 
 The following free, public endpoints can be used directly — no sign-up required.
 
-### General
-
 | Name | Driver | Host | Database | User | Password | Notes |
 |------|--------|------|----------|------|----------|-------|
-| RNAcentral | `postgres` | `hh-pgsql-public.ebi.ac.uk` | `pfmegrnargs` | `reader` | *(public read-only — see [RNAcentral docs](https://rnacentral.org/help/public-database))* | ⚠️ Currently degraded: the public `reader` account has no `USAGE` on the `rnacen` schema, so introspection returns almost nothing and queries fail with *permission denied for schema rnacen* |
 | RFAM | `mysql` | `mysql-rfam-public.ebi.ac.uk` | `Rfam` | `rfamro` | *(empty)* | RNA families |
 | Neo4j Movies | `neo4j` | `demo.neo4jlabs.com` | `movies` | `movies` | *(public demo — see [Neo4j Labs](https://demo.neo4jlabs.com))* | Movie graph (scheme: `neo4j+s`) |
 | JSONPlaceholder | `rest` | – | `https://jsonplaceholder.typicode.com` | – | – | Fake REST data |
@@ -76,31 +167,7 @@ The following free, public endpoints can be used directly — no sign-up require
 | PokéAPI | `rest` | – | `https://pokeapi.co/api/v2` | – | – | Pokémon |
 | Jikan | `rest` | – | `https://api.jikan.moe/v4` | – | – | Anime (MyAnimeList) |
 
-### Bioinformatics
-
-All entries below are freely accessible without registration unless noted.
-Pass connection parameters as shown; entity names and `where` filters follow each catalog entry's documentation.
-
-| Name | Driver | Catalog key | Base URL | Notes |
-|------|--------|-------------|----------|-------|
-| NCBI E-utilities | `rest` | `ncbi` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | General access to all NCBI databases; pass `db=` in `where` |
-| GenBank | `rest` | `genbank` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | Nucleotide sequences; use `where: { db: "nuccore" }` |
-| PubMed | `rest` | `pubmed` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | Biomedical literature; use `where: { db: "pubmed" }` |
-| RefSeq | `rest` | `refseq` | `https://api.ncbi.nlm.nih.gov/datasets/v2` | Reference sequences via NCBI Datasets v2 API |
-| GEO | `rest` | `geo` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` | Gene expression; use `where: { db: "gds" }` |
-| UniProt | `rest` | `uniprot` | `https://rest.uniprot.org` | Protein knowledgebase (Swiss-Prot + TrEMBL) |
-| PDB | `rest` | `pdb` | `https://data.rcsb.org/rest/v1/core` | 3-D macromolecular structures |
-| InterPro | `rest` | `interpro` | `https://www.ebi.ac.uk/interpro/api` | Protein families and domains |
-| HMDB | `rest` | `hmdb` | `https://hmdb.ca` | Human metabolome; 200 000+ metabolites |
-| STRING | `rest` | `string-db` | `https://string-db.org/api/json` | Protein–protein interaction networks |
-| Ensembl | `rest` | `ensembl` | `https://rest.ensembl.org` | Vertebrate genome browser |
-| Reactome | `rest` | `reactome` | `https://reactome.org/ContentService` | Biological pathway knowledgebase |
-| KEGG | `kegg` | `kegg` | `https://rest.kegg.jp` | Pathway/compound/reaction; academic use; pass `where: { _pathSuffix: "…" }` for `/find`, `/get`, `/link` |
-| EMBL-EBI (ENA) | `rest` | `embl-ebi` | `https://www.ebi.ac.uk/ena/portal/api` | European Nucleotide Archive |
-| FlyBase | `rest` | `flybase` | `https://api.flybase.org` | Drosophila genetics and genomics |
-| WormBase | `rest` | `wormbase` | `https://wormbase.org` | *C. elegans* biology |
-| ZFIN | `rest` | `zfin` | `https://zfin.org/action/api` | Zebrafish genetics and genomics |
-| BRENDA | `rest` | `brenda` | `https://www.brenda-enzymes.org/rest` | Enzyme database; **free registration required** |
+BioCyc databases (`biocyc-*` catalog entries) use the `biocyc` driver; most require a BioCyc account, passed as `connection.user` / `connection.password`.
 
 ---
 
@@ -170,6 +237,23 @@ mutation {
   }
 }
 ```
+
+---
+
+## Running Mozg in production
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `PORT` | `4000` | HTTP port |
+| `MOZG_HTTP_TIMEOUT_MS` | `30000` | Timeout per outbound request |
+| `MOZG_HTTP_RETRIES` | `2` | Retries for 408/429/502/503/504 and network errors |
+| `MOZG_HTTP_CACHE_TTL_MS` | `0` (off) | Cache identical outbound GETs for this long — trades freshness for speed |
+| `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
+| `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |
+
+- `GET /healthz` answers `{"status":"ok"}` without touching any upstream, for load balancers and orchestrators.
+- The container runs as an unprivileged user and declares a `HEALTHCHECK`.
+- `npm run verify:sources` checks every life-science source and relation against the live APIs; `npm run health` probes every catalog entry.  Both run weekly in CI and upload their reports.
 
 ---
 

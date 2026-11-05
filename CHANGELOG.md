@@ -23,7 +23,26 @@ verified against the live APIs, and joined up across sources.
   `include: ["structures.entry"]`), pass per-source API keys, or get records
   exactly as the source sent them.  `connection` is now optional when `source`
   is given.  The streaming endpoint accepts the same shorthand.
-- **SOURCES_PLACEHOLDER**
+- **47 connected life-science sources** (206 entities, 663 relations, 441 of
+  them between sources), each entity verified against the live API:
+  - Genes & genomes: `ensembl`, `ncbi-gene`, `hgnc`, `mygene`, `alliance`,
+    `flybase`, `genbank`, `ncbi`, `ena`
+  - Proteins & structures: `uniprot`, `pdb`, `pdbe`, `alphafold`, `interpro`,
+    `rnacentral`
+  - Interactions & pathways: `string-db`, `intact`, `reactome`, `rhea`,
+    `regulondb` (and `kegg`, whose relations now resolve)
+  - Function & ontologies: `quickgo`, `geneontology`, `ols`, `hpo`, `mesh`
+  - Chemistry & drugs: `chembl`, `pubchem`, `chebi`, `lipidmaps`, `rxnorm`,
+    `openfda`, `dgidb`
+  - Disease & variants: `opentargets`, `monarch`, `gwas`, `clinvar`,
+    `myvariant`, `gnomad`, `civic`
+  - Clinical: `clinicaltrials`; Literature: `pubmed`, `europepmc`
+  - Expression & samples: `gtex`, `proteinatlas`, `geo`, `biosamples`, `pride`
+
+  Every entity and relation is listed in the generated `docs/sources.md`;
+  22 runnable life-science examples replace the old bioinformatics ones.
+- `limit` on relations (`RelationInput.limit`, and on catalog relations) to
+  cap related rows per parent; `hasOne`/`belongsTo` now fetch a single row.
 - **Resilient outbound HTTP** (`src/database/http.js`) for every network
   source: timeouts, retries with exponential backoff that honour
   `Retry-After`, per-host rate limits matching each API's published policy,
@@ -46,7 +65,7 @@ verified against the live APIs, and joined up across sources.
 - `registerCatalog(entry)` — register private sources when embedding Mozg.
 - Query builder: life-science sources grouped by category; choosing one fills
   in `source`, the entity's example `where`, and offers its relations as
-  `include` checkboxes.
+  `include` checkboxes.  The "Work in Progress" banner is gone.
 - `/healthz` endpoint, graceful shutdown on SIGTERM/SIGINT, a production
   `Dockerfile`, and a CI job that builds the image and checks `/healthz`.
 
@@ -73,5 +92,7 @@ verified against the live APIs, and joined up across sources.
   in the path, so every one of them failed.
 - `limit` is honoured for life-science sources (it was sent as
   JSONPlaceholder's `_limit`, which they ignore).
+- The query builder generated invalid GraphQL for any `where` clause or
+  connection `headers` (it pasted JSON, whose quoted keys GraphQL rejects).
 
 [Unreleased]: https://github.com/Skitionek/Mozg/commits/main
