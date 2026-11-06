@@ -99,6 +99,11 @@ describe('mesh adapter: Neo4j-shaped schema', () => {
     assert.deepEqual(data, [{ name: 'Barbara' }])
   })
 
+  test('an entity named after its node label finds the pluralised field', async () => {
+    const { data } = await mesh.executeQuery({ connection: NEO4J, from: 'User', where: { id: 2 }, select: ['name'] })
+    assert.deepEqual(data, [{ name: 'Barbara' }])
+  })
+
   test('a plain where value means equality', async () => {
     const { data } = await mesh.executeQuery({ connection: NEO4J, from: 'posts', where: { user_id: 1 } })
     assert.deepEqual(data.map((p) => p.title), ['Engines', 'Notes'])
