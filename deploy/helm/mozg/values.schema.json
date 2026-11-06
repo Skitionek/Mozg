@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Mozg chart values",
+  "type": "object",
+  "definitions": {
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": { "type": "object" },
+        "limits": { "type": "object" }
+      }
+    },
+    "scaleToZero": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "cooldownSeconds": { "type": "integer", "minimum": 0 },
+        "pollingIntervalSeconds": { "type": "integer", "minimum": 1 },
+        "initialCooldownSeconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": ["string", "number"] },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "required": ["name", "columns"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "columns": { "type": "array", "items": { "type": "string" } },
+        "obo": {
+          "type": "object",
+          "description": "OBO key (Bioregistry prefix) of each identifier column",
+          "additionalProperties": { "type": ["string", "array", "null"] }
+        },
+        "relations": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "engine": { "enum": ["postgres", "neo4j"] },
+        "image": { "$ref": "#/definitions/image" },
+        "database": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "username": { "type": "string", "minLength": 1 },
+        "existingSecret": { "type": "string" },
+        "dump": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "sha256": { "type": "string", "pattern": "^([0-9a-f]{64})?$" },
+            "format": { "enum": ["tar.gz", "tgz", "dump", "sql", "sql.gz"] },
+            "restoreJobs": { "type": "integer", "minimum": 1 },
+            "verifySQL": { "type": "string" },
+            "migrate": { "type": "boolean" }
+          }
+        },
+        "initSQL": { "type": "string" },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "size": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|k|M|G|T|P)?$" },
+            "storageClass": { "type": "string" },
+            "accessModes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" },
+        "startupTimeoutSeconds": { "type": "integer", "minimum": 10 },
+        "scaleToZero": { "$ref": "#/definitions/scaleToZero" },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+            "annotations": { "type": "object" }
+          }
+        },
+        "neo4j": {
+          "type": "object",
+          "properties": {
+            "heapSize": { "type": "string" },
+            "pageCacheSize": { "type": "string" },
+            "config": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } }
+          }
+        },
+        "downloaderImage": { "type": "string" },
+        "catalog": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "preset": { "type": "string" },
+            "label": { "type": "string" },
+            "description": { "type": "string" },
+            "category": { "type": "string" },
+            "entities": { "type": "array", "items": { "$ref": "#/definitions/entity" } }
+          }
+        },
+        "nodeSelector": { "type": "object" },
+        "tolerations": { "type": "array" },
+        "affinity": { "type": "object" }
+      }
+    }
+  },
+  "properties": {
+    "replicaCount": { "type": "integer", "minimum": 1 },
+    "image": { "$ref": "#/definitions/image" },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "ingress": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+    "resources": { "$ref": "#/definitions/resources" },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+    "podDisruptionBudget": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+    "mozg": {
+      "type": "object",
+      "properties": {
+        "httpTimeoutMs": { "type": "integer", "minimum": 1 },
+        "httpRetries": { "type": "integer", "minimum": 0 },
+        "httpCacheTtlMs": { "type": "integer", "minimum": 0 },
+        "allowPrivateMirrors": { "type": "boolean" },
+        "shutdownGraceMs": { "type": "integer", "minimum": 0 },
+        "wakeTimeoutMs": { "type": "integer", "minimum": 0 },
+        "demandWindowMs": { "type": "integer", "minimum": 0 },
+        "extraSourcesConfigMaps": { "type": "array", "items": { "type": "string" } },
+        "extraEnv": { "type": "array" }
+      }
+    },
+    "databaseDefaults": { "$ref": "#/definitions/database" },
+    "databases": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
+      "additionalProperties": { "$ref": "#/definitions/database" }
+    }
+  }
+}

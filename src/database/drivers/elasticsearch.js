@@ -1,29 +1,32 @@
 'use strict'
 
 /**
- * Elasticsearch driver.
+ * Elasticsearch / OpenSearch driver.
  *
- * Translates Mozg query inputs into Elasticsearch REST API calls.
- * The `from` field maps to the index name (e.g. "documents", "genes").
- * The `where` object may contain any Elasticsearch query parameters;
- * a special key `_body` (JSON string) is used as the request body for
- * POST-based search queries. All other where keys are passed as query params.
+ * `from` names an index, and a query searches it:
  *
- * Authentication is supported via:
- *  - user + password → HTTP Basic auth
- *  - user alone      → Bearer token
+ *   where    exact-match filters ({ user_id: 3, name: "Carl" }) — compared
+ *            against the field's keyword form when the mapping has one, so
+ *            analysed text fields still match whole values
+ *   limit    → size, offset → from, orderBy → sort (keyword form for text)
+ *   select   → _source filtering
+ *   relations  hasMany / hasOne / belongsTo via one batched `terms` query each
  *
- * Connection properties:
- *  database:  Base URL (e.g. "http://localhost:9200")
- *  user:      Optional username or API key
- *  password:  Optional password
+ * Reserved where keys:
+ *   _body   a raw search request body (JSON string), sent as-is
+ *   q / _q  a Lucene query string (query_string)
  *
- * Examples (POST body search):
- *  { from: "genes", where: { _body: '{"query":{"match":{"name":"BRCA1"}}}' } }
- *  { from: "documents/_search", where: { q: "apoptosis", size: "10" } }
+ * A `from` that names an API endpoint (`_cat/indices`, `users/_doc/1`) is
+ * fetched with GET, other where keys becoming URL parameters, as before.
+ *
+ * Connection: database = cluster base URL (http://localhost:9200);
+ * user + password → Basic auth, user alone → Bearer token.
  */
 
-const UNWRAP_KEYS = ['hits', 'documents', 'results', 'items', 'records']
+const http = require('../http')
+
+const MAX_WINDOW = 10_000 // index.max_result_window default
+const MAPPING_TTL_MS = 60_000
 
 function buildAuth (connection) {
   const { user, password } = connection
@@ -33,137 +36,204 @@ function buildAuth (connection) {
   return { Authorization: `Basic ${encoded}` }
 }
 
-function normalise (response) {
-  if (Array.isArray(response)) return response
-
-  // Elasticsearch _search response: { hits: { hits: [...] } }
-  if (response && response.hits && Array.isArray(response.hits.hits)) {
-    return response.hits.hits.map(h => ({ _id: h._id, _score: h._score, ...h._source }))
-  }
-
-  if (response && typeof response === 'object') {
-    for (const key of UNWRAP_KEYS) {
-      if (Object.prototype.hasOwnProperty.call(response, key)) {
-        const val = response[key]
-        if (Array.isArray(val)) return val
-        if (val && typeof val === 'object') return [val]
-      }
-    }
-    return [response]
-  }
-
-  return [response]
+function baseUrl (connection) {
+  return (connection.database || '').replace(/\/$/, '')
 }
 
-function applySelect (rows, select) {
-  if (!select || select.length === 0) return rows
-  return rows.map((row) => {
-    const filtered = {}
-    for (const field of select) {
-      if (Object.prototype.hasOwnProperty.call(row, field)) {
-        filtered[field] = row[field]
-      }
-    }
-    return filtered
+async function request (connection, path, { method = 'GET', body } = {}) {
+  const headers = {
+    Accept: 'application/json',
+    ...(connection.headers && typeof connection.headers === 'object' ? connection.headers : {}),
+    ...buildAuth(connection)
+  }
+  if (body != null) headers['Content-Type'] = 'application/json'
+  const { body: json } = await http.request(`${baseUrl(connection)}${path}`, {
+    method,
+    headers,
+    body: typeof body === 'string' ? body : (body != null ? JSON.stringify(body) : undefined)
   })
+  return json
+}
+
+/** Rows from a search response: each hit's _source, plus _id and _score. */
+function hitsToRows (response) {
+  if (response && response.hits && Array.isArray(response.hits.hits)) {
+    return response.hits.hits.map((h) => ({ _id: h._id, _score: h._score, ...h._source }))
+  }
+  if (Array.isArray(response)) return response
+  return response == null ? [] : [response]
+}
+
+// ── Mappings ────────────────────────────────────────────────────────────────
+
+const mappingCache = new Map()
+
+/** Flatten an index mapping into { field: { type, keyword } }. */
+function flattenProperties (properties, prefix = '') {
+  const out = {}
+  for (const [name, spec] of Object.entries(properties || {})) {
+    const path = prefix + name
+    if (spec.properties) Object.assign(out, flattenProperties(spec.properties, `${path}.`))
+    const keyword = spec.fields && Object.entries(spec.fields).find(([, f]) => f.type === 'keyword')
+    out[path] = { type: spec.type || 'object', keyword: keyword ? `${path}.${keyword[0]}` : null }
+  }
+  return out
+}
+
+async function getFields (connection, index) {
+  const key = `${baseUrl(connection)}|${index}|${connection.user || ''}`
+  const hit = mappingCache.get(key)
+  if (hit && hit.expires > Date.now()) return hit.fields
+  const json = await request(connection, `/${encodeURIComponent(index)}/_mapping`)
+  const fields = {}
+  for (const idx of Object.values(json || {})) {
+    Object.assign(fields, flattenProperties(idx.mappings && idx.mappings.properties))
+  }
+  mappingCache.set(key, { fields, expires: Date.now() + MAPPING_TTL_MS })
+  return fields
+}
+
+/** The field name to use for exact matching and sorting. */
+function exactField (fields, name) {
+  const f = fields[name]
+  if (f && f.type === 'text') return f.keyword || name
+  return name
+}
+
+function exactClause (fields, name, value) {
+  const field = exactField(fields, name)
+  return Array.isArray(value) ? { terms: { [field]: value } } : { term: { [field]: value } }
+}
+
+// ── Query ───────────────────────────────────────────────────────────────────
+
+function isEndpointPath (from) {
+  return /(^|\/)_/.test(from.replace(/^\//, ''))
+}
+
+async function search (connection, index, { where, select, limit, offset, orderBy, orderDirection }) {
+  const raw = where && where._body
+  let body
+  if (raw) {
+    body = typeof raw === 'string' ? JSON.parse(raw) : raw
+  } else {
+    const fields = await getFields(connection, index)
+    const filter = []
+    const must = []
+    for (const [k, v] of Object.entries(where || {})) {
+      if (k === 'q' || k === '_q') must.push({ query_string: { query: String(v) } })
+      else filter.push(exactClause(fields, k, v))
+    }
+    body = { query: filter.length || must.length ? { bool: { filter, must } } : { match_all: {} } }
+    if (orderBy) {
+      body.sort = [{ [exactField(fields, orderBy)]: { order: (orderDirection || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc', unmapped_type: 'keyword' } }]
+    }
+  }
+  if (select && select.length > 0) body._source = select
+  body.size = Math.min(limit != null ? limit : (body.size ?? 10), MAX_WINDOW)
+  if (offset) body.from = offset
+
+  return hitsToRows(await request(connection, `/${encodeURIComponent(index)}/_search`, { method: 'POST', body }))
 }
 
 async function executeQuery (input) {
-  const {
-    connection,
-    from,
-    select,
-    where,
-    limit,
-    offset
-  } = input
+  const { connection, from, select, where, relations, limit, offset } = input
+  const index = from.replace(/^\//, '')
 
-  const base = (connection.database || '').replace(/\/$/, '')
-  const indexPath = from.startsWith('/') ? from : `/${from}`
-
-  const authHeaders = buildAuth(connection)
-  const extraHeaders =
-    connection.headers && typeof connection.headers === 'object'
-      ? connection.headers
-      : {}
-
-  let url
-  let method
-  let body
-  let headers
-
-  const queryParams = where && typeof where === 'object'
-    ? Object.fromEntries(Object.entries(where).filter(([k]) => k !== '_body'))
-    : {}
-
-  if (limit != null) queryParams.size = String(limit)
-  if (offset != null) queryParams.from = String(offset)
-
-  const rawUrl = new URL(`${base}${indexPath}`)
-  for (const [k, v] of Object.entries(queryParams)) {
-    rawUrl.searchParams.set(k, v)
-  }
-  url = rawUrl.toString()
-
-  // If a JSON body is provided, use POST /_search
-  const bodyStr = where && where._body ? where._body : null
-  if (bodyStr) {
-    // Append /_search if not already present
-    if (!url.endsWith('/_search') && !url.includes('/_search?')) {
-      const u = new URL(url)
-      u.pathname = u.pathname.replace(/\/?$/, '/_search')
-      url = u.toString()
-    }
-    method = 'POST'
-    body = bodyStr
-    headers = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...extraHeaders,
-      ...authHeaders
+  let rows
+  if (isEndpointPath(index)) {
+    // An explicit API endpoint: GET it, other where keys as URL parameters.
+    const url = new URL(`${baseUrl(connection)}/${index}`)
+    for (const [k, v] of Object.entries(where || {})) url.searchParams.set(k, String(v))
+    if (limit != null) url.searchParams.set('size', String(limit))
+    if (offset != null) url.searchParams.set('from', String(offset))
+    rows = hitsToRows(await request(connection, url.pathname + url.search))
+    if (select && select.length > 0) {
+      rows = rows.map((row) => Object.fromEntries(select.filter((f) => Object.hasOwn(row, f)).map((f) => [f, row[f]])))
     }
   } else {
-    method = 'GET'
-    headers = {
-      Accept: 'application/json',
-      ...extraHeaders,
-      ...authHeaders
-    }
+    rows = await search(connection, index, input)
   }
 
-  const res = await globalThis.fetch(url, {
-    method,
-    headers,
-    ...(body ? { body } : {})
-  })
-
-  if (!res.ok) {
-    throw new Error(`Elasticsearch request failed: ${res.status} ${res.statusText} — ${url}`)
+  if (relations && relations.length > 0 && rows.length > 0) {
+    await loadRelations(connection, rows, relations)
   }
-
-  const json = await res.json()
-  let rows = normalise(json)
-  rows = applySelect(rows, select)
 
   return { data: rows, count: rows.length }
 }
 
-async function introspect (connection) {
-  const base = (connection.database || '').replace(/\/$/, '')
-  const authHeaders = buildAuth(connection)
-  const headers = { Accept: 'application/json', ...authHeaders }
+async function loadRelations (connection, rows, relations) {
+  for (const rel of relations) {
+    // A relation naming another catalog entry has no index here to join
+    // against; the connector resolves it against that entry's connection.
+    if (rel.catalog) {
+      const { resolveCrossCatalogRelation } = require('../relations')
+      const connector = require('../connector')
+      await resolveCrossCatalogRelation(connector.executeQuery, rows, rel)
+      continue
+    }
 
-  try {
-    const res = await globalThis.fetch(`${base}/_cat/indices?format=json`, { headers })
-    if (!res.ok) return { tables: [] }
-    const indices = await res.json()
-    const tables = Array.isArray(indices)
-      ? indices.map(idx => ({ name: idx.index || idx.index, columns: [] }))
-      : []
-    return { tables }
-  } catch {
-    return { tables: [] }
+    const { entity, localKey = '_id', foreignKey, ownerKey = '_id', alias, type = 'hasMany', select, where, relations: nested } = rel
+    const resultKey = alias || entity
+
+    try {
+      const isBelongsTo = type === 'belongsTo'
+      const sourceKey = isBelongsTo ? foreignKey : localKey
+      const targetKey = isBelongsTo ? ownerKey : foreignKey
+      const ids = [...new Set(rows.map((r) => r[sourceKey]).filter((v) => v != null))]
+      if (!ids.length) {
+        rows.forEach((r) => { r[resultKey] = type === 'hasMany' ? [] : null })
+        continue
+      }
+
+      const fields = select && select.length > 0 && !select.includes(targetKey) ? [targetKey, ...select] : select
+      let relRows
+      if (targetKey === '_id') {
+        const res = await request(connection, `/${encodeURIComponent(entity)}/_mget`, { method: 'POST', body: { ids: ids.map(String) } })
+        relRows = (res.docs || []).filter((d) => d.found).map((d) => ({ _id: d._id, ...d._source }))
+      } else {
+        relRows = await search(connection, entity, { where: { ...(where || {}), [targetKey]: ids }, select: fields, limit: MAX_WINDOW })
+      }
+      if (nested && nested.length > 0) await loadRelations(connection, relRows, nested)
+
+      const grouped = new Map()
+      for (const r of relRows) {
+        const k = String(r[targetKey])
+        if (!grouped.has(k)) grouped.set(k, [])
+        grouped.get(k).push(r)
+      }
+      for (const row of rows) {
+        const matches = grouped.get(String(row[sourceKey])) || []
+        row[resultKey] = type === 'hasMany' ? matches : (matches[0] ?? null)
+      }
+    } catch (err) {
+      const errObj = { error: `relation fetch failed for ${entity}: ${err.message}` }
+      rows.forEach((r) => { r[resultKey] = errObj })
+    }
   }
 }
 
-module.exports = { executeQuery, introspect }
+async function introspect (connection) {
+  const indices = await request(connection, '/_cat/indices?format=json')
+  const names = (Array.isArray(indices) ? indices : [])
+    .map((i) => i.index)
+    .filter((name) => name && !name.startsWith('.'))
+    .sort()
+
+  const tables = []
+  for (const name of names) {
+    const fields = await getFields(connection, name)
+    tables.push({
+      name,
+      columns: [
+        { name: '_id', type: 'keyword', nullable: false, defaultValue: null, isPrimaryKey: true },
+        ...Object.entries(fields)
+          .filter(([, f]) => f.type !== 'object')
+          .map(([field, f]) => ({ name: field, type: f.type, nullable: true, defaultValue: null, isPrimaryKey: false }))
+      ]
+    })
+  }
+  return { tables }
+}
+
+module.exports = { executeQuery, introspect, flattenProperties }

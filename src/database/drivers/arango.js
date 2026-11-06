@@ -2,14 +2,27 @@
 
 const { Database } = require('arangojs')
 
-// Connection cache
+/**
+ * ArangoDB driver.
+ *
+ * Every name a caller supplies — collection, attribute, sort key — reaches
+ * AQL as a bind parameter (`@@collection`, `doc[@attr]`), never as query
+ * text.  Interpolating them let a caller append arbitrary AQL, including
+ * REMOVE/UPDATE, which matters most when Mozg holds the credentials itself
+ * (a self-hosted database behind a deployment).
+ */
+
+// Connection cache, keyed by everything the client is built from — the
+// password included, so a wrong password never rides on a client another
+// caller already authenticated.  The key stays in this process's memory,
+// beside the client that holds the same password already.
 const dbCache = new Map()
 
 function getDatabase (config) {
   const scheme = config.scheme || 'http'
   const host = config.host || 'localhost'
   const port = config.port || 8529
-  const key = `${scheme}://${host}:${port}|${config.database}|${config.user}`
+  const key = JSON.stringify([scheme, host, port, config.database, config.user, config.password || ''])
 
   if (!dbCache.has(key)) {
     dbCache.set(
@@ -24,38 +37,60 @@ function getDatabase (config) {
   return dbCache.get(key)
 }
 
+/**
+ * Accumulates bind parameters for one AQL query.  `attr(name)` and
+ * `value(v)` return the placeholder to splice into the query text.
+ */
+function binder () {
+  const vars = {}
+  let n = 0
+  return {
+    vars,
+    collection (name) {
+      if (typeof name !== 'string' || name === '') throw new Error('A collection name is required')
+      vars['@coll' + n] = name
+      return `@@coll${n++}`
+    },
+    attr (name) {
+      if (typeof name !== 'string' || name === '') throw new Error('An attribute name is required')
+      vars['attr' + n] = name
+      return `@attr${n++}`
+    },
+    value (v) {
+      vars['val' + n] = v
+      return `@val${n++}`
+    }
+  }
+}
+
+/** `{ a: doc[@x], b: doc[@y] }` for a select list, else the whole document. */
+function projection (b, select) {
+  if (!select || select.length === 0) return 'doc'
+  return `{ ${select.map((field) => `[${b.value(field)}]: doc[${b.attr(field)}]`).join(', ')} }`
+}
+
+function filters (b, where) {
+  return Object.entries(where || {}).map(([k, v]) => `doc[${b.attr(k)}] == ${b.value(v)}`)
+}
+
 async function executeQuery (input) {
   const { connection, from, select, where, relations, limit, offset, orderBy, orderDirection } = input
   const db = getDatabase(connection)
+  const b = binder()
 
-  const bindVars = {}
-  let aqlStr = `FOR doc IN \`${from}\``
-
-  if (where && Object.keys(where).length > 0) {
-    const filters = Object.entries(where).map(([k, v], i) => {
-      bindVars[`val${i}`] = v
-      return `doc.${k} == @val${i}`
-    })
-    aqlStr += ` FILTER ${filters.join(' AND ')}`
+  let aql = `FOR doc IN ${b.collection(from)}`
+  const conds = filters(b, where)
+  if (conds.length) aql += ` FILTER ${conds.join(' AND ')}`
+  if (orderBy) aql += ` SORT doc[${b.attr(orderBy)}] ${(orderDirection || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC'}`
+  if (limit != null || offset) {
+    // AQL has no offset without a count; a count this large means "the rest".
+    aql += ` LIMIT ${b.value(offset || 0)}, ${b.value(limit != null ? limit : Number.MAX_SAFE_INTEGER)}`
   }
+  aql += ` RETURN ${projection(b, select)}`
 
-  if (orderBy) aqlStr += ` SORT doc.${orderBy} ${(orderDirection || 'asc').toUpperCase()}`
-
-  if (offset != null && limit != null) aqlStr += ` LIMIT ${offset}, ${limit}`
-  else if (offset != null) aqlStr += ` LIMIT ${offset}, 10000`
-  else if (limit != null) aqlStr += ` LIMIT ${limit}`
-
-  if (select && select.length > 0) {
-    const fields = select.map((s) => `${s}: doc.${s}`).join(', ')
-    aqlStr += ` RETURN { ${fields} }`
-  } else {
-    aqlStr += ' RETURN doc'
-  }
-
-  const cursor = await db.query(aqlStr, bindVars)
+  const cursor = await db.query(aql, b.vars)
   const rows = await cursor.all()
 
-  // Load document-style relations (foreign key on the child side)
   if (relations && relations.length > 0) {
     await loadRelations(db, rows, relations)
   }
@@ -67,38 +102,51 @@ async function loadRelations (db, rows, relations) {
   if (!rows.length) return
 
   for (const rel of relations) {
-    const { entity, localKey = '_key', foreignKey, alias, type = 'hasMany', select, where, relations: nested } = rel
+    // A relation naming another catalog entry has no collection here to join
+    // against; the connector resolves it against that entry's connection.
+    if (rel.catalog) {
+      const { resolveCrossCatalogRelation } = require('../relations')
+      const connector = require('../connector')
+      await resolveCrossCatalogRelation(connector.executeQuery, rows, rel)
+      continue
+    }
+
+    const { entity, localKey = '_key', foreignKey, ownerKey = '_key', alias, type = 'hasMany', select, where, relations: nested } = rel
     const resultKey = alias || entity
 
-    if (type === 'hasMany' || type === 'hasOne') {
-      const parentIds = [...new Set(rows.map((r) => r[localKey]).filter((v) => v != null))]
-      if (!parentIds.length) { rows.forEach((r) => { r[resultKey] = type === 'hasMany' ? [] : null }); continue }
-
-      const bindVars = { parentIds }
-      const filters = where ? Object.entries(where).map(([k, v], i) => { bindVars[`wv${i}`] = v; return `doc.${k} == @wv${i}` }) : []
-      const selectClause = select && select.length > 0 ? `{ ${select.map((s) => `${s}: doc.${s}`).join(', ')} }` : 'doc'
-      const aqlStr = `FOR doc IN \`${entity}\` FILTER doc.${foreignKey} IN @parentIds${filters.length ? ' AND ' + filters.join(' AND ') : ''} RETURN ${selectClause}`
-
-      const cursor = await db.query(aqlStr, bindVars)
-      const relRows = await cursor.all()
-      if (nested && nested.length > 0) await loadRelations(db, relRows, nested)
-
-      const grouped = {}
-      for (const r of relRows) { const k = r[foreignKey]; if (!grouped[k]) grouped[k] = []; grouped[k].push(r) }
-      for (const row of rows) {
-        row[resultKey] = type === 'hasMany' ? (grouped[row[localKey]] || []) : ((grouped[row[localKey]] || [])[0] ?? null)
+    try {
+      const isBelongsTo = type === 'belongsTo'
+      const sourceKey = isBelongsTo ? foreignKey : localKey
+      const targetKey = isBelongsTo ? ownerKey : foreignKey
+      const ids = [...new Set(rows.map((r) => r[sourceKey]).filter((v) => v != null))]
+      if (!ids.length) {
+        rows.forEach((r) => { r[resultKey] = type === 'hasMany' ? [] : null })
+        continue
       }
-    } else if (type === 'belongsTo') {
-      const foreignIds = [...new Set(rows.map((r) => r[foreignKey]).filter((v) => v != null))]
-      if (!foreignIds.length) { rows.forEach((r) => { r[resultKey] = null }); continue }
 
-      const aqlStr = `FOR doc IN \`${entity}\` FILTER doc._key IN @ids RETURN doc`
-      const cursor = await db.query(aqlStr, { ids: foreignIds })
-      const relRows = await cursor.all()
+      const b = binder()
+      const target = b.attr(targetKey)
+      const conds = [`doc[${target}] IN ${b.value(ids)}`, ...filters(b, where)]
+      // The join key must come back even when the caller's select leaves it out.
+      const fields = select && select.length > 0 && !select.includes(targetKey) ? [targetKey, ...select] : select
+      const aql = `FOR doc IN ${b.collection(entity)} FILTER ${conds.join(' AND ')} RETURN ${projection(b, fields)}`
+      const relRows = await (await db.query(aql, b.vars)).all()
       if (nested && nested.length > 0) await loadRelations(db, relRows, nested)
 
-      const byKey = Object.fromEntries(relRows.map((r) => [r._key, r]))
-      for (const row of rows) { row[resultKey] = byKey[row[foreignKey]] ?? null }
+      const grouped = new Map()
+      for (const r of relRows) {
+        const k = String(r[targetKey])
+        if (!grouped.has(k)) grouped.set(k, [])
+        grouped.get(k).push(r)
+      }
+      for (const row of rows) {
+        const matches = grouped.get(String(row[sourceKey])) || []
+        row[resultKey] = type === 'hasMany' ? matches : (matches[0] ?? null)
+      }
+    } catch (err) {
+      // Partial result: keep the parent rows, report the failed relation in place.
+      const errObj = { error: `relation fetch failed for ${entity}: ${err.message}` }
+      rows.forEach((r) => { r[resultKey] = errObj })
     }
   }
 }
@@ -112,7 +160,7 @@ async function introspect (connection) {
       .filter((c) => c.type === 2) // 2 = document, 3 = edge
       .map(async (col) => {
         // Sample one document to infer properties
-        const cursor = await db.query(`FOR doc IN \`${col.name}\` LIMIT 1 RETURN doc`)
+        const cursor = await db.query('FOR doc IN @@coll LIMIT 1 RETURN doc', { '@coll': col.name })
         const docs = await cursor.all()
         const sample = docs[0] || {}
         const columns = Object.entries(sample).map(([name, val]) => ({
@@ -129,4 +177,12 @@ async function introspect (connection) {
   return { tables }
 }
 
-module.exports = { executeQuery, introspect }
+/** Close every cached client's connections. */
+async function destroyAll () {
+  for (const db of dbCache.values()) {
+    if (typeof db.close === 'function') db.close()
+  }
+  dbCache.clear()
+}
+
+module.exports = { executeQuery, introspect, destroyAll }

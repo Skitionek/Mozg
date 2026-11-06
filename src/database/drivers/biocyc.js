@@ -1,33 +1,48 @@
 'use strict'
 
-// BioCyc / Pathway Tools web-service connector.
-//
-// Connection parameters:
-//   database  – organism database code, e.g. "ECOLI", "META", "HUMAN", "ARA"
-//   host      – optional; defaults to websvc.biocyc.org (cloud) or a local
-//               Pathway Tools server (e.g. localhost:1555)
-//   scheme    – "https" (default) or "http" (for local PTools)
-//   port      – optional; overrides scheme default
-//   user      – BioCyc account e-mail (optional for public read access)
-//   password  – BioCyc account password (optional)
-//
-// Supported entity types (from):
-//   genes, compounds, reactions, pathways, proteins, rna, organisms
+/**
+ * BioCyc / Pathway Tools web-service connector.
+ *
+ * Uses the documented Pathway Tools web services
+ * (https://biocyc.org/web-services.shtml):
+ *
+ *   apixml?fn=get-class-all-instances&id=ORG:Class&detail=low
+ *
+ * which returns every instance of a class with its common name, synonyms
+ * and references to related frames (a pathway's reactions, a gene's
+ * products).  The driver used to call `/ORG/class-instances?o=…`, an
+ * endpoint BioCyc no longer serves (it answers 400 with an HTML page).
+ *
+ * Connection:
+ *   database  organism database code, e.g. "ECOLI", "META", "HUMAN"
+ *   host      optional; defaults to websvc.biocyc.org, or a local Pathway
+ *             Tools server (scheme "http", port e.g. 1555)
+ *   user / password  BioCyc account.  Anonymous access covers little: most
+ *             databases, and anything beyond a small quota, need an account.
+ *
+ * Rows: { _id: frame id, name: common name, types: parent classes, synonyms,
+ * <other fields with '-' → '_'> }.  Fields that reference other frames hold
+ * frame ids, which is what relations follow: a relation's `foreignKey` names
+ * the parent field holding the related frames' ids (`reaction_list`,
+ * `product`), and `entity` names their class.
+ */
 
-const BIOCYC_CLASSES = ['genes', 'compounds', 'reactions', 'pathways', 'proteins', 'rna', 'organisms']
+const http = require('../http')
 
-// Map entity names → BioCyc class names
 const CLASS_MAP = {
-  genes: 'Gene',
-  compounds: 'Compound',
-  reactions: 'Reaction',
-  pathways: 'Pathway',
-  proteins: 'Protein',
-  rna: 'RNA',
-  organisms: 'Organism'
+  genes: 'Genes',
+  compounds: 'Compounds',
+  reactions: 'Reactions',
+  pathways: 'Pathways',
+  proteins: 'Proteins',
+  rna: 'RNAs',
+  organisms: 'Organisms'
 }
 
-// Session cookie cache keyed by user e-mail
+// A class listing is one large document, and BioCyc rations anonymous
+// requests, so the listing a query already fetched is reused briefly.
+const LISTING_TTL_MS = 5 * 60_000
+const listingCache = new Map()
 const sessionCache = new Map()
 
 function baseUrl (config) {
@@ -41,136 +56,160 @@ function baseUrl (config) {
 
 async function authenticate (config) {
   if (!config.user || !config.password) return null
-  if (sessionCache.has(config.user)) return sessionCache.get(config.user)
+  const key = `${baseUrl(config)}|${config.user}`
+  if (sessionCache.has(key)) return sessionCache.get(key)
 
-  const body = new URLSearchParams({ email: config.user, password: config.password })
-  const res = await fetch(`${baseUrl(config)}/credentials/login/`, {
+  const res = await globalThis.fetch(`${baseUrl(config)}/credentials/login/`, {
     method: 'POST',
-    body,
+    body: new URLSearchParams({ email: config.user, password: config.password }),
     redirect: 'manual'
   })
-
-  const raw = res.headers.get('set-cookie') || ''
-  // Extract the session cookie value (typically "BioCycSessionID=...")
-  const cookie = raw.split(';')[0] || null
-  if (cookie) sessionCache.set(config.user, cookie)
+  const cookie = (res.headers.get('set-cookie') || '').split(';')[0] || null
+  if (!cookie) throw new Error(`BioCyc login failed for ${config.user} (HTTP ${res.status})`)
+  sessionCache.set(key, cookie)
   return cookie
 }
 
 async function biocycGet (path, config) {
   const cookie = await authenticate(config)
-  const headers = { Accept: 'text/plain' }
+  const headers = { Accept: 'application/xml' }
   if (cookie) headers.Cookie = cookie
-
-  const url = `${baseUrl(config)}${path}`
-  const res = await fetch(url, { headers })
-  if (!res.ok) throw new Error(`BioCyc HTTP ${res.status}: ${res.statusText} — ${url}`)
-  return res.text()
+  const { body, status } = await http.request(`${baseUrl(config)}${path}`, {
+    headers,
+    format: 'xml',
+    rateLimit: { requestsPerSecond: 1, maxConcurrent: 1 },
+    allowStatus: [307]
+  })
+  if (status === 307) {
+    throw new Error('BioCyc requires an account for this request — pass your BioCyc login as connection.user / connection.password (https://biocyc.org/account.shtml)')
+  }
+  if (/^\s*<!DOCTYPE html/i.test(body)) throw new Error(`BioCyc answered with an HTML page instead of data for ${path}`)
+  return body
 }
 
-// Parse BioCyc attribute-value (AV) text format into plain objects.
-function parseAV (text) {
-  const records = []
-  let current = null
+function asArray (v) {
+  return v == null ? [] : Array.isArray(v) ? v : [v]
+}
 
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim()
-    if (!line || line === '-------') {
-      if (current) { records.push(current); current = null }
-      continue
-    }
-    if (line.startsWith('FRAME:')) {
-      current = { _id: line.slice(6).trim() }
-    } else if (current) {
-      const colon = line.indexOf(':')
-      if (colon === -1) continue
-      const key = line.slice(0, colon).trim().toLowerCase().replace(/-/g, '_')
-      const val = line.slice(colon + 1).trim()
-      if (current[key] === undefined) {
-        current[key] = val
-      } else if (Array.isArray(current[key])) {
-        current[key].push(val)
-      } else {
-        current[key] = [current[key], val]
-      }
-    }
+/** One frame element of an apixml response → a flat row. */
+function frameToRow (node) {
+  const row = { _id: node['@_frameid'] || node['@_ID'] }
+  for (const [key, raw] of Object.entries(node)) {
+    if (key.startsWith('@_')) continue
+    const values = asArray(raw).flatMap((item) => {
+      if (item == null) return []
+      if (typeof item !== 'object') return [item]
+      if (Object.hasOwn(item, '#text')) return [item['#text']]
+      // A container of references: <reaction-list><Reaction frameid=…/>…
+      const refs = Object.entries(item).filter(([k]) => !k.startsWith('@_')).flatMap(([, v]) => asArray(v))
+        .map((ref) => ref && ref['@_frameid']).filter(Boolean)
+      if (refs.length) return refs
+      return item['@_frameid'] ? [item['@_frameid']] : []
+    })
+    const field = key.replace(/-/g, '_')
+    row[field] = values.length === 1 && !/(_list|^synonym|^parent|^types)$/.test(field) ? values[0] : values
   }
+  row.name = row.common_name ?? row._id
+  row.types = row.parent ?? row.types ?? []
+  return row
+}
 
-  if (current) records.push(current)
-  return records
+function parseListing (xml) {
+  const { XMLParser } = require('fast-xml-parser')
+  const doc = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', parseTagValue: true }).parse(xml)
+  const root = doc['ptools-xml'] || {}
+  const rows = []
+  for (const [tag, nodes] of Object.entries(root)) {
+    if (tag === 'metadata' || tag.startsWith('@_')) continue
+    for (const node of asArray(nodes)) if (node && typeof node === 'object') rows.push(frameToRow(node))
+  }
+  return rows
+}
+
+async function listClass (config, className) {
+  const key = `${baseUrl(config)}|${config.database}|${className}|${config.user || ''}`
+  const hit = listingCache.get(key)
+  if (hit && hit.expires > Date.now()) return hit.rows
+
+  const id = encodeURIComponent(`${config.database}:${className}`)
+  const rows = parseListing(await biocycGet(`/apixml?fn=get-class-all-instances&id=${id}&detail=low`, config))
+  listingCache.set(key, { rows, expires: Date.now() + LISTING_TTL_MS })
+  return rows
+}
+
+function classFor (entity) {
+  return CLASS_MAP[String(entity).toLowerCase()] || entity
+}
+
+function matchesWhere (row, where) {
+  return Object.entries(where || {}).every(([k, v]) => [].concat(row[k] ?? row[k.toLowerCase()] ?? []).map(String).includes(String(v)))
+}
+
+function project (rows, select) {
+  if (!select || select.length === 0) return rows
+  return rows.map((row) => Object.fromEntries(select.filter((f) => Object.hasOwn(row, f)).map((f) => [f, row[f]])))
 }
 
 async function executeQuery (input) {
-  const { connection, from, where, limit, offset, relations } = input
-  const orgId = connection.database
-  const className = CLASS_MAP[from.toLowerCase()] || from
+  const { connection, from, where, select, limit, offset, orderBy, orderDirection, relations } = input
+  if (!connection.database) throw new Error('BioCyc needs connection.database: an organism database code such as ECOLI')
 
-  const text = await biocycGet(`/${orgId}/class-instances?o=${encodeURIComponent(className)}&detail=low`, connection)
-  let rows = parseAV(text)
+  let rows = (await listClass(connection, classFor(from))).filter((row) => matchesWhere(row, where))
 
-  // Client-side filtering
-  if (where && Object.keys(where).length > 0) {
-    rows = rows.filter((row) =>
-      Object.entries(where).every(([k, v]) => String(row[k.toLowerCase()] ?? '') === String(v))
-    )
+  if (orderBy) {
+    const sign = (orderDirection || 'asc').toLowerCase() === 'desc' ? -1 : 1
+    rows = [...rows].sort((a, b) => String(a[orderBy] ?? '').localeCompare(String(b[orderBy] ?? '')) * sign)
   }
+  rows = rows.slice(offset || 0, limit != null ? (offset || 0) + limit : undefined)
+  // Copies, so relations attached below never land in the shared listing.
+  rows = rows.map((row) => ({ ...row }))
 
-  if (offset != null) rows = rows.slice(offset)
-  if (limit != null) rows = rows.slice(0, limit)
-
-  // Resolve relations: fetch full detail for related frames
-  if (relations && relations.length > 0) {
-    for (const row of rows) {
-      for (const rel of relations) {
-        const relKey = rel.alias || rel.entity
-        const ids = [].concat(row[rel.foreignKey] || []).filter(Boolean)
-        if (!ids.length) { row[relKey] = rel.type === 'hasMany' ? [] : null; continue }
-
-        const relClass = CLASS_MAP[rel.entity.toLowerCase()] || rel.entity
-        const relRows = []
-        for (const id of ids) {
-          try {
-            const t = await biocycGet(`/${orgId}/class-instances?o=${encodeURIComponent(relClass)}&detail=low`, connection)
-            const parsed = parseAV(t).filter((r) => r._id === id)
-            relRows.push(...parsed)
-          } catch { /* skip inaccessible frames */ }
-        }
-        row[relKey] = rel.type === 'hasMany' ? relRows : (relRows[0] ?? null)
+  for (const rel of relations || []) {
+    if (rel.catalog) {
+      const { resolveCrossCatalogRelation } = require('../relations')
+      const connector = require('../connector')
+      await resolveCrossCatalogRelation(connector.executeQuery, rows, rel)
+      continue
+    }
+    const resultKey = rel.alias || rel.entity
+    try {
+      // One listing of the related class serves every parent row.
+      const byId = new Map((await listClass(connection, classFor(rel.entity))).map((r) => [r._id, r]))
+      for (const row of rows) {
+        const related = [].concat(row[rel.foreignKey] || []).map((id) => byId.get(id)).filter(Boolean)
+        row[resultKey] = rel.type === 'hasMany' || rel.type == null ? project(related, rel.select) : (project(related, rel.select)[0] ?? null)
       }
+    } catch (err) {
+      const errObj = { error: `relation fetch failed for ${rel.entity}: ${err.message}` }
+      rows.forEach((r) => { r[resultKey] = errObj })
     }
   }
 
-  return { data: rows, count: rows.length }
+  return { data: project(rows, select), count: rows.length }
+}
+
+const BASE_COLUMNS = ['_id', 'name', 'types', 'synonym', 'common_name']
+const EXTRA_COLUMNS = {
+  genes: ['product', 'left_end_position', 'right_end_position', 'transcription_direction'],
+  compounds: ['molecular_weight', 'formula', 'inchi'],
+  reactions: ['ec_number', 'enzymatic_reaction'],
+  pathways: ['reaction_list', 'taxonomic_range']
 }
 
 async function introspect (_connection) {
-  // BioCyc has a well-known fixed schema; return it statically.
-  const tables = BIOCYC_CLASSES.map((name) => ({
-    name,
-    columns: [
-      { name: '_id', type: 'String', nullable: false, defaultValue: null, isPrimaryKey: true },
-      { name: 'name', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'types', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false },
-      ...extraColumns(name)
-    ]
-  }))
-  return { tables }
-}
-
-function extraColumns (entity) {
-  const map = {
-    genes: [{ name: 'left_end_position', type: 'Integer', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'right_end_position', type: 'Integer', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'transcription_direction', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false }],
-    compounds: [{ name: 'molecular_weight', type: 'Float', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'formula', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'inchi', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false }],
-    reactions: [{ name: 'ec_number', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'enzymatic_reaction', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false }],
-    pathways: [{ name: 'taxonomic_range', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false },
-      { name: 'reaction_list', type: 'String', nullable: true, defaultValue: null, isPrimaryKey: false }]
+  // Every PGDB shares the Pathway Tools schema; describe it without a request.
+  return {
+    tables: Object.keys(CLASS_MAP).map((name) => ({
+      name,
+      columns: [...BASE_COLUMNS, ...(EXTRA_COLUMNS[name] || [])].map((column) => ({
+        name: column,
+        type: 'String',
+        nullable: column !== '_id',
+        defaultValue: null,
+        isPrimaryKey: column === '_id'
+      }))
+    }))
   }
-  return map[entity] || []
 }
 
-module.exports = { executeQuery, introspect }
+module.exports = { executeQuery, introspect, parseListing }
