@@ -35,9 +35,11 @@ podLabels: {}
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
+  # A high UID that cannot collide with a host user; the image needs no
+  # particular user (its files are world-readable, /tmp is an emptyDir).
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
   seccompProfile:
     type: RuntimeDefault
 
@@ -68,7 +70,25 @@ resources:
     cpu: 100m
     memory: 256Mi
   limits:
+    cpu: "1"
     memory: 1Gi
+
+# Restrict traffic with NetworkPolicies (needs a CNI that enforces them):
+# Mozg accepts traffic from anywhere and may call anything (it queries public
+# APIs); each self-hosted database accepts connections only from Mozg pods.
+networkPolicy:
+  enabled: true
+  # -- Who may reach Mozg (NetworkPolicy `from` peers); empty = anyone
+  ingressFrom: []
+
+# Resources of the helm test pod
+testResources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
 
 autoscaling:
   enabled: false

@@ -5,6 +5,8 @@ metadata:
   name: {{ include "mozg.fullname" . }}
   labels:
     {{- include "mozg.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" . | trim | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

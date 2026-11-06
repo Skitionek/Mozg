@@ -6,6 +6,8 @@ metadata:
   name: {{ include "mozg.fullname" . }}
   labels:
     {{- include "mozg.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.server" . | trim | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -16,6 +18,7 @@ spec:
   template:
     metadata:
       annotations:
+        {{- include "mozg.checkov.server" . | trim | nindent 8 }}
         # Restart when the catalog of self-hosted databases changes.
         checksum/sources: {{ include (print $.Template.BasePath "/sources-configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}

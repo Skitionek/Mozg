@@ -13,6 +13,8 @@ metadata:
   name: {{ include "mozg.db.fullname" $ctx }}
   labels:
     {{- include "mozg.db.labels" $ctx | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" $ | trim | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

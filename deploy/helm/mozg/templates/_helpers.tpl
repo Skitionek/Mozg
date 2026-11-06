@@ -117,3 +117,39 @@ mozg.io/database: {{ .name }}
 {{- define "mozg.db.image" -}}
 {{- printf "%s:%s" .db.image.repository (toString .db.image.tag) }}
 {{- end }}
+
+{{/*
+checkov skips, documented where they apply.  Each line is
+`checkov.io/skipN: <check>=<reason>`; .skips is a list of "<check>=<reason>".
+*/}}
+{{- define "mozg.checkov.render" -}}
+{{- range $i, $skip := . }}
+checkov.io/skip{{ add1 $i }}: {{ $skip | quote }}
+{{- end }}
+{{- end }}
+
+{{- define "mozg.checkov.ns" -}}
+CKV_K8S_21=The namespace is chosen at install time with helm install -n; the chart sets none on purpose
+{{- end }}
+
+{{- define "mozg.checkov.pull" -}}
+CKV_K8S_15=The pull policy is a value (image.pullPolicy); IfNotPresent suits tagged releases
+{{- end }}
+
+{{- define "mozg.checkov.digest" -}}
+CKV_K8S_43=Images are referenced by tag from values; pin a digest in image.tag if your policy requires it
+{{- end }}
+
+{{/* Annotations for the Mozg Deployment (on the resource and its pod template) */}}
+{{- define "mozg.checkov.server" -}}
+{{- include "mozg.checkov.render" (list
+    (include "mozg.checkov.ns" .)
+    (include "mozg.checkov.pull" .)
+    (include "mozg.checkov.digest" .)
+    "CKV_K8S_35=Mozg reads self-hosted database credentials from environment variables named in its catalog; they are never returned by the API") }}
+{{- end }}
+
+{{/* Annotations for a resource that is not a workload */}}
+{{- define "mozg.checkov.resource" -}}
+{{- include "mozg.checkov.render" (list (include "mozg.checkov.ns" .)) }}
+{{- end }}
