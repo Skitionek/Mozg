@@ -36,6 +36,9 @@ function createConnectionCache () {
   return { getOrCreate, destroyAll }
 }
 
+// Column name for the per-parent row number; never returned to callers.
+const ROW_NUMBER = '__mozg_rn'
+
 async function executeKnexQuery (getKnexInstance, input) {
   const { connection, from, select, where, relations, limit, offset, orderBy, orderDirection } = input
   const db = getKnexInstance(connection)
@@ -72,7 +75,7 @@ async function loadKnexRelations (db, rows, relations) {
       continue
     }
 
-    const { entity, localKey = 'id', foreignKey, ownerKey = 'id', alias, type = 'hasMany', select, where, relations: nested } = rel
+    const { entity, localKey = 'id', foreignKey, ownerKey = 'id', alias, type = 'hasMany', select, where, limit, relations: nested } = rel
     const resultKey = alias || entity
 
     try {
@@ -84,14 +87,21 @@ async function loadKnexRelations (db, rows, relations) {
         }
 
         let relQ = db(entity).whereIn(foreignKey, parentIds)
-        if (select && select.length > 0) {
-          const cols = select.includes(foreignKey) ? select : [foreignKey, ...select]
-          relQ = relQ.select(cols)
-        } else {
-          relQ = relQ.select('*')
-        }
         if (where) relQ = relQ.where(where)
-        const relRows = await relQ
+        const cols = select && select.length > 0 ? (select.includes(foreignKey) ? select : [foreignKey, ...select]) : ['*']
+
+        // A per-parent cap (hasOne is a cap of one) is applied inside the
+        // database, numbering each parent's rows with a window function, so
+        // a parent with thousands of related rows never ships them all.
+        const perParent = type === 'hasOne' ? 1 : limit
+        let relRows
+        if (perParent != null) {
+          const numbered = relQ.select([...cols, db.raw('row_number() over (partition by ?? order by ??) as ??', [foreignKey, foreignKey, ROW_NUMBER])])
+          relRows = (await db.select('*').from(numbered.as('mozg_numbered')).where(ROW_NUMBER, '<=', perParent))
+            .map(({ [ROW_NUMBER]: _n, ...row }) => row)
+        } else {
+          relRows = await relQ.select(cols)
+        }
 
         if (nested && nested.length > 0) await loadKnexRelations(db, relRows, nested)
 

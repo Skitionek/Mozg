@@ -45,17 +45,25 @@ Key files:
 
 ## Known deferred issues
 
-The following security and performance concerns are tracked in separate issues
-and should **not** be fixed inline — add a `// TODO(#issue)` comment instead:
+Re-checked against the code (see docs/connectors.md for the evidence).  Open
+items should **not** be fixed inline — add a `// TODO(#issue)` comment instead:
 
-| Category | Area | Description |
-|----------|------|-------------|
-| Security | `src/ontology/index.js` | SSRF: arbitrary server-side URL fetch; needs allowlist + timeout |
-| Security | `src/database/drivers/neo4j.js` | Cypher injection via unescaped identifiers (`from`, `orderBy`, `alias`) |
-| Security | `src/index.js` | Path traversal in static file server; needs `decodeURIComponent` + root-check |
-| Security | `src/database/drivers/sql.js` | Connection cache keyed without password; same-user different-password reuse |
-| Performance | `src/database/drivers/rest.js` | N+1 sub-requests per relation row; should be batched/parallelised |
-| Performance | `src/database/drivers/biocyc.js` | Refetches full class-instance list per related ID instead of building an index |
+| Category | Area | Status | Description |
+|----------|------|--------|-------------|
+| Performance | `src/database/drivers/rest.js` | Open (mitigated) | Relations issue one request per parent row (REST has no generic batch filter); they now run four at a time instead of one after another |
+| Performance | `src/database/drivers/mesh-adapter.js` | Open (mitigated) | Same per-row relation lookups for MySQL / Neo4j / OpenAPI / OData / SOAP — handler filter types share no generic `in` operator — now four at a time |
+| Performance | `src/database/drivers/{sqlite3,mesh-adapter,arango}.js` | Open | Connection/source caches have no eviction; long-running servers that see many distinct connections grow without bound |
+
+Resolved since this table was first written:
+
+| Area | Resolution |
+|------|------------|
+| `src/ontology/index.js` SSRF | Fetches go through `secureFetch` (`src/ontology/url-validator.js`): protocol allowlist, private-address refusal, timeout, size cap |
+| Neo4j Cypher injection (`neo4j.js`, now `mesh-adapter.js`) | Labels and relation keys are checked by `assertSafeCypherIdentifier`; every value travels as a GraphQL variable |
+| Static file path traversal (`src/index.js`, now `src/static.js`) | `decodeURIComponent` plus a resolve-and-contain root check |
+| Connection cache keyed without password (`sql.js`, now postgres / mesh-adapter / arango) | Every cache key includes the password, so a wrong password never reuses an authenticated connection (shown live against MySQL before the fix) |
+| ArangoDB AQL injection | Collection, attribute and sort names travel as bind parameters |
+| `src/database/drivers/biocyc.js` refetch per related id | One listing per related class serves every parent row, cached briefly |
 
 ## Commit messages
 

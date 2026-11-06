@@ -111,7 +111,7 @@ async function loadRelations (db, rows, relations) {
       continue
     }
 
-    const { entity, localKey = '_key', foreignKey, ownerKey = '_key', alias, type = 'hasMany', select, where, relations: nested } = rel
+    const { entity, localKey = '_key', foreignKey, ownerKey = '_key', alias, type = 'hasMany', select, where, limit, relations: nested } = rel
     const resultKey = alias || entity
 
     try {
@@ -126,10 +126,20 @@ async function loadRelations (db, rows, relations) {
 
       const b = binder()
       const target = b.attr(targetKey)
-      const conds = [`doc[${target}] IN ${b.value(ids)}`, ...filters(b, where)]
       // The join key must come back even when the caller's select leaves it out.
       const fields = select && select.length > 0 && !select.includes(targetKey) ? [targetKey, ...select] : select
-      const aql = `FOR doc IN ${b.collection(entity)} FILTER ${conds.join(' AND ')} RETURN ${projection(b, fields)}`
+      const coll = b.collection(entity)
+      const extra = filters(b, where)
+      const perParent = type === 'hasOne' ? 1 : (type === 'hasMany' ? limit : null)
+      let aql
+      if (perParent != null) {
+        // A per-parent cap: one LIMITed subquery per parent id.
+        const conds = [`doc[${target}] == id`, ...extra]
+        aql = `FOR id IN ${b.value(ids)} FOR doc IN (FOR doc IN ${coll} FILTER ${conds.join(' AND ')} LIMIT ${b.value(perParent)} RETURN doc) RETURN ${projection(b, fields)}`
+      } else {
+        const conds = [`doc[${target}] IN ${b.value(ids)}`, ...extra]
+        aql = `FOR doc IN ${coll} FILTER ${conds.join(' AND ')} RETURN ${projection(b, fields)}`
+      }
       const relRows = await (await db.query(aql, b.vars)).all()
       if (nested && nested.length > 0) await loadRelations(db, relRows, nested)
 

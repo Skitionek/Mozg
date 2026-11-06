@@ -96,6 +96,11 @@ describe('biocyc driver', () => {
     await assert.rejects(biocyc.executeQuery({ connection: connection(), from: 'genes' }), /BioCyc requires an account for this request — pass your BioCyc login/)
   })
 
+  test('an anti-bot challenge page is reported as such, not dumped', async () => {
+    globalThis.fetch = async () => ({ ok: false, status: 403, statusText: 'Forbidden', headers: { get: () => 'text/html' }, text: async () => '<html><title>Checking your browser...</title><input ID="pow-challenge"></html>' })
+    await assert.rejects(biocyc.executeQuery({ connection: connection(), from: 'genes' }), (err) => /anti-bot browser check/.test(err.message) && !/<html>/.test(err.message))
+  })
+
   test('needs an organism database code', async () => {
     await assert.rejects(biocyc.executeQuery({ connection: { driver: 'biocyc' }, from: 'genes' }), /organism database code/)
   })

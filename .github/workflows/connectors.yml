@@ -1,0 +1,116 @@
+name: Connectors
+
+# Runs every database connector against a real server of its kind, using the
+# shared suite in tests/integration (select/where/order/paging, hasMany /
+# hasOne / belongsTo, nesting, introspection, a relation into an api source,
+# and bad-credential handling).  SQLite needs no server and runs too.
+#
+# The public-endpoint drivers (OpenAPI, OData, SOAP, REST, KEGG, BioCyc) are
+# not exercised here — their upstreams are third-party services; see
+# docs/connectors.md for how each was checked.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  connectors:
+    name: Database connectors against real servers
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: mozg-it
+          POSTGRES_DB: mozg_it
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: mozg-it-root
+          MYSQL_DATABASE: mozg_it
+          MYSQL_USER: mozg
+          MYSQL_PASSWORD: mozg-it
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pmozg-it-root"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+
+      neo4j:
+        image: neo4j:5
+        env:
+          NEO4J_AUTH: neo4j/mozg-it-password
+        ports: ["7687:7687"]
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p mozg-it-password 'RETURN 1' || exit 1"
+          --health-interval 5s --health-timeout 5s --health-retries 40
+
+      arangodb:
+        image: arangodb:3.12
+        env:
+          ARANGO_ROOT_PASSWORD: mozg-it
+        ports: ["8529:8529"]
+
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "true"
+          xpack.security.http.ssl.enabled: "false"
+          ELASTIC_PASSWORD: mozg-it
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs -u elastic:mozg-it http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 5s --health-timeout 5s --health-retries 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Let the MySQL test user authenticate with mysql_native_password
+        # The MySQL driver goes through the graphql-mesh MySQL handler, whose
+        # client (mysql 2.x) cannot speak MySQL 8's default
+        # caching_sha2_password.  See docs/connectors.md.
+        run: |
+          docker exec ${{ job.services.mysql.id }} mysql -uroot -pmozg-it-root \
+            -e "ALTER USER 'mozg'@'%' IDENTIFIED WITH mysql_native_password BY 'mozg-it';"
+
+      - name: Wait for ArangoDB
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fs -u root:mozg-it http://localhost:8529/_api/version; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Run the connector suite
+        env:
+          MOZG_IT_POSTGRES_URL: postgres://postgres:mozg-it@localhost:5432/mozg_it
+          MOZG_IT_MYSQL_URL: mysql://mozg:mozg-it@127.0.0.1:3306/mozg_it
+          MOZG_IT_NEO4J_URL: bolt://neo4j:mozg-it-password@localhost:7687/neo4j
+          MOZG_IT_ARANGO_URL: http://root:mozg-it@localhost:8529/mozg_it
+          MOZG_IT_ELASTICSEARCH_URL: http://elastic:mozg-it@localhost:9200
+        run: node --test --test-timeout=120000 tests/integration/*.test.js
