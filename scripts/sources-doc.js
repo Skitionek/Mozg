@@ -16,7 +16,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { getCatalog } = require('../src/catalog')
-const { entityParams, entityColumns } = require('../src/database/sources')
+const { entityParams, entityColumns, implicitLinks } = require('../src/database/sources')
+const obo = require('../src/database/obo')
 const { CATEGORIES } = require('../src/database/catalog-lint')
 
 const OUT = path.join(__dirname, '..', 'docs', 'sources.md')
@@ -53,6 +54,13 @@ function render () {
     '`where` keys are the entity\'s parameters (required ones marked \\*); `include` takes relation names, and',
     'dots follow them further (`"structures.entry"`).  `raw: true` returns records exactly as the source sent them.',
     '',
+    '**OBO keys** (superscripts) say which identifier space a field or parameter holds, as registered in the',
+    '[Bioregistry](https://bioregistry.io).  Two fields with the same key and the same value name the same thing,',
+    'so relations are declared by key (`by uniprot`), and any entity whose required parameter takes a key a field',
+    'carries can be included without a declaration at all: `include: ["pdbe/bestStructures"]` (the *Linked by key*',
+    'column lists them).  Keyed values are written one canonical way whatever the source sent — see',
+    '[OBO keys](#obo-keys).',
+    '',
     '## Index',
     ''
   )
@@ -83,16 +91,31 @@ function render () {
       ].filter(Boolean)
       push(meta.join(' · '), '')
 
-      push('| Entity | Where | Fields | Include |', '|---|---|---|---|')
+      push('| Entity | Where | Fields | Include | Linked by key |', '|---|---|---|---|---|')
       for (const e of s.entities) {
-        const params = entityParams(e).map((p) => `\`${p.name}\`${p.required ? '\\*' : ''}`).join(', ')
-        const fields = entityColumns(e).map((f) => `\`${f}\``).join(', ')
-        const rels = (e.relations || []).map((r) => `\`${r.alias}\` → ${r.catalog && r.catalog !== s.name ? `${r.catalog}.` : ''}${r.entity}`).join('<br>')
-        push(`| **${cell(e.name)}**<br>${cell(e.description)}<br><sub>e.g. \`${cell(JSON.stringify(e.example))}\`</sub> | ${params} | ${fields} | ${rels} |`)
+        const sup = (keys) => (keys && keys.length ? `<sup>${keys.length > 3 ? `${keys.slice(0, 3).join(', ')}, …` : keys.join(', ')}</sup>` : '')
+        const params = entityParams(e).map((p) => `\`${p.name}\`${p.required ? '\\*' : ''}${sup(obo.paramKeys(e, p.name))}`).join(', ')
+        const fields = entityColumns(e).map((f) => {
+          const declared = e.obo && Object.hasOwn(e.obo, f) && Array.isArray(e.obo[f]) ? e.obo[f] : null
+          const key = obo.fieldKey(e, f)
+          return `\`${f}\`${key ? sup(declared || [key]) : ''}`
+        }).join(', ')
+        const rels = (e.relations || []).map((r) => `\`${r.alias}\` → ${r.catalog && r.catalog !== s.name ? `${r.catalog}.` : ''}${r.entity}${r.obo ? ` <sub>by ${r.obo}</sub>` : ''}`).join('<br>')
+        const declaredTargets = new Set((e.relations || []).map((r) => `${r.catalog || s.name}/${r.entity}`))
+        const links = implicitLinks(s, e).filter((l) => !declaredTargets.has(`${l.catalog}/${l.entity}`)).map((l) => l.name)
+        const linkCell = links.length ? `<details><summary>${links.length}</summary>${links.map((l) => `\`${l}\``).join(' ')}</details>` : ''
+        push(`| **${cell(e.name)}**<br>${cell(e.description)}<br><sub>e.g. \`${cell(JSON.stringify(e.example))}\`</sub> | ${params} | ${fields} | ${rels} | ${linkCell} |`)
       }
       push('')
     }
   }
+
+  push('## OBO keys', '', 'Identifier spaces Mozg recognises, with the form values are written in.  `curie` values carry their prefix (`CHEBI:15365`); `local` values are bare (`P04637`).  A field named in the last column carries the key by convention; names ending in it do too (`partnerUniprotAccession`).', '')
+  push('| Key | Prefix | Form | Field | What it identifies |', '|---|---|---|---|---|')
+  for (const [key, spec] of Object.entries(obo.KEYS)) {
+    push(`| \`${key}\` | \`${spec.prefix}\` | ${spec.form} | ${obo.CANONICAL_FIELD[key] ? `\`${obo.CANONICAL_FIELD[key]}\`` : ''} | ${cell(spec.label)} |`)
+  }
+  push('')
 
   return lines.join('\n')
 }

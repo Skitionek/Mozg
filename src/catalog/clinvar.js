@@ -92,10 +92,10 @@ const VARIANT_FIELDS = {
 }
 
 const VARIANT_RELATIONS = [
-  { alias: 'gene', description: 'The NCBI Gene record of the (first) affected gene', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
-  { alias: 'myvariant', description: 'Aggregated annotation for this variant (MyVariant.info: CADD, gnomAD frequencies, dbNSFP)', catalog: 'myvariant', entity: 'variantByRsId', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-  { alias: 'ensemblVariant', description: 'Ensembl variation record: alleles, frequencies, consequences', catalog: 'ensembl', entity: 'variant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' },
-  { alias: 'gwasAssociations', description: 'GWAS Catalog associations for this variant', catalog: 'gwas', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' }
+  { alias: 'gene', description: 'The NCBI Gene record of the (first) affected gene', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
+  { alias: 'myvariant', description: 'Aggregated annotation for this variant (MyVariant.info: CADD, gnomAD frequencies, dbNSFP)', catalog: 'myvariant', entity: 'variantByRsId', obo: 'dbsnp', type: 'hasMany' },
+  { alias: 'ensemblVariant', description: 'Ensembl variation record: alleles, frequencies, consequences', catalog: 'ensembl', entity: 'variant', obo: 'dbsnp', type: 'hasOne' },
+  { alias: 'gwasAssociations', description: 'GWAS Catalog associations for this variant', catalog: 'gwas', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' }
 ]
 
 module.exports = {

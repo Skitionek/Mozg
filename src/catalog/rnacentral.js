@@ -60,8 +60,8 @@ module.exports = {
       },
       example: { rnacentralId: 'URS000075C808_9606' },
       relations: [
-        { alias: 'xrefs', description: 'Records for this RNA in the expert databases', entity: 'xrefs', localKey: 'rnacentralId', foreignKey: 'rnacentralId', type: 'hasMany' },
-        { alias: 'taxonomy', description: 'The organism (species-specific ids only)', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+        { alias: 'xrefs', description: 'Records for this RNA in the expert databases', entity: 'xrefs', obo: 'rnacentral', type: 'hasMany' },
+        { alias: 'taxonomy', description: 'The organism (species-specific ids only)', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
       ]
     },
     {
@@ -97,7 +97,7 @@ module.exports = {
       paginate: { limit: 'page_size', max: 100 },
       example: { rnacentralId: 'URS000075C808_9606' },
       relations: [
-        { alias: 'rna', description: 'The RNAcentral record', entity: 'rna', localKey: 'rnacentralId', foreignKey: 'rnacentralId', type: 'hasOne' }
+        { alias: 'rna', description: 'The RNAcentral record', entity: 'rna', obo: 'rnacentral', type: 'hasOne' }
       ]
     },
     {
@@ -129,7 +129,7 @@ module.exports = {
       },
       example: { query: 'HOTAIR', taxonId: 9606 },
       relations: [
-        { alias: 'rna', description: 'The full RNAcentral record', entity: 'rna', localKey: 'rnacentralId', foreignKey: 'rnacentralId', type: 'hasOne' }
+        { alias: 'rna', description: 'The full RNAcentral record', entity: 'rna', obo: 'rnacentral', type: 'hasOne' }
       ]
     }
   ]

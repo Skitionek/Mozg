@@ -39,7 +39,7 @@ const SEQUENCE_FIELDS = {
 }
 
 const SEQUENCE_RELATIONS = [
-  { alias: 'taxonomy', description: 'The source organism (NCBI Taxonomy)', catalog: 'ncbi-gene', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+  { alias: 'taxonomy', description: 'The source organism (NCBI Taxonomy)', catalog: 'ncbi-gene', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
 ]
 
 const DB_PARAM = { description: 'nuccore (nucleotide, default) or protein', default: 'nuccore' }

@@ -44,6 +44,7 @@
  */
 
 const http = require('../http')
+const obo = require('../obo')
 const { findEntity, pathParams, entityColumns, sourceForConnection } = require('../sources')
 
 // ── Small path language for field mapping ───────────────────────────────────
@@ -393,6 +394,20 @@ async function executeQuery (input) {
   const { records, serverOffset } = await fetchRecords(entry, entity, params, { limit, offset, connection })
 
   let rows = records.map((record) => (raw ? { ...record } : mapRecord(record, entity.fields, params)))
+
+  // Identifier fields are written one way whatever the source sent, so that
+  // two fields with the same OBO key and value always name the same thing.
+  if (!raw) {
+    const keyed = Object.entries(obo.entityKeys(entity, entityColumns(entity)))
+    if (keyed.length > 0) {
+      rows = rows.map((row) => {
+        for (const [field, key] of keyed) {
+          if (row[field] != null) row[field] = obo.normalize(key, row[field])
+        }
+        return row
+      })
+    }
+  }
 
   // Client-side filters declared by the entity (parameters the API itself cannot apply).
   for (const [name, spec] of Object.entries(entity.params || {})) {

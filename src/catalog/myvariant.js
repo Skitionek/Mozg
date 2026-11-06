@@ -61,10 +61,10 @@ const VARIANT_FIELDS = {
 }
 
 const VARIANT_RELATIONS = [
-  { alias: 'gwasAssociations', description: 'GWAS Catalog trait associations for this variant', catalog: 'gwas', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-  { alias: 'ensemblVariant', description: 'Ensembl variation record', catalog: 'ensembl', entity: 'variant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' },
-  { alias: 'gene', description: 'Ensembl gene the variant falls in', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'clinvar', description: 'The ClinVar variation record', catalog: 'clinvar', entity: 'variant', localKey: 'clinvarId', foreignKey: 'clinvarId', type: 'hasOne' },
+  { alias: 'gwasAssociations', description: 'GWAS Catalog trait associations for this variant', catalog: 'gwas', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' },
+  { alias: 'ensemblVariant', description: 'Ensembl variation record', catalog: 'ensembl', entity: 'variant', obo: 'dbsnp', type: 'hasOne' },
+  { alias: 'gene', description: 'Ensembl gene the variant falls in', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'clinvar', description: 'The ClinVar variation record', catalog: 'clinvar', entity: 'variant', obo: 'clinvar.variation', type: 'hasOne' },
   { alias: 'civic', description: 'CIViC clinical-interpretation summary for the gene', catalog: 'civic', entity: 'gene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasOne' }
 ]
 

@@ -26,9 +26,9 @@ const EVENT_FIELDS = {
 }
 
 const EVENT_RELATIONS = [
-  { alias: 'pathway', description: 'The full record of this event: summary, GO process, literature', entity: 'pathway', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasOne' },
-  { alias: 'events', description: 'Sub-pathways and reactions contained in this event, at every depth', entity: 'events', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasMany' },
-  { alias: 'participants', description: 'Proteins, genes and small molecules taking part in this event', entity: 'participants', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasMany' }
+  { alias: 'pathway', description: 'The full record of this event: summary, GO process, literature', entity: 'pathway', obo: 'reactome', type: 'hasOne' },
+  { alias: 'events', description: 'Sub-pathways and reactions contained in this event, at every depth', entity: 'events', obo: 'reactome', type: 'hasMany' },
+  { alias: 'participants', description: 'Proteins, genes and small molecules taking part in this event', entity: 'participants', obo: 'reactome', type: 'hasMany' }
 ]
 
 module.exports = {
@@ -78,9 +78,9 @@ module.exports = {
       },
       example: { reactomeId: 'R-HSA-69620' },
       relations: [
-        { alias: 'events', description: 'Sub-pathways and reactions contained in this pathway, at every depth', entity: 'events', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasMany' },
-        { alias: 'participants', description: 'Proteins, genes and small molecules taking part in this pathway', entity: 'participants', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasMany' },
-        { alias: 'goTerm', description: 'The GO biological process this pathway corresponds to (QuickGO)', catalog: 'quickgo', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'events', description: 'Sub-pathways and reactions contained in this pathway, at every depth', entity: 'events', obo: 'reactome', type: 'hasMany' },
+        { alias: 'participants', description: 'Proteins, genes and small molecules taking part in this pathway', entity: 'participants', obo: 'reactome', type: 'hasMany' },
+        { alias: 'goTerm', description: 'The GO biological process this pathway corresponds to (QuickGO)', catalog: 'quickgo', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     },
     {
@@ -94,7 +94,7 @@ module.exports = {
       fields: EVENT_FIELDS,
       example: { reactomeId: 'R-HSA-69620' },
       relations: [
-        { alias: 'participants', description: 'Proteins, genes and small molecules taking part in this event', entity: 'participants', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasMany' }
+        { alias: 'participants', description: 'Proteins, genes and small molecules taking part in this event', entity: 'participants', obo: 'reactome', type: 'hasMany' }
       ]
     },
     {
@@ -119,8 +119,8 @@ module.exports = {
       },
       example: { reactomeId: 'R-HSA-69620' },
       relations: [
-        { alias: 'protein', description: 'The UniProt entry, for protein participants', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'compound', description: 'The ChEBI entry, for small-molecule participants', catalog: 'chebi', entity: 'compound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasOne' }
+        { alias: 'protein', description: 'The UniProt entry, for protein participants', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'compound', description: 'The ChEBI entry, for small-molecule participants', catalog: 'chebi', entity: 'compound', obo: 'chebi', type: 'hasOne' }
       ]
     },
     {
@@ -157,7 +157,7 @@ module.exports = {
       emptyStatus: [404],
       example: { query: 'apoptosis', species: 'Homo sapiens', types: 'Pathway' },
       relations: [
-        { alias: 'pathway', description: 'The full record of this event', entity: 'pathway', localKey: 'reactomeId', foreignKey: 'reactomeId', type: 'hasOne' }
+        { alias: 'pathway', description: 'The full record of this event', entity: 'pathway', obo: 'reactome', type: 'hasOne' }
       ]
     }
   ]

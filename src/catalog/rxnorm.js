@@ -23,13 +23,13 @@ const CONCEPT_FIELDS = {
 }
 
 const BASE_RELATIONS = [
-  { alias: 'related', description: 'Clinical and branded drugs, brand names and dose forms built on this concept', entity: 'related', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasMany' },
-  { alias: 'classes', description: 'Drug classes this concept belongs to (ATC, MeSH pharmacologic action, FDA EPC/MoA…)', entity: 'classes', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasMany' }
+  { alias: 'related', description: 'Clinical and branded drugs, brand names and dose forms built on this concept', entity: 'related', obo: 'rxnorm', type: 'hasMany' },
+  { alias: 'classes', description: 'Drug classes this concept belongs to (ATC, MeSH pharmacologic action, FDA EPC/MoA…)', entity: 'classes', obo: 'rxnorm', type: 'hasMany' }
 ]
 
 // FDA labels list the RxCUIs of *products* (SCD/SBD), never of ingredients,
 // so this relation is only offered where rows can be products.
-const PRODUCT_LABELS = { alias: 'productLabels', description: 'FDA drug labels listing this RxNorm product', catalog: 'openfda', entity: 'labelsForRxcui', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasMany' }
+const PRODUCT_LABELS = { alias: 'productLabels', description: 'FDA drug labels listing this RxNorm product', catalog: 'openfda', entity: 'labelsForRxcui', obo: 'rxnorm', type: 'hasMany' }
 
 // Ingredient-level concepts are named the way other drug sources name them,
 // so they can reach sources keyed by drug name.
@@ -117,7 +117,7 @@ module.exports = {
       fields: CONCEPT_FIELDS,
       example: { rxcui: '1191', tty: 'BN' },
       relations: [
-        { alias: 'classes', description: 'Drug classes of the related concept', entity: 'classes', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasMany' },
+        { alias: 'classes', description: 'Drug classes of the related concept', entity: 'classes', obo: 'rxnorm', type: 'hasMany' },
         PRODUCT_LABELS
       ]
     },

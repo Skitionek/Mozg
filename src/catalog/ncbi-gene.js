@@ -49,13 +49,13 @@ const GENE_FIELDS = {
 }
 
 const GENE_RELATIONS = [
-  { alias: 'proteins', description: 'Reviewed UniProtKB entries cross-referenced to this gene', catalog: 'uniprot', entity: 'proteins', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasMany', where: { reviewed: true } },
-  { alias: 'ensemblGene', description: 'The matching Ensembl gene', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'hgnc', description: 'HGNC nomenclature record (human genes)', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
-  { alias: 'mygene', description: 'MyGene.info aggregate annotation', catalog: 'mygene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
-  { alias: 'orthologs', description: 'Orthologous genes in other organisms (NCBI Orthologs)', entity: 'orthologs', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasMany' },
-  { alias: 'taxonomy', description: 'The organism this gene belongs to', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' },
-  { alias: 'publications', description: 'PubMed articles linked to this gene, most recent first', catalog: 'pubmed', entity: 'articlesForGene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasMany' },
+  { alias: 'proteins', description: 'Reviewed UniProtKB entries cross-referenced to this gene', catalog: 'uniprot', entity: 'proteins', obo: 'ncbigene', type: 'hasMany', where: { reviewed: true } },
+  { alias: 'ensemblGene', description: 'The matching Ensembl gene', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'hgnc', description: 'HGNC nomenclature record (human genes)', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
+  { alias: 'mygene', description: 'MyGene.info aggregate annotation', catalog: 'mygene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
+  { alias: 'orthologs', description: 'Orthologous genes in other organisms (NCBI Orthologs)', entity: 'orthologs', obo: 'ncbigene', type: 'hasMany' },
+  { alias: 'taxonomy', description: 'The organism this gene belongs to', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' },
+  { alias: 'publications', description: 'PubMed articles linked to this gene, most recent first', catalog: 'pubmed', entity: 'articlesForGene', obo: 'ncbigene', type: 'hasMany' },
   { alias: 'clinvarVariants', description: 'ClinVar variants in this gene (human)', catalog: 'clinvar', entity: 'variantsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
   { alias: 'gwasAssociations', description: 'GWAS Catalog associations mapped to this gene (human)', catalog: 'gwas', entity: 'associationsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' }
 ]
@@ -114,8 +114,8 @@ module.exports = {
       paginate: { limit: 'page_size', max: 1000 },
       example: { ncbiGeneId: '7157' },
       relations: [
-        { alias: 'taxonomy', description: 'The organism of this ortholog', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' },
-        { alias: 'proteins', description: 'Reviewed UniProtKB entries for this ortholog', catalog: 'uniprot', entity: 'proteins', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasMany', where: { reviewed: true } }
+        { alias: 'taxonomy', description: 'The organism of this ortholog', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' },
+        { alias: 'proteins', description: 'Reviewed UniProtKB entries for this ortholog', catalog: 'uniprot', entity: 'proteins', obo: 'ncbigene', type: 'hasMany', where: { reviewed: true } }
       ]
     },
     {
@@ -149,8 +149,8 @@ module.exports = {
       },
       example: { taxonId: 9606 },
       relations: [
-        { alias: 'parent', description: 'Parent taxon', entity: 'taxonomy', localKey: 'parentTaxonId', foreignKey: 'taxonId', type: 'hasOne' },
-        { alias: 'uniprot', description: 'The same taxon in UniProt (protein counts)', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+        { alias: 'parent', description: 'Parent taxon', entity: 'taxonomy', localKey: 'parentTaxonId', obo: 'ncbitaxon', type: 'hasOne' },
+        { alias: 'uniprot', description: 'The same taxon in UniProt (protein counts)', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
       ]
     }
   ]

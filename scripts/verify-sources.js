@@ -30,9 +30,10 @@
 const { getCatalog, listCatalog } = require('../src/catalog')
 const { executeQuery } = require('../src/database/connector')
 const { fetchRelation } = require('../src/database/relations')
-const { connectionForSource, entityColumns } = require('../src/database/sources')
+const { connectionForSource, entityColumns, resolveRelation } = require('../src/database/sources')
 const { HttpError } = require('../src/database/http')
 const { lintEntry } = require('../src/database/catalog-lint')
+const obo = require('../src/database/obo')
 
 // Resolve another entry for the linter without failing when its file does not
 // exist yet (sources are written in parallel; a missing one reads as unregistered).
@@ -102,6 +103,19 @@ async function verifySource (entry, options = {}) {
     result.status = result.emptyFields.length === columns.length && columns.length > 0 ? 'broken' : 'ok'
     if (result.status === 'broken') result.error = 'every declared field came back empty — the field mapping does not match the response'
 
+    // Same OBO key, same value, same thing — only if every keyed value is
+    // written in its key's canonical form.  One that is not means the field
+    // is annotated with the wrong key or mapped from the wrong place.
+    const offKey = []
+    for (const [field, key] of Object.entries(obo.entityKeys(entity, columns))) {
+      const bad = rows.map((row) => row[field]).find((v) => v != null && !obo.isCanonical(key, v))
+      if (bad !== undefined) offKey.push(`${field} (${key}): ${JSON.stringify(Array.isArray(bad) ? bad.find((x) => !obo.isCanonical(key, x)) : bad)}`)
+    }
+    if (offKey.length > 0 && result.status === 'ok') {
+      result.status = 'broken'
+      result.error = `values not in their OBO key's canonical form — ${offKey.join('; ')}`
+    }
+
     if (!followRelations) continue
 
     const row = rows[0]
@@ -112,9 +126,9 @@ async function verifySource (entry, options = {}) {
       result.relations.push(relResult)
       try {
         const connection = connectionForSource(rel.catalog || entry.name)
-        const value = await fetchRelation(executeQuery, connection, row, rel)
+        const value = await fetchRelation(executeQuery, connection, row, resolveRelation(entry, entity, rel))
         relResult.ms = Date.now() - relStarted
-        if (row[rel.localKey || 'id'] == null) {
+        if (row[resolveRelation(entry, entity, rel).localKey || 'id'] == null) {
           relResult.status = 'ok'
           relResult.note = `parent ${rel.localKey || 'id'} is empty in the example row`
         } else if (value == null || (Array.isArray(value) && value.length === 0)) {

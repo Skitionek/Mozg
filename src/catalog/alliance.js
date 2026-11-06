@@ -1,5 +1,7 @@
 'use strict'
 
+const { GENE_CURIE_KEYS } = require('../database/obo')
+
 /**
  * Alliance of Genome Resources — one API over the model-organism databases:
  * MGI (mouse), RGD (rat), SGD (yeast), ZFIN (zebrafish), WormBase
@@ -71,6 +73,7 @@ module.exports = {
   entities: [
     {
       name: 'gene',
+      obo: { geneId: GENE_CURIE_KEYS },
       description: 'One gene from any Alliance member database',
       path: '/gene/{geneId}',
       params: {
@@ -79,17 +82,18 @@ module.exports = {
       fields: GENE_FIELDS,
       example: { geneId: 'MGI:98834' },
       relations: [
-        { alias: 'orthologs', description: 'Orthologues in the other Alliance species', entity: 'orthologs', localKey: 'geneId', foreignKey: 'geneId', type: 'hasMany' },
-        { alias: 'phenotypes', description: 'Phenotype annotations', entity: 'phenotypes', localKey: 'geneId', foreignKey: 'geneId', type: 'hasMany' },
-        { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
-        { alias: 'protein', description: 'Canonical UniProtKB protein', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'hgnc', description: 'HGNC record (human genes only)', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
+        { alias: 'orthologs', description: 'Orthologues in the other Alliance species', entity: 'orthologs', obo: '*', type: 'hasMany' },
+        { alias: 'phenotypes', description: 'Phenotype annotations', entity: 'phenotypes', obo: '*', type: 'hasMany' },
+        { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
+        { alias: 'protein', description: 'Canonical UniProtKB protein', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'hgnc', description: 'HGNC record (human genes only)', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
         { alias: 'flybase', description: 'FlyBase gene summary (fly genes only)', catalog: 'flybase', entity: 'gene', localKey: 'flybaseGeneId', foreignKey: 'flybaseGeneId', type: 'hasOne' }
       ]
     },
     {
       name: 'orthologs',
+      obo: { geneId: GENE_CURIE_KEYS, orthologGeneId: GENE_CURIE_KEYS },
       description: 'Orthologues of a gene across Alliance species, from the DIOPT-style consensus of prediction methods',
       path: '/gene/{geneId}/orthologs',
       params: {
@@ -113,11 +117,12 @@ module.exports = {
       paginate: { limit: 'limit', page: 'page', pageBase: 1, max: 500 },
       example: { geneId: 'HGNC:11998' },
       relations: [
-        { alias: 'ortholog', description: 'The orthologous gene', entity: 'gene', localKey: 'orthologGeneId', foreignKey: 'geneId', type: 'hasOne' }
+        { alias: 'ortholog', description: 'The orthologous gene', entity: 'gene', localKey: 'orthologGeneId', obo: '*', foreignKey: 'geneId', type: 'hasOne' }
       ]
     },
     {
       name: 'phenotypes',
+      obo: { geneId: GENE_CURIE_KEYS },
       description: 'Phenotype annotations of a gene (mutant phenotypes in model organisms, HPO for human)',
       path: '/gene/{geneId}/phenotypes',
       params: {
@@ -139,6 +144,7 @@ module.exports = {
     },
     {
       name: 'diseaseGenes',
+      obo: { geneId: GENE_CURIE_KEYS, diseaseId: ['doid'] },
       description: 'Genes annotated to a Disease Ontology term (or its descendants), across species',
       path: '/disease/{diseaseId}/genes',
       params: {

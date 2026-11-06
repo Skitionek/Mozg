@@ -1,5 +1,7 @@
 'use strict'
 
+const { GENE_CURIE_KEYS } = require('../database/obo')
+
 /**
  * Gene Ontology Consortium API — GO terms and the GO annotations the
  * consortium aggregates from every model organism database (CC BY 4.0).
@@ -66,12 +68,13 @@ module.exports = {
       },
       example: { goId: 'GO:0006915' },
       relations: [
-        { alias: 'genes', description: 'Gene products annotated to this term, across all contributing databases', entity: 'genesForTerm', localKey: 'goId', foreignKey: 'goId', type: 'hasMany' },
-        { alias: 'quickgo', description: 'The same term in QuickGO, with aspect and hierarchy', catalog: 'quickgo', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'genes', description: 'Gene products annotated to this term, across all contributing databases', entity: 'genesForTerm', obo: 'go', type: 'hasMany' },
+        { alias: 'quickgo', description: 'The same term in QuickGO, with aspect and hierarchy', catalog: 'quickgo', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     },
     {
       name: 'genesForTerm',
+      obo: { geneId: ['uniprot', ...GENE_CURIE_KEYS] },
       description: 'Gene products annotated to a GO term (including its descendants)',
       path: '/bioentity/function/{goId}/genes',
       params: {
@@ -83,12 +86,13 @@ module.exports = {
       paginate: { limit: 'rows', offset: 'start', max: 1000 },
       example: { goId: 'GO:0006915', taxonId: 9606 },
       relations: [
-        { alias: 'protein', description: 'The UniProt entry, for UniProtKB subjects', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'functions', description: 'Every GO annotation of this gene product', entity: 'functionsForGene', localKey: 'geneId', foreignKey: 'geneId', type: 'hasMany' }
+        { alias: 'protein', description: 'The UniProt entry, for UniProtKB subjects', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'functions', description: 'Every GO annotation of this gene product', entity: 'functionsForGene', obo: '*', type: 'hasMany' }
       ]
     },
     {
       name: 'functionsForGene',
+      obo: { geneId: ['uniprot', ...GENE_CURIE_KEYS] },
       description: 'GO annotations of one gene or gene product, by the contributing database\'s CURIE',
       path: '/bioentity/gene/{geneId}/function',
       params: {
@@ -99,7 +103,7 @@ module.exports = {
       paginate: { limit: 'rows', offset: 'start', max: 1000 },
       example: { geneId: 'UniProtKB:P04637' },
       relations: [
-        { alias: 'term', description: 'The annotated GO term', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'term', description: 'The annotated GO term', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     }
   ]

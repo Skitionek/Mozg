@@ -131,10 +131,10 @@ const DRUG_FIELDS = {
 
 // ── Relations ───────────────────────────────────────────────────────────────
 
-const TO_TARGET = { alias: 'target', description: 'Open Targets target record', entity: 'target', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
-const TO_DISEASE = { alias: 'disease', description: 'Open Targets disease record', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' }
-const TO_DRUG = { alias: 'drug', description: 'Open Targets drug record', entity: 'drug', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' }
-const TO_CHEMBL = { alias: 'molecule', description: 'ChEMBL molecule (structure, properties)', catalog: 'chembl', entity: 'molecule', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' }
+const TO_TARGET = { alias: 'target', description: 'Open Targets target record', entity: 'target', obo: 'ensembl', type: 'hasOne' }
+const TO_DISEASE = { alias: 'disease', description: 'Open Targets disease record', entity: 'disease', obo: '*', type: 'hasOne' }
+const TO_DRUG = { alias: 'drug', description: 'Open Targets drug record', entity: 'drug', obo: 'chembl.compound', type: 'hasOne' }
+const TO_CHEMBL = { alias: 'molecule', description: 'ChEMBL molecule (structure, properties)', catalog: 'chembl', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' }
 
 module.exports = {
   name: 'opentargets',
@@ -163,15 +163,15 @@ module.exports = {
       fields: TARGET_FIELDS,
       example: { ensemblGeneId: 'ENSG00000141510' },
       relations: [
-        { alias: 'diseases', description: 'Diseases associated with this target, strongest first', entity: 'targetDiseases', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-        { alias: 'drugs', description: 'Drugs and clinical candidates acting on this target', entity: 'targetDrugs', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-        { alias: 'constraint', description: 'gnomAD loss-of-function and missense constraint', catalog: 'gnomad', entity: 'geneConstraint', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
+        { alias: 'diseases', description: 'Diseases associated with this target, strongest first', entity: 'targetDiseases', obo: 'ensembl', type: 'hasMany' },
+        { alias: 'drugs', description: 'Drugs and clinical candidates acting on this target', entity: 'targetDrugs', obo: 'ensembl', type: 'hasMany' },
+        { alias: 'constraint', description: 'gnomAD loss-of-function and missense constraint', catalog: 'gnomad', entity: 'geneConstraint', obo: 'ensembl', type: 'hasOne' },
         { alias: 'gwasAssociations', description: 'GWAS Catalog associations mapped to this gene', catalog: 'gwas', entity: 'associationsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
         { alias: 'civic', description: 'CIViC clinical-interpretation summary for this gene', catalog: 'civic', entity: 'gene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasOne' },
-        { alias: 'gene', description: 'The Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'protein', description: 'The reviewed UniProt entry', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
-        { alias: 'expression', description: 'GTEx median expression per tissue', catalog: 'gtex', entity: 'expression', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
+        { alias: 'gene', description: 'The Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'protein', description: 'The reviewed UniProt entry', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
+        { alias: 'expression', description: 'GTEx median expression per tissue', catalog: 'gtex', entity: 'expression', obo: 'ensembl', type: 'hasMany' },
         { alias: 'clinvarVariants', description: 'ClinVar variants in this gene', catalog: 'clinvar', entity: 'variantsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' }
       ]
     },
@@ -209,6 +209,7 @@ module.exports = {
     },
     {
       name: 'targetDrugs',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Drugs and clinical candidates whose mechanism acts on a target, with their indications',
       path: '/graphql',
       params: {
@@ -256,10 +257,10 @@ module.exports = {
       fields: DISEASE_FIELDS,
       example: { diseaseId: 'MONDO:0007254' },
       relations: [
-        { alias: 'targets', description: 'Targets associated with this disease, strongest first', entity: 'diseaseTargets', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasMany' },
-        { alias: 'drugs', description: 'Drugs and clinical candidates for this disease', entity: 'diseaseDrugs', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasMany' },
-        { alias: 'phenotypes', description: 'HPO phenotypes annotated to this disease', entity: 'diseasePhenotypes', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasMany' },
-        { alias: 'monarch', description: 'Monarch Initiative entity (genes, phenotypes, models)', catalog: 'monarch', entity: 'entity', localKey: 'diseaseId', foreignKey: 'id', type: 'hasOne' },
+        { alias: 'targets', description: 'Targets associated with this disease, strongest first', entity: 'diseaseTargets', obo: '*', type: 'hasMany' },
+        { alias: 'drugs', description: 'Drugs and clinical candidates for this disease', entity: 'diseaseDrugs', obo: '*', type: 'hasMany' },
+        { alias: 'phenotypes', description: 'HPO phenotypes annotated to this disease', entity: 'diseasePhenotypes', obo: '*', type: 'hasMany' },
+        { alias: 'monarch', description: 'Monarch Initiative entity (genes, phenotypes, models)', catalog: 'monarch', entity: 'entity', obo: '*', type: 'hasOne' },
         { alias: 'trials', description: 'ClinicalTrials.gov studies for this condition', catalog: 'clinicaltrials', entity: 'studies', localKey: 'name', foreignKey: 'condition', type: 'hasMany' }
       ]
     },
@@ -295,12 +296,13 @@ module.exports = {
       example: { diseaseId: 'MONDO:0007254' },
       relations: [
         TO_TARGET,
-        { alias: 'gene', description: 'The Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'proteins', description: 'UniProt entries for this gene', catalog: 'uniprot', entity: 'proteins', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany', where: { reviewed: true } }
+        { alias: 'gene', description: 'The Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'proteins', description: 'UniProt entries for this gene', catalog: 'uniprot', entity: 'proteins', obo: 'ensembl', type: 'hasMany', where: { reviewed: true } }
       ]
     },
     {
       name: 'diseaseDrugs',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Drugs and clinical candidates studied or approved for a disease',
       path: '/graphql',
       params: {
@@ -355,11 +357,12 @@ module.exports = {
       },
       example: { diseaseId: 'MONDO:0018875' },
       relations: [
-        { alias: 'term', description: 'The HPO term', catalog: 'hpo', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' }
+        { alias: 'term', description: 'The HPO term', catalog: 'hpo', entity: 'term', obo: 'hp', type: 'hasOne' }
       ]
     },
     {
       name: 'drug',
+      obo: { chemblId: 'chembl.compound' },
       description: 'A drug or clinical candidate with mechanisms of action and targets',
       path: '/graphql',
       params: {
@@ -370,13 +373,14 @@ module.exports = {
       fields: DRUG_FIELDS,
       example: { chemblId: 'CHEMBL25' },
       relations: [
-        { alias: 'indications', description: 'Diseases this drug is approved for or in trials for', entity: 'drugIndications', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasMany' },
+        { alias: 'indications', description: 'Diseases this drug is approved for or in trials for', entity: 'drugIndications', obo: 'chembl.compound', type: 'hasMany' },
         { alias: 'trials', description: 'ClinicalTrials.gov studies with this drug as an intervention', catalog: 'clinicaltrials', entity: 'studies', localKey: 'name', foreignKey: 'intervention', type: 'hasMany' },
         TO_CHEMBL
       ]
     },
     {
       name: 'drugIndications',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Diseases a drug is approved for or under investigation for, with the furthest clinical stage reached',
       path: '/graphql',
       params: {
@@ -404,6 +408,7 @@ module.exports = {
     },
     {
       name: 'search',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Free-text search across targets, diseases and drugs',
       path: '/graphql',
       params: {

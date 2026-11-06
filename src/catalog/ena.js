@@ -35,7 +35,7 @@ const STUDY_RETURN = 'study_accession,secondary_study_accession,study_title,stud
 
 const STUDY_RELATIONS = [
   { alias: 'runs', description: 'Sequencing runs deposited under this study', entity: 'runs', localKey: 'studyAccession', foreignKey: 'accession', type: 'hasMany' },
-  { alias: 'taxonomy', description: 'Taxonomy of the study organism', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+  { alias: 'taxonomy', description: 'Taxonomy of the study organism', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
 ]
 
 const RUN_FIELDS = {
@@ -75,6 +75,7 @@ module.exports = {
   entities: [
     {
       name: 'study',
+      obo: { studyAccession: 'bioproject' },
       description: 'One study (project) by accession — primary (PRJEB…, PRJNA…) or secondary (ERP…, SRP…)',
       path: '/search',
       params: {
@@ -91,6 +92,7 @@ module.exports = {
     },
     {
       name: 'studies',
+      obo: { studyAccession: 'bioproject' },
       description: 'Studies for an organism (including its sub-taxa) and/or with a title matching a word',
       path: '/search',
       params: {
@@ -113,6 +115,7 @@ module.exports = {
     },
     {
       name: 'runs',
+      obo: { studyAccession: 'bioproject', sampleAccession: 'biosample' },
       description: 'Sequencing runs under a study, sample, experiment or run accession, with read counts and FASTQ locations',
       path: '/filereport',
       params: {
@@ -123,13 +126,14 @@ module.exports = {
       paginate: { limit: 'limit', offset: 'offset' },
       example: { accession: 'SAMEA2591098' },
       relations: [
-        { alias: 'sample', description: 'The BioSamples record of the sequenced sample', catalog: 'biosamples', entity: 'sample', localKey: 'sampleAccession', foreignKey: 'accession', type: 'hasOne' },
-        { alias: 'study', description: 'The study the run belongs to', entity: 'study', localKey: 'studyAccession', foreignKey: 'studyAccession', type: 'hasOne' },
-        { alias: 'taxonomy', description: 'Taxonomy of the sequenced organism', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+        { alias: 'sample', description: 'The BioSamples record of the sequenced sample', catalog: 'biosamples', entity: 'sample', obo: 'biosample', type: 'hasOne' },
+        { alias: 'study', description: 'The study the run belongs to', entity: 'study', obo: 'bioproject', type: 'hasOne' },
+        { alias: 'taxonomy', description: 'Taxonomy of the sequenced organism', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
       ]
     },
     {
       name: 'sequence',
+      obo: { studyAccession: 'bioproject', sampleAccession: 'biosample' },
       description: 'One annotated nucleotide sequence (EMBL/GenBank/DDBJ record) by accession',
       path: '/search',
       params: {
@@ -155,10 +159,10 @@ module.exports = {
       },
       example: { accession: 'MN908947' },
       relations: [
-        { alias: 'taxonomy', description: 'Taxonomy of the source organism', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' },
+        { alias: 'taxonomy', description: 'Taxonomy of the source organism', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' },
         { alias: 'genbank', description: 'The same record in NCBI GenBank', catalog: 'genbank', entity: 'sequence', localKey: 'accession', foreignKey: 'accession', type: 'hasOne' },
-        { alias: 'sample', description: 'The BioSamples record of the source sample', catalog: 'biosamples', entity: 'sample', localKey: 'sampleAccession', foreignKey: 'accession', type: 'hasOne' },
-        { alias: 'study', description: 'The study the sequence was submitted under', entity: 'study', localKey: 'studyAccession', foreignKey: 'studyAccession', type: 'hasOne' }
+        { alias: 'sample', description: 'The BioSamples record of the source sample', catalog: 'biosamples', entity: 'sample', obo: 'biosample', type: 'hasOne' },
+        { alias: 'study', description: 'The study the sequence was submitted under', entity: 'study', obo: 'bioproject', type: 'hasOne' }
       ]
     }
   ]

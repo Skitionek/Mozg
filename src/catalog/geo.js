@@ -32,7 +32,7 @@ const DATASET_FIELDS = {
 }
 
 const DATASET_RELATIONS = [
-  { alias: 'publications', description: 'PubMed citations describing this dataset', catalog: 'pubmed', entity: 'article', localKey: 'pmids', foreignKey: 'pmid', type: 'hasMany' }
+  { alias: 'publications', description: 'PubMed citations describing this dataset', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasMany' }
 ]
 
 module.exports = {
@@ -48,6 +48,7 @@ module.exports = {
   entities: [
     {
       name: 'datasets',
+      obo: { accession: 'geo' },
       description: 'GEO records (series, datasets, platforms, samples) matching a query',
       params: {
         term: { required: true, description: 'Entrez GDS query, e.g. "TP53 AND gse[ETYP] AND Homo sapiens[ORGN]" — https://www.ncbi.nlm.nih.gov/geo/info/qqtutorial.html' },
@@ -63,6 +64,7 @@ module.exports = {
     },
     {
       name: 'dataset',
+      obo: { accession: 'geo' },
       description: 'One GEO record by accession (GSE, GDS, GPL or GSM)',
       params: {
         accession: { required: true, description: 'GEO accession, e.g. GSE2034' }

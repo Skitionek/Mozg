@@ -39,11 +39,11 @@ const COMPOUND_FIELDS = {
 }
 
 const COMPOUND_RELATIONS = [
-  { alias: 'synonyms', description: 'Names, trade names and registry numbers for this compound', entity: 'synonyms', localKey: 'pubchemCid', foreignKey: 'pubchemCid', type: 'hasMany' },
-  { alias: 'bioactivities', description: 'Bioassay outcomes recorded for this compound (first 100; query the entity directly for all)', entity: 'bioactivities', localKey: 'pubchemCid', foreignKey: 'pubchemCid', type: 'hasMany', limit: 100 },
-  { alias: 'literature', description: 'PubMed articles linked to this compound (first 100; query the entity directly for all)', entity: 'literature', localKey: 'pubchemCid', foreignKey: 'pubchemCid', type: 'hasMany', limit: 100 },
-  { alias: 'chembl', description: 'The same structure in ChEMBL (by InChIKey)', catalog: 'chembl', entity: 'moleculeByInchiKey', localKey: 'inchiKey', foreignKey: 'inchiKey', type: 'hasOne' },
-  { alias: 'lipidmaps', description: 'The same structure in LIPID MAPS, for lipids (by InChIKey)', catalog: 'lipidmaps', entity: 'compoundByInchiKey', localKey: 'inchiKey', foreignKey: 'inchiKey', type: 'hasOne' }
+  { alias: 'synonyms', description: 'Names, trade names and registry numbers for this compound', entity: 'synonyms', obo: 'pubchem.compound', type: 'hasMany' },
+  { alias: 'bioactivities', description: 'Bioassay outcomes recorded for this compound (first 100; query the entity directly for all)', entity: 'bioactivities', obo: 'pubchem.compound', type: 'hasMany', limit: 100 },
+  { alias: 'literature', description: 'PubMed articles linked to this compound (first 100; query the entity directly for all)', entity: 'literature', obo: 'pubchem.compound', type: 'hasMany', limit: 100 },
+  { alias: 'chembl', description: 'The same structure in ChEMBL (by InChIKey)', catalog: 'chembl', entity: 'moleculeByInchiKey', obo: 'inchikey', type: 'hasOne' },
+  { alias: 'lipidmaps', description: 'The same structure in LIPID MAPS, for lipids (by InChIKey)', catalog: 'lipidmaps', entity: 'compoundByInchiKey', obo: 'inchikey', type: 'hasOne' }
 ]
 
 const PROPERTY_ROWS = 'PropertyTable.Properties'
@@ -144,8 +144,8 @@ module.exports = {
       },
       example: { pubchemCid: 2244, outcome: 'Active' },
       relations: [
-        { alias: 'gene', description: 'The NCBI gene of the assay target', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
-        { alias: 'article', description: 'The publication describing the assay', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+        { alias: 'gene', description: 'The NCBI gene of the assay target', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
+        { alias: 'article', description: 'The publication describing the assay', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' }
       ]
     },
     {
@@ -163,8 +163,8 @@ module.exports = {
       },
       example: { pubchemCid: 2244 },
       relations: [
-        { alias: 'article', description: 'The PubMed record', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' },
-        { alias: 'europepmc', description: 'The Europe PMC record (abstract, citations, open-access full text)', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+        { alias: 'article', description: 'The PubMed record', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' },
+        { alias: 'europepmc', description: 'The Europe PMC record (abstract, citations, open-access full text)', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
       ]
     }
   ]

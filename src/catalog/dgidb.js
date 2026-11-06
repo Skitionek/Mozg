@@ -44,9 +44,9 @@ const INTERACTION_FIELDS = {
 }
 
 const INTERACTION_RELATIONS = [
-  { alias: 'molecule', description: 'The drug in ChEMBL, when DGIdb normalized it to a ChEMBL id', catalog: 'chembl', entity: 'molecule', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' },
-  { alias: 'rxnorm', description: 'The drug in RxNorm, when DGIdb normalized it to an RxCUI', catalog: 'rxnorm', entity: 'concept', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasOne' },
-  { alias: 'gene', description: 'HGNC record of the gene', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
+  { alias: 'molecule', description: 'The drug in ChEMBL, when DGIdb normalized it to a ChEMBL id', catalog: 'chembl', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' },
+  { alias: 'rxnorm', description: 'The drug in RxNorm, when DGIdb normalized it to an RxCUI', catalog: 'rxnorm', entity: 'concept', obo: 'rxnorm', type: 'hasOne' },
+  { alias: 'gene', description: 'HGNC record of the gene', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
   { alias: 'drugs', description: 'DGIdb drug record (approval, attributes)', entity: 'drug', localKey: 'drugName', foreignKey: 'name', type: 'hasOne' }
 ]
 
@@ -75,6 +75,7 @@ module.exports = {
   entities: [
     {
       name: 'interactionsForGene',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Drugs known to interact with a gene, one row per drug–gene interaction',
       path: '/graphql',
       params: {
@@ -95,6 +96,7 @@ module.exports = {
     },
     {
       name: 'interactionsForDrug',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Genes a drug is known to interact with, one row per drug–gene interaction',
       path: '/graphql',
       params: {
@@ -139,11 +141,12 @@ module.exports = {
       example: { symbol: 'EGFR' },
       relations: [
         { alias: 'interactions', description: 'Drugs interacting with this gene', entity: 'interactionsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
-        { alias: 'hgnc', description: 'HGNC record of the gene', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' }
+        { alias: 'hgnc', description: 'HGNC record of the gene', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' }
       ]
     },
     {
       name: 'drug',
+      obo: { chemblId: 'chembl.compound' },
       description: 'A drug\'s DGIdb record: approval status, anti-neoplastic / immunotherapy flags and attributes such as drug class',
       path: '/graphql',
       params: {
@@ -173,8 +176,8 @@ module.exports = {
       example: { name: 'imatinib' },
       relations: [
         { alias: 'interactions', description: 'Genes this drug interacts with', entity: 'interactionsForDrug', localKey: 'name', foreignKey: 'name', type: 'hasMany' },
-        { alias: 'molecule', description: 'The drug in ChEMBL', catalog: 'chembl', entity: 'molecule', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' },
-        { alias: 'rxnorm', description: 'The drug in RxNorm', catalog: 'rxnorm', entity: 'concept', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasOne' }
+        { alias: 'molecule', description: 'The drug in ChEMBL', catalog: 'chembl', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' },
+        { alias: 'rxnorm', description: 'The drug in RxNorm', catalog: 'rxnorm', entity: 'concept', obo: 'rxnorm', type: 'hasOne' }
       ]
     }
   ]

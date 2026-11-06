@@ -35,12 +35,12 @@ const GENE_FIELDS = {
 }
 
 const GENE_RELATIONS = [
-  { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
-  { alias: 'protein', description: 'Canonical UniProtKB protein', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-  { alias: 'alliance', description: 'Alliance of Genome Resources gene page (orthology, phenotypes)', catalog: 'alliance', entity: 'gene', localKey: 'hgncId', foreignKey: 'geneId', type: 'hasOne' },
-  { alias: 'orthologs', description: 'Model-organism orthologues (Alliance of Genome Resources)', catalog: 'alliance', entity: 'orthologs', localKey: 'hgncId', foreignKey: 'geneId', type: 'hasMany' },
-  { alias: 'target', description: 'Open Targets target record', catalog: 'opentargets', entity: 'target', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
+  { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
+  { alias: 'protein', description: 'Canonical UniProtKB protein', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+  { alias: 'alliance', description: 'Alliance of Genome Resources gene page (orthology, phenotypes)', catalog: 'alliance', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
+  { alias: 'orthologs', description: 'Model-organism orthologues (Alliance of Genome Resources)', catalog: 'alliance', entity: 'orthologs', obo: 'hgnc', type: 'hasMany' },
+  { alias: 'target', description: 'Open Targets target record', catalog: 'opentargets', entity: 'target', obo: 'ensembl', type: 'hasOne' },
   { alias: 'gwasAssociations', description: 'GWAS Catalog associations mapped to this gene', catalog: 'gwas', entity: 'associationsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
   { alias: 'clinvarVariants', description: 'ClinVar variants in this gene', catalog: 'clinvar', entity: 'variantsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
   { alias: 'civic', description: 'CIViC clinical evidence summary', catalog: 'civic', entity: 'gene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasOne' },
@@ -96,7 +96,7 @@ module.exports = {
       },
       example: { query: 'TP5*' },
       relations: [
-        { alias: 'gene', description: 'Full HGNC record', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' }
+        { alias: 'gene', description: 'Full HGNC record', entity: 'gene', obo: 'hgnc', type: 'hasOne' }
       ]
     }
   ]

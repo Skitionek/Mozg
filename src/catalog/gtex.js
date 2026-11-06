@@ -78,9 +78,9 @@ module.exports = {
       fields: GENE_FIELDS,
       example: { ensemblGeneId: 'ENSG00000141510' },
       relations: [
-        { alias: 'expression', description: 'Median expression per tissue', entity: 'expression', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-        { alias: 'eqtls', description: 'Significant single-tissue eQTLs', entity: 'eqtls', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-        { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
+        { alias: 'expression', description: 'Median expression per tissue', entity: 'expression', obo: 'ensembl', type: 'hasMany' },
+        { alias: 'eqtls', description: 'Significant single-tissue eQTLs', entity: 'eqtls', obo: 'ensembl', type: 'hasMany' },
+        { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' }
       ]
     },
     {
@@ -144,8 +144,8 @@ module.exports = {
       },
       example: { ensemblGeneId: 'ENSG00000141510' },
       relations: [
-        { alias: 'variant', description: 'Ensembl record for the eQTL variant', catalog: 'ensembl', entity: 'variant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' },
-        { alias: 'gwasAssociations', description: 'GWAS Catalog associations for the eQTL variant', catalog: 'gwas', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' }
+        { alias: 'variant', description: 'Ensembl record for the eQTL variant', catalog: 'ensembl', entity: 'variant', obo: 'dbsnp', type: 'hasOne' },
+        { alias: 'gwasAssociations', description: 'GWAS Catalog associations for the eQTL variant', catalog: 'gwas', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' }
       ]
     },
     {

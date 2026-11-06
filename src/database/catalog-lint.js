@@ -14,7 +14,10 @@
  * Used by tests/catalog-relations.test.js and scripts/verify-sources.js.
  */
 
-const { entityParams, entityColumns, pathParams } = require('./sources')
+const { entityParams, entityColumns, pathParams, resolveRelation } = require('./sources')
+const obo = require('./obo')
+
+const validKey = (k) => k === '*' || Object.hasOwn(obo.KEYS, k)
 
 const CATEGORIES = [
   'Genes & genomes',
@@ -76,8 +79,20 @@ function lintEntry (entry, lookup) {
       }
     }
 
+    // OBO key annotations must name keys Mozg knows.
+    for (const [name, key] of Object.entries(entity.obo || {})) {
+      for (const k of [].concat(key == null ? [] : key)) {
+        if (!validKey(k)) fail(`${where}: obo.${name} names unknown OBO key "${k}"`)
+      }
+    }
+    for (const [name, spec] of Object.entries(entity.params || {})) {
+      if (spec && spec.obo != null) {
+        for (const k of [].concat(spec.obo)) if (!validKey(k)) fail(`${where}: params.${name}.obo names unknown OBO key "${k}"`)
+      }
+    }
+
     const aliases = new Set()
-    for (const rel of entity.relations || []) {
+    for (let rel of entity.relations || []) {
       const label = `${where} → ${rel.alias || rel.entity}`
       if (entry.driver === 'api') {
         if (!rel.alias) fail(`${label}: api relations need an alias (the include name)`)
@@ -91,6 +106,20 @@ function lintEntry (entry, lookup) {
       if (!target) {
         fail(`${label}: target source "${targetName}" is not registered`)
         continue
+      }
+
+      // A relation declared by OBO key must resolve to one field and one parameter.
+      if (rel.obo != null) {
+        if (!validKey(rel.obo)) {
+          fail(`${label}: obo names unknown OBO key "${rel.obo}"`)
+          continue
+        }
+        try {
+          rel = resolveRelation(entry, entity, rel)
+        } catch (err) {
+          fail(err.message.replace(`${entry.name}/`, ''))
+          continue
+        }
       }
       if (target.driver !== 'api') continue
 
@@ -111,6 +140,15 @@ function lintEntry (entry, lookup) {
       if (entry.driver === 'api') {
         const local = rel.type === 'belongsTo' ? rel.foreignKey : (rel.localKey || 'id')
         if (!entityColumns(entity).includes(local)) fail(`${label}: "${local}" is not a field of ${entry.name}/${entity.name}`)
+
+        // Joining identifiers from different spaces can only ever match by accident.
+        const fieldKey = obo.fieldKey(entity, local)
+        const possible = obo.fieldKeys(entity, local)
+        const accepted = obo.paramKeys(targetEntity, key)
+        const fits = obo.accepts(accepted, fieldKey) || possible.some((k) => obo.accepts(accepted, k))
+        if (fieldKey && accepted.length > 0 && !fits) {
+          fail(`${label}: joins "${local}" (OBO key ${fieldKey}) to "${key}", which takes ${accepted.join(' or ')}`)
+        }
       }
     }
   }

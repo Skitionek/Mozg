@@ -47,7 +47,7 @@ const LABEL_FIELDS = {
 }
 
 const LABEL_RELATIONS = [
-  { alias: 'rxnorm', description: 'The RxNorm concept of this product', catalog: 'rxnorm', entity: 'concept', localKey: 'rxcui', foreignKey: 'rxcui', type: 'hasOne' },
+  { alias: 'rxnorm', description: 'The RxNorm concept of this product', catalog: 'rxnorm', entity: 'concept', obo: 'rxnorm', type: 'hasOne' },
   { alias: 'adverseEvents', description: 'Most frequently reported adverse reactions for this generic name (FAERS)', entity: 'adverseEventCounts', localKey: 'genericName', foreignKey: 'drugName', type: 'hasMany' },
   { alias: 'chembl', description: 'ChEMBL compounds matching the generic name', catalog: 'chembl', entity: 'molecules', localKey: 'genericName', foreignKey: 'name', type: 'hasMany' }
 ]

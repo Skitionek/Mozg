@@ -58,10 +58,10 @@ const VARIANT_FIELDS = {
 }
 
 const VARIANT_RELATIONS = [
-  { alias: 'geneConstraint', description: 'Constraint of the gene the variant falls in', entity: 'geneConstraint', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'gene', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, AlphaMissense)', catalog: 'myvariant', entity: 'variantByRsId', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-  { alias: 'gwasAssociations', description: 'GWAS Catalog trait associations', catalog: 'gwas', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' }
+  { alias: 'geneConstraint', description: 'Constraint of the gene the variant falls in', entity: 'geneConstraint', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'gene', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, AlphaMissense)', catalog: 'myvariant', entity: 'variantByRsId', obo: 'dbsnp', type: 'hasMany' },
+  { alias: 'gwasAssociations', description: 'GWAS Catalog trait associations', catalog: 'gwas', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' }
 ]
 
 async function graphql (ctx, query, variables) {
@@ -138,9 +138,9 @@ module.exports = {
       },
       example: { ensemblGeneId: 'ENSG00000141510' },
       relations: [
-        { alias: 'gene', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'target', description: 'Open Targets target record', catalog: 'opentargets', entity: 'target', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' }
+        { alias: 'gene', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'target', description: 'Open Targets target record', catalog: 'opentargets', entity: 'target', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' }
       ]
     },
     {

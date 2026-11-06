@@ -146,6 +146,35 @@ function registerCatalog (entry) {
 }
 
 /**
+ * Register every `*.json` catalog entry in a directory — how a deployment
+ * adds the databases it hosts itself (the Helm chart mounts one file per
+ * enabled database).  JSON only, never code: these files come from
+ * configuration, not from the repository.  Connection fields can name
+ * environment variables (`{ "env": "CHEMBL_DB_PASSWORD" }`) so credentials
+ * stay in secrets and never appear in the catalog query.
+ * @param {string} dir
+ * @returns {string[]} names of the entries registered
+ */
+function loadCatalogDir (dir) {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  if (!dir || !fs.existsSync(dir)) return []
+  const names = []
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
+    const entry = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))
+    if (Object.hasOwn(REGISTRY, entry.name)) {
+      throw new Error(`${file}: catalog entry "${entry.name}" is already registered`)
+    }
+    registerCatalog(entry)
+    names.push(entry.name)
+  }
+  return names
+}
+
+// Deployment-supplied sources, registered once at startup.
+if (process.env.MOZG_SOURCES_DIR) loadCatalogDir(process.env.MOZG_SOURCES_DIR)
+
+/**
  * Return the names of all registered catalog entries without loading them.
  * @returns {string[]}
  */
@@ -176,4 +205,4 @@ function findCatalogsByDatabase (database) {
     })
 }
 
-module.exports = { getCatalog, listCatalog, findCatalogsByDatabase, registerCatalog }
+module.exports = { getCatalog, listCatalog, findCatalogsByDatabase, registerCatalog, loadCatalogDir }

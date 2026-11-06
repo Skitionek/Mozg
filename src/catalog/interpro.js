@@ -61,8 +61,8 @@ module.exports = {
       paginate: { limit: 'page_size', max: 200 },
       example: { uniprotAccession: 'P04637' },
       relations: [
-        { alias: 'entry', description: 'Full InterPro entry (description, GO terms, literature)', entity: 'entry', localKey: 'interproId', foreignKey: 'interproId', type: 'hasOne' },
-        { alias: 'protein', description: 'The UniProtKB entry', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
+        { alias: 'entry', description: 'Full InterPro entry (description, GO terms, literature)', entity: 'entry', obo: 'interpro', type: 'hasOne' },
+        { alias: 'protein', description: 'The UniProtKB entry', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' }
       ]
     },
     {
@@ -91,8 +91,8 @@ module.exports = {
       },
       example: { interproId: 'IPR011615' },
       relations: [
-        { alias: 'reviewedProteins', description: 'Swiss-Prot proteins containing this entry', entity: 'reviewedProteins', localKey: 'interproId', foreignKey: 'interproId', type: 'hasMany' },
-        { alias: 'representativeStructure', description: 'Representative PDB structure', catalog: 'pdb', entity: 'entry', localKey: 'representativePdbId', foreignKey: 'pdbId', type: 'hasOne' }
+        { alias: 'reviewedProteins', description: 'Swiss-Prot proteins containing this entry', entity: 'reviewedProteins', obo: 'interpro', type: 'hasMany' },
+        { alias: 'representativeStructure', description: 'Representative PDB structure', catalog: 'pdb', entity: 'entry', obo: 'pdb', type: 'hasOne' }
       ]
     },
     {
@@ -117,8 +117,8 @@ module.exports = {
       paginate: { limit: 'page_size', max: 200 },
       example: { interproId: 'IPR011615' },
       relations: [
-        { alias: 'protein', description: 'The UniProtKB entry', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'alphafold', description: 'AlphaFold prediction for the protein', catalog: 'alphafold', entity: 'prediction', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
+        { alias: 'protein', description: 'The UniProtKB entry', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'alphafold', description: 'AlphaFold prediction for the protein', catalog: 'alphafold', entity: 'prediction', obo: 'uniprot', type: 'hasOne' }
       ]
     }
   ]
