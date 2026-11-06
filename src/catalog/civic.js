@@ -54,7 +54,7 @@ const EVIDENCE_FIELDS = {
 }
 
 const EVIDENCE_RELATIONS = [
-  { alias: 'publication', description: 'The supporting publication (Europe PMC)', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+  { alias: 'publication', description: 'The supporting publication (Europe PMC)', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
 ]
 
 const VARIANT_SELECTION = `
@@ -103,8 +103,8 @@ const VARIANT_FIELDS = {
 const VARIANT_RELATIONS = [
   { alias: 'evidence', description: 'Accepted clinical evidence for this variant', entity: 'evidenceForVariant', localKey: 'civicVariantId', foreignKey: 'civicVariantId', type: 'hasMany' },
   { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, gnomAD)', catalog: 'myvariant', entity: 'variant', localKey: 'myvariantHgvs', foreignKey: 'hgvs', type: 'hasOne' },
-  { alias: 'clinvar', description: 'The ClinVar variation record', catalog: 'clinvar', entity: 'variant', localKey: 'clinvarId', foreignKey: 'clinvarId', type: 'hasOne' },
-  { alias: 'gwasAssociations', description: 'GWAS Catalog trait associations', catalog: 'gwas', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' }
+  { alias: 'clinvar', description: 'The ClinVar variation record', catalog: 'clinvar', entity: 'variant', obo: 'clinvar.variation', type: 'hasOne' },
+  { alias: 'gwasAssociations', description: 'GWAS Catalog trait associations', catalog: 'gwas', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' }
 ]
 
 module.exports = {
@@ -157,7 +157,7 @@ module.exports = {
         { alias: 'variants', description: 'Variants curated for this gene', entity: 'variantsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
         { alias: 'evidence', description: 'Accepted clinical evidence across the gene\'s molecular profiles', entity: 'evidenceForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
         { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'geneBySymbol', localKey: 'symbol', foreignKey: 'symbol', type: 'hasOne' },
-        { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' }
+        { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' }
       ]
     },
     {

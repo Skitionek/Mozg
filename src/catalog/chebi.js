@@ -20,10 +20,10 @@ const names = (r, kind) => ((r.names && r.names[kind]) || []).map((n) => n.name)
 const toNumber = (v) => (v == null || v === '' ? null : Number(v))
 
 const COMPOUND_RELATIONS = [
-  { alias: 'pubchem', description: 'The PubChem compound with the same InChIKey', catalog: 'pubchem', entity: 'compoundByInchiKey', localKey: 'inchiKey', foreignKey: 'inchiKey', type: 'hasOne' },
-  { alias: 'ontologyRelations', description: 'ChEBI ontology relations: is a, has role, has functional parent, …', entity: 'ontologyRelations', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasMany' },
-  { alias: 'reactions', description: 'Rhea reactions this compound takes part in', catalog: 'rhea', entity: 'reactionsForCompound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasMany' },
-  { alias: 'ols', description: 'The compound as an ontology term in OLS', catalog: 'ols', entity: 'term', localKey: 'chebiId', foreignKey: 'termId', type: 'hasOne' }
+  { alias: 'pubchem', description: 'The PubChem compound with the same InChIKey', catalog: 'pubchem', entity: 'compoundByInchiKey', obo: 'inchikey', type: 'hasOne' },
+  { alias: 'ontologyRelations', description: 'ChEBI ontology relations: is a, has role, has functional parent, …', entity: 'ontologyRelations', obo: 'chebi', type: 'hasMany' },
+  { alias: 'reactions', description: 'Rhea reactions this compound takes part in', catalog: 'rhea', entity: 'reactionsForCompound', obo: 'chebi', type: 'hasMany' },
+  { alias: 'ols', description: 'The compound as an ontology term in OLS', catalog: 'ols', entity: 'term', obo: 'chebi', type: 'hasOne' }
 ]
 
 module.exports = {
@@ -88,7 +88,7 @@ module.exports = {
       },
       example: { chebiId: 'CHEBI:15365' },
       relations: [
-        { alias: 'compound', description: 'The related ChEBI entry in full', entity: 'compound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasOne' }
+        { alias: 'compound', description: 'The related ChEBI entry in full', entity: 'compound', obo: 'chebi', type: 'hasOne' }
       ]
     },
     {
@@ -111,7 +111,7 @@ module.exports = {
       paginate: { limit: 'size', page: 'page', pageBase: 1, max: 100 },
       example: { term: 'aspirin' },
       relations: COMPOUND_RELATIONS.filter((r) => r.alias !== 'ontologyRelations').concat([
-        { alias: 'compound', description: 'The full ChEBI entry', entity: 'compound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasOne' }
+        { alias: 'compound', description: 'The full ChEBI entry', entity: 'compound', obo: 'chebi', type: 'hasOne' }
       ])
     }
   ]

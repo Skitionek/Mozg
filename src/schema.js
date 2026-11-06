@@ -2,7 +2,8 @@
 
 const { executeQuery } = require('./database/connector')
 const { introspectDatabase } = require('./database/introspect')
-const { connectionForSource, entityColumns, entityParams } = require('./database/sources')
+const { connectionForSource, entityColumns, entityParams, implicitLinks, isEnvValue, isServerHeld } = require('./database/sources')
+const obo = require('./database/obo')
 
 // ---------------------------------------------------------------------------
 // JSON scalar
@@ -63,6 +64,13 @@ const typeDefs = /* GraphQL */ `
     Catalog files are loaded lazily on first access.
     """
     catalog(name: String, category: String, driver: Driver): [CatalogEntry!]!
+
+    """
+    The OBO keys Mozg understands: identifier spaces, as registered in the
+    Bioregistry, that catalog fields and parameters are annotated with.
+    Two fields with the same key and the same value name the same thing.
+    """
+    oboKeys: [OboKey!]!
 
     """
     Parse an OWL ontology and return the GraphQL schema that would be generated
@@ -210,6 +218,12 @@ const typeDefs = /* GraphQL */ `
     where: JSON
     """Maximum related rows per parent row (hasMany)"""
     limit: Int
+    """
+    Join by OBO key instead of naming fields: the parent field carrying this
+    key and the target parameter accepting it are found from the catalog
+    (e.g. obo: "uniprot").  Explicit localKey / foreignKey still win.
+    """
+    obo: String
     """Nested relations on the related entity"""
     relations: [RelationInput!]
   }
@@ -368,6 +382,8 @@ const typeDefs = /* GraphQL */ `
     license: String
     """How the source authenticates, when it does (api sources)"""
     auth: CatalogAuth
+    """True when the database is hosted with this deployment; its connection is held by the server and cannot be overridden"""
+    selfHosted: Boolean!
     """Driver required to connect"""
     driver: Driver!
     """Default connection parameters (credentials are public demo values where applicable)"""
@@ -376,7 +392,7 @@ const typeDefs = /* GraphQL */ `
     entities: [CatalogEntity!]!
   }
 
-  """Connection parameters template stored in a catalog entry"""
+  """Connection parameters template stored in a catalog entry; values the server supplies from its environment are never shown"""
   type CatalogConnection {
     host: String
     port: Int
@@ -408,12 +424,53 @@ const typeDefs = /* GraphQL */ `
     description: String
     """Known column / property / field names"""
     columns: [String!]!
+    """Fields with the OBO key each carries, where it carries one"""
+    fields: [CatalogField!]!
     """Parameters accepted in where (api sources)"""
     params: [CatalogParam!]!
     """A where value known to return rows — a ready-made starting point"""
     example: JSON
     """Pre-defined relations to other entities"""
     relations: [CatalogRelation!]!
+    """
+    Relations nobody had to declare: entities in any source whose required
+    parameter shares an OBO key with a field here.  Use the name in include.
+    """
+    links: [CatalogLink!]!
+  }
+
+  """A field of a catalog entity"""
+  type CatalogField {
+    name: String!
+    """OBO key of the identifier this field holds (* = a CURIE naming its own key)"""
+    obo: String
+  }
+
+  """An implicit relation, by shared OBO key"""
+  type CatalogLink {
+    """Name to use in QueryInput.include, e.g. pdbe/bestStructures"""
+    name: String!
+    catalog: String!
+    entity: String!
+    localKey: String!
+    foreignKey: String!
+    obo: String!
+    description: String
+  }
+
+  """An identifier space"""
+  type OboKey {
+    """Bioregistry prefix, e.g. uniprot"""
+    key: String!
+    label: String!
+    """Preferred CURIE prefix, e.g. CHEBI"""
+    prefix: String!
+    """curie (written PREFIX:local) or local (written bare)"""
+    form: String!
+    """Pattern of the local identifier"""
+    pattern: String!
+    """Catalog field name conventionally carrying this key"""
+    field: String
   }
 
   """A parameter an api entity accepts in where"""
@@ -424,6 +481,8 @@ const typeDefs = /* GraphQL */ `
     required: Boolean!
     description: String
     example: JSON
+    """OBO keys of the identifiers this parameter accepts"""
+    obo: [String!]!
   }
 
   """A pre-defined relationship within a catalog entity"""
@@ -439,6 +498,8 @@ const typeDefs = /* GraphQL */ `
     description: String
     """Cap on related rows per parent row, when the catalog sets one"""
     limit: Int
+    """OBO key the join is declared by, when it is"""
+    obo: String
   }
 `
 
@@ -462,7 +523,15 @@ const resolvers = {
     catalog: (_parent, { name, category, driver }) => require('./catalog').getCatalog(name)
       .filter((entry) => !category || entry.category === category)
       .filter((entry) => !driver || entry.driver === driver),
-    generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input)
+    generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input),
+    oboKeys: () => Object.entries(obo.KEYS).map(([key, spec]) => ({
+      key,
+      label: spec.label,
+      prefix: spec.prefix,
+      form: spec.form,
+      pattern: spec.pattern.source,
+      field: obo.CANONICAL_FIELD[key] || null
+    }))
   },
   Mutation: {
     ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input)
@@ -470,10 +539,31 @@ const resolvers = {
   CatalogAuth: {
     required: (auth) => Boolean(auth.required)
   },
+  CatalogEntry: {
+    selfHosted: (entry) => isServerHeld(entry),
+    // Entities need to know their entry to resolve relations declared by OBO key.
+    entities: (entry) => entry.entities.map((entity) => ({ ...entity, __entry: entry }))
+  },
+  CatalogConnection: Object.fromEntries(['host', 'port', 'database', 'user', 'password', 'scheme', 'headers'].map((field) => [
+    field,
+    (connection) => (isEnvValue(connection[field]) ? null : connection[field])
+  ])),
   CatalogEntity: {
     columns: (entity) => entityColumns(entity),
-    params: (entity) => entityParams(entity),
-    relations: (entity) => entity.relations || []
+    fields: (entity) => entityColumns(entity).map((name) => ({ name, obo: obo.fieldKey(entity, name) })),
+    params: (entity) => entityParams(entity).map((p) => ({ ...p, obo: obo.paramKeys(entity, p.name) })),
+    relations: (entity) => (entity.relations || []).map((rel) => {
+      try {
+        return require('./database/sources').resolveRelation(entity.__entry, entity, rel)
+      } catch {
+        return rel
+      }
+    }),
+    links: (entity) => {
+      if (!entity.__entry || entity.__entry.driver !== 'api') return []
+      const declared = new Set((entity.relations || []).map((r) => `${r.catalog || entity.__entry.name}/${r.entity}`))
+      return implicitLinks(entity.__entry, entity).filter((l) => !declared.has(`${l.catalog}/${l.entity}`))
+    }
   }
 }
 

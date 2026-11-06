@@ -44,11 +44,11 @@ const POLYMER_ENTITY_GRAPHQL = `query ($id: String!) {
 }`
 
 const POLYMER_ENTITY_RELATIONS = [
-  { alias: 'protein', description: 'The UniProtKB entry this polymer entity maps to (SIFTS)', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-  { alias: 'alphafold', description: 'AlphaFold prediction for the mapped UniProt protein', catalog: 'alphafold', entity: 'prediction', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-  { alias: 'domains', description: 'InterPro entries matched on the mapped UniProt protein', catalog: 'interpro', entity: 'proteinEntries', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'entry', description: 'The PDB entry this entity belongs to', entity: 'entry', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasOne' },
-  { alias: 'taxonomy', description: 'Source organism taxonomy', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+  { alias: 'protein', description: 'The UniProtKB entry this polymer entity maps to (SIFTS)', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+  { alias: 'alphafold', description: 'AlphaFold prediction for the mapped UniProt protein', catalog: 'alphafold', entity: 'prediction', obo: 'uniprot', type: 'hasOne' },
+  { alias: 'domains', description: 'InterPro entries matched on the mapped UniProt protein', catalog: 'interpro', entity: 'proteinEntries', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'entry', description: 'The PDB entry this entity belongs to', entity: 'entry', obo: 'pdb', type: 'hasOne' },
+  { alias: 'taxonomy', description: 'Source organism taxonomy', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
 ]
 
 module.exports = {
@@ -102,10 +102,10 @@ module.exports = {
       },
       example: { pdbId: '1TUP' },
       relations: [
-        { alias: 'polymerEntities', description: 'Distinct polymer chains with their UniProt mappings', entity: 'polymerEntities', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasMany' },
-        { alias: 'ligands', description: 'Bound small molecules (PDBe)', catalog: 'pdbe', entity: 'ligands', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasMany' },
-        { alias: 'uniprotMappings', description: 'Chain-to-UniProt residue mappings (PDBe SIFTS)', catalog: 'pdbe', entity: 'uniprotMappings', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasMany' },
-        { alias: 'publication', description: 'Primary citation in PubMed', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+        { alias: 'polymerEntities', description: 'Distinct polymer chains with their UniProt mappings', entity: 'polymerEntities', obo: 'pdb', type: 'hasMany' },
+        { alias: 'ligands', description: 'Bound small molecules (PDBe)', catalog: 'pdbe', entity: 'ligands', obo: 'pdb', type: 'hasMany' },
+        { alias: 'uniprotMappings', description: 'Chain-to-UniProt residue mappings (PDBe SIFTS)', catalog: 'pdbe', entity: 'uniprotMappings', obo: 'pdb', type: 'hasMany' },
+        { alias: 'publication', description: 'Primary citation in PubMed', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' }
       ]
     },
     {
@@ -163,11 +163,12 @@ module.exports = {
       },
       example: { pdbId: '4HHB', assemblyId: 1 },
       relations: [
-        { alias: 'entry', description: 'The PDB entry this assembly belongs to', entity: 'entry', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasOne' }
+        { alias: 'entry', description: 'The PDB entry this assembly belongs to', entity: 'entry', obo: 'pdb', type: 'hasOne' }
       ]
     },
     {
       name: 'chemicalComponent',
+      obo: { chemblId: 'chembl.compound' },
       description: 'A chemical component (ligand, residue or ion) from the PDB Chemical Component Dictionary',
       path: '/chemcomp/{compId}',
       params: {
@@ -191,8 +192,8 @@ module.exports = {
       },
       example: { compId: 'HEM' },
       relations: [
-        { alias: 'compound', description: 'The PubChem compound with the same InChIKey', catalog: 'pubchem', entity: 'compoundByInchiKey', localKey: 'inchiKey', foreignKey: 'inchiKey', type: 'hasOne' },
-        { alias: 'molecule', description: 'The ChEMBL molecule for this component', catalog: 'chembl', entity: 'molecule', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' }
+        { alias: 'compound', description: 'The PubChem compound with the same InChIKey', catalog: 'pubchem', entity: 'compoundByInchiKey', obo: 'inchikey', type: 'hasOne' },
+        { alias: 'molecule', description: 'The ChEMBL molecule for this component', catalog: 'chembl', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' }
       ]
     }
   ]

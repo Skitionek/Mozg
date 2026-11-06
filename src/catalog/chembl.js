@@ -47,12 +47,12 @@ const MOLECULE_FIELDS = {
 }
 
 const MOLECULE_RELATIONS = [
-  { alias: 'mechanisms', description: 'Mechanisms of action of this drug', entity: 'mechanisms', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasMany' },
-  { alias: 'indications', description: 'Diseases this drug is approved or in trials for', entity: 'indications', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasMany' },
-  { alias: 'activities', description: 'Measured bioactivities of this molecule', entity: 'activities', localKey: 'chemblId', foreignKey: 'moleculeChemblId', type: 'hasMany' },
-  { alias: 'parent', description: 'Parent compound (salt-stripped form)', entity: 'molecule', localKey: 'parentChemblId', foreignKey: 'chemblId', type: 'hasOne' },
-  { alias: 'pubchem', description: 'The same structure in PubChem (by InChIKey)', catalog: 'pubchem', entity: 'compoundByInchiKey', localKey: 'inchiKey', foreignKey: 'inchiKey', type: 'hasOne' },
-  { alias: 'drug', description: 'Open Targets drug record (indications, linked targets, warnings)', catalog: 'opentargets', entity: 'drug', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' },
+  { alias: 'mechanisms', description: 'Mechanisms of action of this drug', entity: 'mechanisms', obo: 'chembl.compound', type: 'hasMany' },
+  { alias: 'indications', description: 'Diseases this drug is approved or in trials for', entity: 'indications', obo: 'chembl.compound', type: 'hasMany' },
+  { alias: 'activities', description: 'Measured bioactivities of this molecule', entity: 'activities', obo: 'chembl.compound', type: 'hasMany' },
+  { alias: 'parent', description: 'Parent compound (salt-stripped form)', entity: 'molecule', localKey: 'parentChemblId', obo: 'chembl.compound', type: 'hasOne' },
+  { alias: 'pubchem', description: 'The same structure in PubChem (by InChIKey)', catalog: 'pubchem', entity: 'compoundByInchiKey', obo: 'inchikey', type: 'hasOne' },
+  { alias: 'drug', description: 'Open Targets drug record (indications, linked targets, warnings)', catalog: 'opentargets', entity: 'drug', obo: 'chembl.compound', type: 'hasOne' },
   { alias: 'clinicalTrials', description: 'ClinicalTrials.gov studies with this drug as an intervention', catalog: 'clinicaltrials', entity: 'studies', localKey: 'name', foreignKey: 'intervention', type: 'hasMany' },
   { alias: 'labels', description: 'FDA drug labels for this generic name', catalog: 'openfda', entity: 'labels', localKey: 'name', foreignKey: 'genericName', type: 'hasMany' },
   { alias: 'rxnorm', description: 'RxNorm concept for this drug name', catalog: 'rxnorm', entity: 'drug', localKey: 'name', foreignKey: 'name', type: 'hasOne' },
@@ -75,12 +75,12 @@ const TARGET_FIELDS = {
 }
 
 const TARGET_RELATIONS = [
-  { alias: 'activities', description: 'Measured bioactivities against this target', entity: 'activities', localKey: 'chemblId', foreignKey: 'targetChemblId', type: 'hasMany' },
-  { alias: 'drugs', description: 'Drug mechanisms acting on this target', entity: 'mechanisms', localKey: 'chemblId', foreignKey: 'targetChemblId', type: 'hasMany' },
-  { alias: 'protein', description: 'UniProt entry of the (first) target component', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
+  { alias: 'activities', description: 'Measured bioactivities against this target', entity: 'activities', obo: 'chembl.target', type: 'hasMany' },
+  { alias: 'drugs', description: 'Drug mechanisms acting on this target', entity: 'mechanisms', obo: 'chembl.target', type: 'hasMany' },
+  { alias: 'protein', description: 'UniProt entry of the (first) target component', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
   { alias: 'gene', description: 'HGNC gene record for the target symbol', catalog: 'hgnc', entity: 'geneBySymbol', localKey: 'symbol', foreignKey: 'symbol', type: 'hasOne' },
   { alias: 'geneInteractions', description: 'Drug–gene interactions for the target gene (DGIdb)', catalog: 'dgidb', entity: 'interactionsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
-  { alias: 'taxonomy', description: 'Taxonomy of the target organism', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+  { alias: 'taxonomy', description: 'Taxonomy of the target organism', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
 ]
 
 const PAGINATE = { limit: 'limit', offset: 'offset', max: 1000 }
@@ -102,6 +102,7 @@ module.exports = {
   entities: [
     {
       name: 'molecule',
+      obo: { chemblId: 'chembl.compound' },
       description: 'One compound or drug by ChEMBL id',
       path: '/molecule/{chemblId}.json',
       params: {
@@ -113,6 +114,7 @@ module.exports = {
     },
     {
       name: 'moleculeByInchiKey',
+      obo: { chemblId: 'chembl.compound' },
       description: 'The ChEMBL compound with this standard InChIKey',
       path: '/molecule/{inchiKey}.json',
       params: {
@@ -124,6 +126,7 @@ module.exports = {
     },
     {
       name: 'molecules',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Compounds matching a name or synonym (full-text search, best match first)',
       path: '/molecule/search.json',
       params: {
@@ -137,6 +140,7 @@ module.exports = {
     },
     {
       name: 'target',
+      obo: { chemblId: 'chembl.target' },
       description: 'One drug target (protein, complex, family…) by ChEMBL id',
       path: '/target/{chemblId}.json',
       params: {
@@ -148,6 +152,7 @@ module.exports = {
     },
     {
       name: 'targetsForProtein',
+      obo: { chemblId: 'chembl.target' },
       description: 'ChEMBL targets that include this UniProt protein as a component (single protein, complexes, families)',
       path: '/target.json',
       params: {
@@ -161,6 +166,7 @@ module.exports = {
     },
     {
       name: 'targets',
+      obo: { chemblId: 'chembl.target' },
       description: 'Targets matching a name or gene symbol (full-text search)',
       path: '/target/search.json',
       params: {
@@ -216,13 +222,14 @@ module.exports = {
       paginate: PAGINATE,
       example: { targetChemblId: 'CHEMBL203', standardType: 'IC50' },
       relations: [
-        { alias: 'molecule', description: 'The measured compound', entity: 'molecule', localKey: 'moleculeChemblId', foreignKey: 'chemblId', type: 'hasOne' },
-        { alias: 'target', description: 'The target it was measured against', entity: 'target', localKey: 'targetChemblId', foreignKey: 'chemblId', type: 'hasOne' },
-        { alias: 'document', description: 'Publication or dataset the measurement comes from', entity: 'document', localKey: 'documentChemblId', foreignKey: 'documentChemblId', type: 'hasOne' }
+        { alias: 'molecule', description: 'The measured compound', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' },
+        { alias: 'target', description: 'The target it was measured against', entity: 'target', obo: 'chembl.target', type: 'hasOne' },
+        { alias: 'document', description: 'Publication or dataset the measurement comes from', entity: 'document', obo: 'chembl.document', type: 'hasOne' }
       ]
     },
     {
       name: 'mechanisms',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Curated mechanisms of action of approved and clinical drugs, by drug or by target',
       path: '/mechanism.json',
       params: {
@@ -248,12 +255,13 @@ module.exports = {
       paginate: PAGINATE,
       example: { chemblId: 'CHEMBL25' },
       relations: [
-        { alias: 'molecule', description: 'The drug', entity: 'molecule', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' },
-        { alias: 'target', description: 'The target the drug acts on', entity: 'target', localKey: 'targetChemblId', foreignKey: 'chemblId', type: 'hasOne' }
+        { alias: 'molecule', description: 'The drug', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' },
+        { alias: 'target', description: 'The target the drug acts on', entity: 'target', obo: 'chembl.target', type: 'hasOne' }
       ]
     },
     {
       name: 'indications',
+      obo: { chemblId: 'chembl.compound' },
       description: 'Diseases a drug is approved for or investigated in, with the highest clinical phase reached',
       path: '/drug_indication.json',
       params: {
@@ -277,10 +285,10 @@ module.exports = {
       paginate: PAGINATE,
       example: { chemblId: 'CHEMBL25' },
       relations: [
-        { alias: 'molecule', description: 'The drug', entity: 'molecule', localKey: 'chemblId', foreignKey: 'chemblId', type: 'hasOne' },
-        { alias: 'disease', description: 'Open Targets disease record', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' },
-        { alias: 'diseaseTerm', description: 'The EFO term in the Ontology Lookup Service', catalog: 'ols', entity: 'term', localKey: 'diseaseId', foreignKey: 'termId', where: { ontology: 'efo' }, type: 'hasOne' },
-        { alias: 'mesh', description: 'The MeSH heading for the indication', catalog: 'mesh', entity: 'descriptor', localKey: 'meshId', foreignKey: 'meshId', type: 'hasOne' }
+        { alias: 'molecule', description: 'The drug', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' },
+        { alias: 'disease', description: 'Open Targets disease record', catalog: 'opentargets', entity: 'disease', obo: '*', type: 'hasOne' },
+        { alias: 'diseaseTerm', description: 'The EFO term in the Ontology Lookup Service', catalog: 'ols', entity: 'term', obo: '*', where: { ontology: 'efo' }, type: 'hasOne' },
+        { alias: 'mesh', description: 'The MeSH heading for the indication', catalog: 'mesh', entity: 'descriptor', obo: 'mesh', type: 'hasOne' }
       ]
     },
     {
@@ -301,8 +309,8 @@ module.exports = {
       },
       example: { documentChemblId: 'CHEMBL1134862' },
       relations: [
-        { alias: 'article', description: 'The PubMed record', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' },
-        { alias: 'activities', description: 'Activities extracted from this document', entity: 'activitiesInDocument', localKey: 'documentChemblId', foreignKey: 'documentChemblId', type: 'hasMany' }
+        { alias: 'article', description: 'The PubMed record', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' },
+        { alias: 'activities', description: 'Activities extracted from this document', entity: 'activitiesInDocument', obo: 'chembl.document', type: 'hasMany' }
       ]
     },
     {
@@ -328,8 +336,8 @@ module.exports = {
       paginate: PAGINATE,
       example: { documentChemblId: 'CHEMBL1134862' },
       relations: [
-        { alias: 'molecule', description: 'The measured compound', entity: 'molecule', localKey: 'moleculeChemblId', foreignKey: 'chemblId', type: 'hasOne' },
-        { alias: 'target', description: 'The target it was measured against', entity: 'target', localKey: 'targetChemblId', foreignKey: 'chemblId', type: 'hasOne' }
+        { alias: 'molecule', description: 'The measured compound', entity: 'molecule', obo: 'chembl.compound', type: 'hasOne' },
+        { alias: 'target', description: 'The target it was measured against', entity: 'target', obo: 'chembl.target', type: 'hasOne' }
       ]
     }
   ]

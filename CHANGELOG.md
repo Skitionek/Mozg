@@ -41,6 +41,25 @@ verified against the live APIs, and joined up across sources.
 
   Every entity and relation is listed in the generated `docs/sources.md`;
   22 runnable life-science examples replace the old bioinformatics ones.
+- **OBO keys.** Identifier fields and parameters are annotated with the
+  Bioregistry prefix of their identifier space (`uniprot`, `ensembl`,
+  `chebi`, `mondo`, …; `src/database/obo.js`), by naming convention or an
+  entity-level `obo` map.  Built on the rule *same key + same value = same
+  thing*:
+  - the api driver writes keyed values in one canonical form per key, and
+    `verify-sources` fails values that are not;
+  - relations are declared by key (`obo: 'uniprot'`) — 529 of the 663
+    catalog relations now are; `RelationInput.obo` does the same in a query;
+  - undeclared joins: `include: ["source/entity"]` follows any entity whose
+    required parameter takes a key a field carries (`CatalogEntity.links`);
+  - the catalog lint rejects unknown keys and relations that join
+    identifiers from different spaces;
+  - `oboKeys` query, `CatalogEntity.fields`, `CatalogParam.obo`,
+    `CatalogRelation.obo`; the query builder offers OBO links as includes.
+- Self-hosting support: `MOZG_SOURCES_DIR` registers JSON catalog entries at
+  startup; connection values may come from the environment
+  (`{ "env": "VAR" }`), are never shown by the `catalog` query, and a
+  source whose connection the server holds cannot be redirected by callers.
 - `limit` on relations (`RelationInput.limit`, and on catalog relations) to
   cap related rows per parent; `hasOne`/`belongsTo` now fetch a single row.
 - **Resilient outbound HTTP** (`src/database/http.js`) for every network

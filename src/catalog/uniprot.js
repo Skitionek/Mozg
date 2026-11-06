@@ -68,17 +68,17 @@ function searchQuery (params) {
 }
 
 const PROTEIN_RELATIONS = [
-  { alias: 'structures', description: 'Experimental PDB structures mapped to this protein, best coverage first (PDBe SIFTS; top 50 — query pdbe/bestStructures for all)', catalog: 'pdbe', entity: 'bestStructures', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany', limit: 50 },
-  { alias: 'alphafold', description: 'AlphaFold predicted structure', catalog: 'alphafold', entity: 'prediction', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-  { alias: 'domains', description: 'InterPro families, domains and sites matched on this protein', catalog: 'interpro', entity: 'proteinEntries', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'goAnnotations', description: 'Gene Ontology annotations (QuickGO)', catalog: 'quickgo', entity: 'annotations', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'pathways', description: 'Reactome pathways this protein participates in', catalog: 'reactome', entity: 'pathwaysForProtein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'interactions', description: 'Curated molecular interactions (IntAct)', catalog: 'intact', entity: 'interactions', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'reactions', description: 'Biochemical reactions catalysed (Rhea)', catalog: 'rhea', entity: 'reactions', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'drugTargets', description: 'ChEMBL drug targets that include this protein', catalog: 'chembl', entity: 'targetsForProtein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-  { alias: 'gene', description: 'The Ensembl gene encoding this protein', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'target', description: 'Open Targets target record (tractability, safety, disease associations)', catalog: 'opentargets', entity: 'target', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'taxonomy', description: 'Taxonomy node of the source organism', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' }
+  { alias: 'structures', description: 'Experimental PDB structures mapped to this protein, best coverage first (PDBe SIFTS; top 50 — query pdbe/bestStructures for all)', catalog: 'pdbe', entity: 'bestStructures', obo: 'uniprot', type: 'hasMany', limit: 50 },
+  { alias: 'alphafold', description: 'AlphaFold predicted structure', catalog: 'alphafold', entity: 'prediction', obo: 'uniprot', type: 'hasOne' },
+  { alias: 'domains', description: 'InterPro families, domains and sites matched on this protein', catalog: 'interpro', entity: 'proteinEntries', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'goAnnotations', description: 'Gene Ontology annotations (QuickGO)', catalog: 'quickgo', entity: 'annotations', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'pathways', description: 'Reactome pathways this protein participates in', catalog: 'reactome', entity: 'pathwaysForProtein', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'interactions', description: 'Curated molecular interactions (IntAct)', catalog: 'intact', entity: 'interactions', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'reactions', description: 'Biochemical reactions catalysed (Rhea)', catalog: 'rhea', entity: 'reactions', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'drugTargets', description: 'ChEMBL drug targets that include this protein', catalog: 'chembl', entity: 'targetsForProtein', obo: 'uniprot', type: 'hasMany' },
+  { alias: 'gene', description: 'The Ensembl gene encoding this protein', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'target', description: 'Open Targets target record (tractability, safety, disease associations)', catalog: 'opentargets', entity: 'target', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'taxonomy', description: 'Taxonomy node of the source organism', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' }
 ]
 
 module.exports = {
@@ -98,6 +98,7 @@ module.exports = {
   entities: [
     {
       name: 'protein',
+      obo: { chemblId: 'chembl.target' },
       description: 'One UniProtKB entry by accession',
       path: '/uniprotkb/{uniprotAccession}',
       params: {
@@ -110,6 +111,7 @@ module.exports = {
     },
     {
       name: 'proteins',
+      obo: { chemblId: 'chembl.target' },
       description: 'UniProtKB entries matching a gene, organism or free query',
       path: '/uniprotkb/search',
       params: {
@@ -149,7 +151,7 @@ module.exports = {
       },
       example: { taxonId: 9606 },
       relations: [
-        { alias: 'parent', description: 'Parent taxon', entity: 'taxonomy', localKey: 'parentTaxonId', foreignKey: 'taxonId', type: 'hasOne' }
+        { alias: 'parent', description: 'Parent taxon', entity: 'taxonomy', localKey: 'parentTaxonId', obo: 'ncbitaxon', type: 'hasOne' }
       ]
     }
   ]

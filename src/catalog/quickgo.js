@@ -36,9 +36,9 @@ const ANNOTATION_FIELDS = {
 }
 
 const ANNOTATION_RELATIONS = [
-  { alias: 'term', description: 'The annotated GO term', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' },
-  { alias: 'protein', description: 'The annotated UniProt protein', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-  { alias: 'publication', description: 'The PubMed article supporting the annotation (Europe PMC)', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+  { alias: 'term', description: 'The annotated GO term', entity: 'term', obo: 'go', type: 'hasOne' },
+  { alias: 'protein', description: 'The annotated UniProt protein', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+  { alias: 'publication', description: 'The PubMed article supporting the annotation (Europe PMC)', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
 ]
 
 module.exports = {
@@ -111,10 +111,10 @@ module.exports = {
       },
       example: { goId: 'GO:0006915' },
       relations: [
-        { alias: 'children', description: 'Direct children of the term (is_a, part_of, regulates…)', entity: 'children', localKey: 'goId', foreignKey: 'goId', type: 'hasMany' },
-        { alias: 'ancestors', description: 'Every ancestor of the term over is_a and part_of', entity: 'ancestors', localKey: 'goId', foreignKey: 'goId', type: 'hasMany' },
-        { alias: 'humanAnnotations', description: 'Human gene products annotated to the term', entity: 'annotationsForTerm', localKey: 'goId', foreignKey: 'goId', type: 'hasMany', where: { taxonId: 9606 } },
-        { alias: 'goc', description: 'The same term in the GO Consortium API', catalog: 'geneontology', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'children', description: 'Direct children of the term (is_a, part_of, regulates…)', entity: 'children', obo: 'go', type: 'hasMany' },
+        { alias: 'ancestors', description: 'Every ancestor of the term over is_a and part_of', entity: 'ancestors', obo: 'go', type: 'hasMany' },
+        { alias: 'humanAnnotations', description: 'Human gene products annotated to the term', entity: 'annotationsForTerm', obo: 'go', type: 'hasMany', where: { taxonId: 9606 } },
+        { alias: 'goc', description: 'The same term in the GO Consortium API', catalog: 'geneontology', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     },
     {
@@ -133,7 +133,7 @@ module.exports = {
       },
       example: { goId: 'GO:0006915' },
       relations: [
-        { alias: 'term', description: 'The child term in full', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'term', description: 'The child term in full', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     },
     {
@@ -148,7 +148,7 @@ module.exports = {
       fields: { goId: (id) => id },
       example: { goId: 'GO:0006915' },
       relations: [
-        { alias: 'term', description: 'The ancestor term in full', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'term', description: 'The ancestor term in full', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     },
     {
@@ -169,7 +169,7 @@ module.exports = {
       paginate: { limit: 'limit', page: 'page', pageBase: 1, max: 600 },
       example: { query: 'apoptotic process' },
       relations: [
-        { alias: 'term', description: 'The term in full', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'term', description: 'The term in full', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     }
   ]

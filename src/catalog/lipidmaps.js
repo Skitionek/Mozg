@@ -39,9 +39,9 @@ const COMPOUND_FIELDS = {
 }
 
 const COMPOUND_RELATIONS = [
-  { alias: 'pubchem', description: 'The PubChem compound', catalog: 'pubchem', entity: 'compound', localKey: 'pubchemCid', foreignKey: 'pubchemCid', type: 'hasOne' },
-  { alias: 'chebi', description: 'The ChEBI entity', catalog: 'chebi', entity: 'compound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasOne' },
-  { alias: 'chembl', description: 'The same structure in ChEMBL (by InChIKey)', catalog: 'chembl', entity: 'moleculeByInchiKey', localKey: 'inchiKey', foreignKey: 'inchiKey', type: 'hasOne' },
+  { alias: 'pubchem', description: 'The PubChem compound', catalog: 'pubchem', entity: 'compound', obo: 'pubchem.compound', type: 'hasOne' },
+  { alias: 'chebi', description: 'The ChEBI entity', catalog: 'chebi', entity: 'compound', obo: 'chebi', type: 'hasOne' },
+  { alias: 'chembl', description: 'The same structure in ChEMBL (by InChIKey)', catalog: 'chembl', entity: 'moleculeByInchiKey', obo: 'inchikey', type: 'hasOne' },
   { alias: 'kegg', description: 'The KEGG COMPOUND record', catalog: 'kegg', entity: '/get', localKey: 'keggId', foreignKey: '_pathSuffix', type: 'hasOne' }
 ]
 

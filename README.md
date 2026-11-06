@@ -132,7 +132,8 @@ catalog.
 
 - **`where`** takes the entity's declared parameters — `catalog(name: "chembl")` lists them with an example for each.  An unknown key is an error, never a silently ignored filter.
 - **`include`** follows catalog relations by name, across sources.  `"mechanisms.target"` fetches the molecule's mechanisms, then each mechanism's target.  You can still pass explicit `relations` alongside.
-- **Identifiers have one name everywhere** — `uniprotAccession`, `ensemblGeneId`, `ncbiGeneId`, `hgncId`, `chemblId`, `pubchemCid`, `inchiKey`, `pmid`, `rsId`, `diseaseId`, … — which is what makes the joins line up.
+- **Identifiers carry OBO keys** — the [Bioregistry](https://bioregistry.io) prefix of their identifier space (`uniprot`, `ensembl`, `ncbigene`, `chebi`, `mondo`, …).  Two fields with the same key and the same value name the same thing, so Mozg writes every keyed value one canonical way (`CHEBI:15365`, `P04637`, unversioned `ENSG00000141510`) whatever the source sent, and relations are declared by key rather than by field names.
+- **Joins nobody declared** — `include: ["pdbe/bestStructures"]` follows any entity whose required parameter takes a key a field carries, across all sources (the `catalog` query lists them as `links`; `oboKeys` lists the keys).  Self-hosted databases join the same way through their annotated columns.
 - **`raw: true`** returns records exactly as the source sent them, for fields the catalog does not map.
 - **`apiKeys: { ncbi: "…", openfda: "…" }`** passes optional keys that raise a provider's rate limit; keys never appear in error messages.
 - Relations are fetched per parent row and throttled per provider, so wide `include`s are slow by design — use `limit` on the parent query.

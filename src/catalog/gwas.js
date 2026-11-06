@@ -1,5 +1,7 @@
 'use strict'
 
+const { getPath } = require('../database/drivers/api')
+
 /**
  * NHGRI-EBI GWAS Catalog — curated SNP–trait associations from published
  * genome-wide association studies.
@@ -14,7 +16,13 @@ const toUnderscore = (id) => String(id).trim().replace(':', '_')
 
 const ASSOCIATION_FIELDS = {
   associationId: 'association_id',
-  rsId: 'snp_allele[0].rs_id',
+  // GWAS Catalog names a variant without a dbSNP id by its position
+  // (chr10:123340431); that is not an rsId, so it goes in variantName only.
+  rsId: (r) => {
+    const id = getPath(r, 'snp_allele[0].rs_id')
+    return typeof id === 'string' && /^rs\d+$/i.test(id) ? id : null
+  },
+  variantName: 'snp_allele[0].rs_id',
   riskAllele: 'snp_allele[0].effect_allele',
   // p_value underflows to 0 for the strongest hits; mantissa × 10^exponent does not
   pValue: 'p_value',
@@ -38,11 +46,11 @@ const ASSOCIATION_FIELDS = {
 
 const ASSOCIATION_RELATIONS = [
   { alias: 'study', description: 'The GWAS study that reported this association', entity: 'study', localKey: 'studyId', foreignKey: 'studyId', type: 'hasOne' },
-  { alias: 'variant', description: 'GWAS Catalog record of the lead variant', entity: 'variant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' },
-  { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, gnomAD frequencies)', catalog: 'myvariant', entity: 'variantByRsId', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-  { alias: 'ensemblVariant', description: 'Ensembl variation record (alleles, consequences, mappings)', catalog: 'ensembl', entity: 'variant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' },
-  { alias: 'disease', description: 'Open Targets record of the (first) mapped trait', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' },
-  { alias: 'publication', description: 'The publication (Europe PMC)', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+  { alias: 'variant', description: 'GWAS Catalog record of the lead variant', entity: 'variant', obo: 'dbsnp', type: 'hasOne' },
+  { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, gnomAD frequencies)', catalog: 'myvariant', entity: 'variantByRsId', obo: 'dbsnp', type: 'hasMany' },
+  { alias: 'ensemblVariant', description: 'Ensembl variation record (alleles, consequences, mappings)', catalog: 'ensembl', entity: 'variant', obo: 'dbsnp', type: 'hasOne' },
+  { alias: 'disease', description: 'Open Targets record of the (first) mapped trait', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', obo: '*', foreignKey: 'diseaseId', type: 'hasOne' },
+  { alias: 'publication', description: 'The publication (Europe PMC)', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
 ]
 
 // Strongest associations first; 50 per request unless the caller asks for a limit.
@@ -147,8 +155,8 @@ module.exports = {
       example: { studyId: 'GCST000001' },
       relations: [
         { alias: 'associations', description: 'Associations this study reported', entity: 'associationsForStudy', localKey: 'studyId', foreignKey: 'studyId', type: 'hasMany' },
-        { alias: 'disease', description: 'Open Targets record of the (first) mapped trait', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' },
-        { alias: 'publication', description: 'The publication (Europe PMC)', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+        { alias: 'disease', description: 'Open Targets record of the (first) mapped trait', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', obo: '*', foreignKey: 'diseaseId', type: 'hasOne' },
+        { alias: 'publication', description: 'The publication (Europe PMC)', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
       ]
     },
     {
@@ -171,9 +179,9 @@ module.exports = {
       },
       example: { rsId: 'rs7412' },
       relations: [
-        { alias: 'associations', description: 'Trait associations reported for this variant', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-        { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, gnomAD frequencies)', catalog: 'myvariant', entity: 'variantByRsId', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-        { alias: 'ensemblVariant', description: 'Ensembl variation record', catalog: 'ensembl', entity: 'variant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' }
+        { alias: 'associations', description: 'Trait associations reported for this variant', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' },
+        { alias: 'annotation', description: 'MyVariant.info annotation (ClinVar, CADD, gnomAD frequencies)', catalog: 'myvariant', entity: 'variantByRsId', obo: 'dbsnp', type: 'hasMany' },
+        { alias: 'ensemblVariant', description: 'Ensembl variation record', catalog: 'ensembl', entity: 'variant', obo: 'dbsnp', type: 'hasOne' }
       ]
     }
   ]

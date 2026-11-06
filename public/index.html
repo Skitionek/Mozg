@@ -1487,7 +1487,8 @@
             entities {
               name description columns example
               params { name required description }
-              relations { entity foreignKey localKey alias type catalog description }
+              relations { entity foreignKey localKey alias type catalog description obo }
+              links { name obo description }
             }
           }
         }` }),
@@ -1550,17 +1551,25 @@
   function renderIncludes(entry, entity) {
     const list = document.getElementById('include-list');
     const rels = entity.relations || [];
-    if (rels.length === 0) {
+    const links = entity.links || [];
+    if (rels.length === 0 && links.length === 0) {
       list.innerHTML = '<div style="font-size:.72rem;color:var(--muted)">This entity declares no relations.</div>';
       return;
     }
-    list.innerHTML = rels.map((r, i) => `
+    const option = (alias, target, description, key) => `
       <label style="display:flex;gap:.4rem;align-items:flex-start;margin:.25rem 0;font-weight:normal;cursor:pointer">
-        <input type="checkbox" data-alias="${escapeHTML(r.alias)}" id="inc-${i}" style="width:auto;margin-top:.15rem" />
-        <span><strong>${escapeHTML(r.alias)}</strong>
-          <span style="color:var(--muted)">→ ${escapeHTML((r.catalog || entry.name) + '/' + r.entity)}</span><br />
-          <span style="font-size:.72rem;color:var(--muted)">${escapeHTML(r.description || '')}</span></span>
-      </label>`).join('');
+        <input type="checkbox" data-alias="${escapeHTML(alias)}" style="width:auto;margin-top:.15rem" />
+        <span style="min-width:0;overflow-wrap:anywhere"><strong>${escapeHTML(alias)}</strong>
+          ${target ? `<span style="color:var(--muted)">→ ${escapeHTML(target)}</span>` : ''}${key ? ` <span style="font-size:.68rem;color:var(--accent)" title="joined by OBO key">by ${escapeHTML(key)}</span>` : ''}<br />
+          <span style="font-size:.72rem;color:var(--muted)">${escapeHTML(description || '')}</span></span>
+      </label>`;
+    // Declared relations first; then everything reachable through a shared
+    // OBO key, which needs no declaration (same key + same value = same thing).
+    list.innerHTML = rels.map((r) => option(r.alias, (r.catalog || entry.name) + '/' + r.entity, r.description, r.obo)).join('')
+      + (links.length
+        ? `<div style="font-size:.7rem;color:var(--muted);margin:.5rem 0 .2rem;text-transform:uppercase;letter-spacing:.04em">Linked by OBO key (${links.length})</div>`
+          + links.map((l) => option(l.name, null, l.description, l.obo)).join('')
+        : '');
     list.querySelectorAll('input[type=checkbox]').forEach((cb) => cb.addEventListener('change', () => {
       includes = [...list.querySelectorAll('input:checked')].map((x) => x.dataset.alias);
       generateQuery();

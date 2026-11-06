@@ -106,6 +106,60 @@ parameter of the target entity and `localKey` a field of this one —
 `tests/catalog-relations.test.js` enforces both for every relation.  A parent
 whose `localKey` is null gets `[]` (hasMany) or `null` (hasOne) without a request.
 
+## OBO keys
+
+Every identifier field and parameter carries an **OBO key**: the prefix of
+its identifier space as the [Bioregistry](https://bioregistry.io) (the OBO
+community's registry) names it — `uniprot`, `ensembl`, `ncbigene`, `chebi`,
+`mondo`, … (`src/database/obo.js` lists them all).  One rule follows:
+
+> **Two fields with the same OBO key and the same value name the same thing.**
+
+Three things make that rule hold and put it to work:
+
+1. **Canonical values.** The api driver writes every keyed field one way,
+   whatever the source sent: OBO ontologies as CURIEs with the preferred
+   prefix (`CHEBI:15365`, `GO:0006915`, `HGNC:11998`), everything else as the
+   bare local id (`P04637`, unversioned `ENSG00000141510`, `7157`).
+   `verify-sources` fails an entity whose keyed values are not canonical.
+2. **Relations declared by key.** Name the key instead of the fields; Mozg
+   finds the parent field carrying it and the target parameter accepting it:
+   ```js
+   { alias: 'structures', catalog: 'pdbe', entity: 'bestStructures', obo: 'uniprot', type: 'hasMany' }
+   ```
+   Keep `localKey` when several fields carry the key (`localKey:
+   'partnerUniprotAccession', obo: 'uniprot'`).  Declare relations this way
+   whenever both sides are identifiers; explicit `localKey`/`foreignKey`
+   remain for joins on non-identifiers (gene symbols, names).
+3. **Links nobody declared.** Any entity whose one required parameter takes a
+   key that a field carries is reachable without a declaration:
+   `include: ["pdbe/bestStructures"]`, or `include:
+   ["uniprot/protein(partnerUniprotAccession)"]` for a non-canonical field.
+   The `catalog` query lists them per entity as `links`.
+
+**Annotating.** Fields and parameters named by the conventions table below
+— or ending in one of those names (`partnerUniprotAccession`,
+`targetChemblId`, plurals like `pdbIds`) — need nothing.  Anything else gets
+an entity-level `obo` map, which applies to fields and parameters alike:
+
+```js
+obo: { chemblId: 'chembl.target', studyAccession: 'bioproject' }
+obo: { geneId: GENE_CURIE_KEYS }   // a list: CURIEs from any of these spaces
+obo: { taxonId: null }             // switch the convention off
+```
+
+A list on a field means its values are CURIEs naming their own space; on a
+parameter it is the spaces accepted.  `params.<name>.obo` overrides for one
+parameter.  ChEMBL ids are refined (`chembl.compound`, `chembl.target`,
+`chembl.assay`, `chembl.document`); a plain `chembl` matches any of them.
+The catalog lint rejects unknown keys, `obo` relations that do not resolve,
+and any relation joining identifiers from different spaces.
+
+**Self-hosted databases** (SQL tables, Neo4j labels — see `docs/deploy.md`)
+annotate their identifier columns the same way; a keyed column is both a
+field and a filter, so public sources link into the table and the table
+links out to them.
+
 ## Conventions
 
 **Identifier fields and parameters use one name everywhere**, so a relation is

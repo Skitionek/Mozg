@@ -39,9 +39,9 @@ const ARTICLE_FIELDS = {
 }
 
 const ARTICLE_RELATIONS = [
-  { alias: 'europepmc', description: 'The same article in Europe PMC: abstract, MeSH terms, keywords, citation count', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' },
-  { alias: 'citedBy', description: 'Articles citing this one (Europe PMC)', catalog: 'europepmc', entity: 'citations', localKey: 'pmid', foreignKey: 'pmid', type: 'hasMany' },
-  { alias: 'references', description: 'Articles this one cites (Europe PMC)', catalog: 'europepmc', entity: 'references', localKey: 'pmid', foreignKey: 'pmid', type: 'hasMany' }
+  { alias: 'europepmc', description: 'The same article in Europe PMC: abstract, MeSH terms, keywords, citation count', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' },
+  { alias: 'citedBy', description: 'Articles citing this one (Europe PMC)', catalog: 'europepmc', entity: 'citations', obo: 'pubmed', type: 'hasMany' },
+  { alias: 'references', description: 'Articles this one cites (Europe PMC)', catalog: 'europepmc', entity: 'references', obo: 'pubmed', type: 'hasMany' }
 ]
 
 module.exports = {

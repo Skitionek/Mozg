@@ -51,8 +51,8 @@ const PROJECT_FIELDS = {
 }
 
 const PROJECT_RELATIONS = [
-  { alias: 'files', description: 'Files deposited with the dataset', entity: 'files', localKey: 'projectAccession', foreignKey: 'projectAccession', type: 'hasMany' },
-  { alias: 'publication', description: 'The dataset\'s first referenced publication', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+  { alias: 'files', description: 'Files deposited with the dataset', entity: 'files', obo: 'pride.project', type: 'hasMany' },
+  { alias: 'publication', description: 'The dataset\'s first referenced publication', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
 ]
 
 module.exports = {
@@ -73,6 +73,7 @@ module.exports = {
   entities: [
     {
       name: 'projects',
+      obo: { projectAccession: 'pride.project' },
       description: 'Datasets matching a keyword (gene, protein, disease, tissue, technique…), newest first',
       path: '/search/projects',
       params: {
@@ -87,6 +88,7 @@ module.exports = {
     },
     {
       name: 'project',
+      obo: { projectAccession: 'pride.project' },
       description: 'One PRIDE / ProteomeXchange dataset',
       path: '/projects/{projectAccession}',
       params: {
@@ -98,6 +100,7 @@ module.exports = {
     },
     {
       name: 'files',
+      obo: { projectAccession: 'pride.project' },
       description: 'Files of a dataset (raw, peak lists, results, search engine output) with download locations',
       path: '/projects/{projectAccession}/files',
       params: {

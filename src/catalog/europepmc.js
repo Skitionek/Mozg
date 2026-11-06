@@ -32,9 +32,9 @@ const ARTICLE_FIELDS = {
 }
 
 const ARTICLE_RELATIONS = [
-  { alias: 'pubmed', description: 'The PubMed citation record', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' },
-  { alias: 'citedBy', description: 'Articles citing this one', entity: 'citations', localKey: 'pmid', foreignKey: 'pmid', type: 'hasMany' },
-  { alias: 'references', description: 'Articles this one cites', entity: 'references', localKey: 'pmid', foreignKey: 'pmid', type: 'hasMany' }
+  { alias: 'pubmed', description: 'The PubMed citation record', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' },
+  { alias: 'citedBy', description: 'Articles citing this one', entity: 'citations', obo: 'pubmed', type: 'hasMany' },
+  { alias: 'references', description: 'Articles this one cites', entity: 'references', obo: 'pubmed', type: 'hasMany' }
 ]
 
 // Citation and reference list items: a lighter shape than a search hit.
@@ -53,8 +53,8 @@ const CITATION_FIELDS = {
 }
 
 const CITATION_RELATIONS = [
-  { alias: 'article', description: 'The full Europe PMC record (abstract, MeSH, DOI)', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' },
-  { alias: 'pubmed', description: 'The PubMed citation record', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+  { alias: 'article', description: 'The full Europe PMC record (abstract, MeSH, DOI)', entity: 'article', obo: 'pubmed', type: 'hasOne' },
+  { alias: 'pubmed', description: 'The PubMed citation record', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' }
 ]
 
 module.exports = {

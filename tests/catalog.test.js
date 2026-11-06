@@ -3,14 +3,19 @@
 const { test, describe } = require('node:test')
 const assert = require('node:assert/strict')
 const { getCatalog, listCatalog } = require('../src/catalog/index')
-const { entityColumns, entityParams } = require('../src/database/sources')
+const { entityColumns, entityParams, resolveRelation } = require('../src/database/sources')
 
-/** The relation on `source/entity` that targets `catalog/target`, if any. */
+/**
+ * The relation on `source/entity` that targets `catalog/target`, if any, with
+ * its join fields resolved the way the query path resolves them (a relation
+ * declared by OBO key names no fields of its own).
+ */
 function link (source, entity, catalog, target) {
   const [entry] = getCatalog(source)
   const e = entry.entities.find((x) => x.name === entity)
   assert.ok(e, `${source}/${entity} should exist`)
-  return (e.relations || []).find((r) => (r.catalog || source) === catalog && (!target || r.entity === target))
+  const rel = (e.relations || []).find((r) => (r.catalog || source) === catalog && (!target || r.entity === target))
+  return rel && resolveRelation(entry, e, rel)
 }
 
 describe('catalog', () => {
@@ -69,13 +74,13 @@ describe('catalog', () => {
     }
   })
 
-  test('every catalog relation has entity, foreignKey, and type', () => {
+  test('every catalog relation has entity, a join (foreignKey or OBO key), and type', () => {
     const entries = getCatalog()
     for (const entry of entries) {
       for (const entity of entry.entities) {
         for (const rel of entity.relations || []) {
           assert.ok(rel.entity, `relation in ${entry.name}/${entity.name}: entity is required`)
-          assert.ok(rel.foreignKey, `relation in ${entry.name}/${entity.name}: foreignKey is required`)
+          assert.ok(rel.foreignKey || rel.obo, `relation in ${entry.name}/${entity.name}: foreignKey or an OBO key is required`)
           assert.ok(rel.type, `relation in ${entry.name}/${entity.name}: type is required`)
           assert.ok(
             ['hasMany', 'hasOne', 'belongsTo'].includes(rel.type),

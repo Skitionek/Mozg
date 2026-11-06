@@ -29,10 +29,10 @@ const TERM_FIELDS = {
 }
 
 const TERM_LINKS = [
-  { alias: 'children', description: 'Direct children of the term', entity: 'children', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasMany' },
-  { alias: 'parents', description: 'Direct parents of the term', entity: 'parents', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasMany' },
-  { alias: 'genes', description: 'Genes annotated to the phenotype', entity: 'genesForTerm', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasMany' },
-  { alias: 'diseases', description: 'OMIM and Orphanet diseases presenting the phenotype', entity: 'diseasesForTerm', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasMany' }
+  { alias: 'children', description: 'Direct children of the term', entity: 'children', obo: 'hp', type: 'hasMany' },
+  { alias: 'parents', description: 'Direct parents of the term', entity: 'parents', obo: 'hp', type: 'hasMany' },
+  { alias: 'genes', description: 'Genes annotated to the phenotype', entity: 'genesForTerm', obo: 'hp', type: 'hasMany' },
+  { alias: 'diseases', description: 'OMIM and Orphanet diseases presenting the phenotype', entity: 'diseasesForTerm', obo: 'hp', type: 'hasMany' }
 ]
 
 const BRIEF_TERM = {
@@ -50,10 +50,10 @@ const DISEASE_FIELDS = {
 }
 
 const DISEASE_RELATIONS = [
-  { alias: 'phenotypes', description: 'Every phenotype annotated to the disease, by category', entity: 'phenotypesForDisease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasMany' },
-  { alias: 'genes', description: 'Genes associated with the disease', entity: 'genesForDisease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasMany' },
-  { alias: 'monarch', description: 'The disease in the Monarch Initiative graph, via its MONDO id', catalog: 'monarch', entity: 'entity', localKey: 'mondoId', foreignKey: 'id', type: 'hasOne' },
-  { alias: 'opentargets', description: 'Open Targets disease record, via its MONDO id', catalog: 'opentargets', entity: 'disease', localKey: 'mondoId', foreignKey: 'diseaseId', type: 'hasOne' }
+  { alias: 'phenotypes', description: 'Every phenotype annotated to the disease, by category', entity: 'phenotypesForDisease', obo: '*', type: 'hasMany' },
+  { alias: 'genes', description: 'Genes associated with the disease', entity: 'genesForDisease', obo: '*', type: 'hasMany' },
+  { alias: 'monarch', description: 'The disease in the Monarch Initiative graph, via its MONDO id', catalog: 'monarch', entity: 'entity', obo: 'mondo', type: 'hasOne' },
+  { alias: 'opentargets', description: 'Open Targets disease record, via its MONDO id', catalog: 'opentargets', entity: 'disease', obo: 'mondo', type: 'hasOne' }
 ]
 
 const GENE_FIELDS = {
@@ -62,9 +62,9 @@ const GENE_FIELDS = {
 }
 
 const GENE_RELATIONS = [
-  { alias: 'gene', description: 'The NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
+  { alias: 'gene', description: 'The NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
   { alias: 'hgnc', description: 'The HGNC record of the gene symbol', catalog: 'hgnc', entity: 'geneBySymbol', localKey: 'symbol', foreignKey: 'symbol', type: 'hasOne' },
-  { alias: 'phenotypes', description: 'Every phenotype annotated to the gene', entity: 'phenotypesForGene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasMany' }
+  { alias: 'phenotypes', description: 'Every phenotype annotated to the gene', entity: 'phenotypesForGene', obo: 'ncbigene', type: 'hasMany' }
 ]
 
 module.exports = {
@@ -93,7 +93,7 @@ module.exports = {
       example: { hpoId: 'HP:0001250' },
       relations: [
         ...TERM_LINKS,
-        { alias: 'ols', description: 'The term in OLS, with cross-ontology links', catalog: 'ols', entity: 'term', localKey: 'hpoId', foreignKey: 'termId', type: 'hasOne' }
+        { alias: 'ols', description: 'The term in OLS, with cross-ontology links', catalog: 'ols', entity: 'term', obo: 'hp', type: 'hasOne' }
       ]
     },
     {
@@ -130,7 +130,7 @@ module.exports = {
       paginate: { limit: 'limit', page: 'page', pageBase: 0, max: 100 },
       example: { q: 'seizure' },
       relations: [
-        { alias: 'term', description: 'The full term record', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' }
+        { alias: 'term', description: 'The full term record', entity: 'term', obo: 'hp', type: 'hasOne' }
       ]
     },
     {
@@ -171,7 +171,7 @@ module.exports = {
       },
       example: { ncbiGeneId: '7157' },
       relations: [
-        { alias: 'term', description: 'The full phenotype term', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' }
+        { alias: 'term', description: 'The full phenotype term', entity: 'term', obo: 'hp', type: 'hasOne' }
       ]
     },
     {
@@ -205,7 +205,7 @@ module.exports = {
       },
       example: { diseaseId: 'OMIM:151623' },
       relations: [
-        { alias: 'term', description: 'The full phenotype term', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' }
+        { alias: 'term', description: 'The full phenotype term', entity: 'term', obo: 'hp', type: 'hasOne' }
       ]
     },
     {

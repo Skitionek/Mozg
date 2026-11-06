@@ -1,5 +1,7 @@
 'use strict'
 
+const { GENE_CURIE_KEYS, ONTOLOGY_KEYS } = require('../database/obo')
+
 /**
  * Monarch Initiative — a knowledge graph integrating genes, diseases,
  * phenotypes and model organisms across species (HPO annotations, OMIM,
@@ -74,11 +76,11 @@ const ASSOCIATION_FIELDS = {
 }
 
 const ASSOCIATION_RELATIONS = [
-  { alias: 'subjectEntity', description: 'The subject node', entity: 'entity', localKey: 'subject', foreignKey: 'id', type: 'hasOne' },
-  { alias: 'objectEntity', description: 'The object node', entity: 'entity', localKey: 'object', foreignKey: 'id', type: 'hasOne' },
+  { alias: 'subjectEntity', description: 'The subject node', entity: 'entity', localKey: 'subject', obo: '*', foreignKey: 'id', type: 'hasOne' },
+  { alias: 'objectEntity', description: 'The object node', entity: 'entity', localKey: 'object', obo: '*', foreignKey: 'id', type: 'hasOne' },
   { alias: 'disease', description: 'Open Targets disease record for the disease side', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' },
-  { alias: 'phenotype', description: 'HPO term for the phenotype side', catalog: 'hpo', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' },
-  { alias: 'hgnc', description: 'HGNC record for a human gene side', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' }
+  { alias: 'phenotype', description: 'HPO term for the phenotype side', catalog: 'hpo', entity: 'term', obo: 'hp', type: 'hasOne' },
+  { alias: 'hgnc', description: 'HGNC record for a human gene side', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' }
 ]
 
 const PHENOTYPE_CATEGORY = (id) => (/^(HGNC|NCBIGene|MGI|RGD|ZFIN|FB|WB|SGD|Xenbase):/.test(id)
@@ -104,6 +106,7 @@ module.exports = {
   entities: [
     {
       name: 'entity',
+      obo: { id: [...GENE_CURIE_KEYS, ...ONTOLOGY_KEYS, 'ncbigene', 'omim', 'orpha'] },
       description: 'A gene, disease, phenotype or other node by CURIE',
       path: '/entity/{id}',
       params: {
@@ -135,18 +138,19 @@ module.exports = {
       },
       example: { id: 'MONDO:0007254' },
       relations: [
-        { alias: 'phenotypes', description: 'Phenotypes annotated to this disease or gene', entity: 'phenotypes', localKey: 'id', foreignKey: 'id', type: 'hasMany' },
-        { alias: 'genes', description: 'Genes causally linked or correlated with this disease', entity: 'diseaseGenes', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasMany' },
+        { alias: 'phenotypes', description: 'Phenotypes annotated to this disease or gene', entity: 'phenotypes', localKey: 'id', obo: '*', foreignKey: 'id', type: 'hasMany' },
+        { alias: 'genes', description: 'Genes causally linked or correlated with this disease', entity: 'diseaseGenes', localKey: 'diseaseId', obo: '*', foreignKey: 'diseaseId', type: 'hasMany' },
         { alias: 'diseases', description: 'Diseases this gene causes or is correlated with', entity: 'geneDiseases', localKey: 'geneId', foreignKey: 'geneId', type: 'hasMany' },
-        { alias: 'associations', description: 'Every association with this node as subject', entity: 'associations', localKey: 'id', foreignKey: 'subject', type: 'hasMany' },
-        { alias: 'openTargets', description: 'Open Targets disease record (targets, drugs)', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' },
-        { alias: 'hgnc', description: 'HGNC record for a human gene', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
-        { alias: 'gene', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'hpo', description: 'HPO term record for a phenotype', catalog: 'hpo', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' }
+        { alias: 'associations', description: 'Every association with this node as subject', entity: 'associations', localKey: 'id', obo: '*', foreignKey: 'subject', type: 'hasMany' },
+        { alias: 'openTargets', description: 'Open Targets disease record (targets, drugs)', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', obo: '*', foreignKey: 'diseaseId', type: 'hasOne' },
+        { alias: 'hgnc', description: 'HGNC record for a human gene', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
+        { alias: 'gene', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'hpo', description: 'HPO term record for a phenotype', catalog: 'hpo', entity: 'term', obo: 'hp', type: 'hasOne' }
       ]
     },
     {
       name: 'associations',
+      obo: { subject: [...GENE_CURIE_KEYS, ...ONTOLOGY_KEYS, 'ncbigene', 'omim', 'orpha'], object: [...GENE_CURIE_KEYS, ...ONTOLOGY_KEYS, 'ncbigene', 'omim', 'orpha'] },
       description: 'Biolink associations from a subject and/or to an object, optionally of given categories',
       path: '/association',
       params: {
@@ -163,6 +167,7 @@ module.exports = {
     },
     {
       name: 'phenotypes',
+      obo: { id: [...GENE_CURIE_KEYS, ...ONTOLOGY_KEYS, 'ncbigene', 'omim', 'orpha'] },
       description: 'Phenotypes (HPO and model-organism) annotated to a disease or gene',
       path: '/association',
       params: {
@@ -188,6 +193,7 @@ module.exports = {
     },
     {
       name: 'geneDiseases',
+      obo: { geneId: [...GENE_CURIE_KEYS, 'ncbigene'] },
       description: 'Diseases a gene causes or is correlated with',
       path: '/association',
       params: {

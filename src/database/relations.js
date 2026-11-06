@@ -1,6 +1,22 @@
 'use strict'
 
 /**
+ * The value to join on, in the form the target expects when the relation is
+ * declared by OBO key: a CURIE-valued field (`MONDO:0007254`) feeding a
+ * parameter that takes MONDO ids, or a bare id feeding a CURIE parameter.
+ * A value whose identifier space the relation cannot take resolves to
+ * nothing rather than to a query that would match something else.
+ */
+function joinValue (value, rel) {
+  if (value == null || !rel.obo) return value
+  const obo = require('./obo')
+  if (rel.obo === '*') return obo.normalize('*', value)
+  const key = obo.keyOfCurie(String(value))
+  if (key && key !== rel.obo && !obo.accepts([rel.obo], key)) return null
+  return obo.normalize(rel.obo, value)
+}
+
+/**
  * Resolve one relation for one parent row by issuing a second query.
  *
  * Shared by the streaming endpoint, the connector's cross-catalog relation
@@ -35,8 +51,12 @@ async function fetchRelation (executeQuery, connection, row, rel) {
   // than needing to know KEGG is different.
   const matchKey = connection.driver === 'kegg' ? '_pathSuffix' : null
 
+  if (!matchKey && type !== 'belongsTo' && !foreignKey) {
+    throw new Error(`relation ${rel.alias || entity} has no foreignKey${rel.obo ? ` (declared by OBO key "${rel.obo}" but not resolved against a catalog source)` : ''}`)
+  }
+
   if (type === 'hasMany' || type === 'hasOne') {
-    const parentId = row[localKey]
+    const parentId = joinValue(row[localKey], rel)
     if (parentId == null) return type === 'hasMany' ? [] : null
 
     const { data } = await executeQuery({

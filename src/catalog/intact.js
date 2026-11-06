@@ -80,9 +80,9 @@ module.exports = {
       paginate: { limit: 'pageSize', page: 'page', pageBase: 0, max: 100 },
       example: { uniprotAccession: 'P04637' },
       relations: [
-        { alias: 'partner', description: 'The partner\'s UniProtKB entry, when the partner is a protein', catalog: 'uniprot', entity: 'protein', localKey: 'partnerUniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'partnerInteractions', description: 'The partner\'s own interactions', entity: 'interactions', localKey: 'partnerUniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-        { alias: 'publication', description: 'The publication the interaction was curated from', catalog: 'europepmc', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+        { alias: 'partner', description: 'The partner\'s UniProtKB entry, when the partner is a protein', catalog: 'uniprot', entity: 'protein', localKey: 'partnerUniprotAccession', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'partnerInteractions', description: 'The partner\'s own interactions', entity: 'interactions', localKey: 'partnerUniprotAccession', obo: 'uniprot', type: 'hasMany' },
+        { alias: 'publication', description: 'The publication the interaction was curated from', catalog: 'europepmc', entity: 'article', obo: 'pubmed', type: 'hasOne' }
       ]
     }
   ]

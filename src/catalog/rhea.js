@@ -26,7 +26,7 @@ const REACTION_FIELDS = {
 }
 
 const REACTION_RELATIONS = [
-  { alias: 'participants', description: 'ChEBI compounds taking part in the reaction', entity: 'participants', localKey: 'rheaId', foreignKey: 'rheaId', type: 'hasMany' }
+  { alias: 'participants', description: 'ChEBI compounds taking part in the reaction', entity: 'participants', obo: 'rhea', type: 'hasMany' }
 ]
 
 const searchEntity = (overrides) => ({
@@ -116,7 +116,7 @@ module.exports = {
       },
       example: { rheaId: 'RHEA:10596' },
       relations: [
-        { alias: 'compound', description: 'The ChEBI entry of the participant', catalog: 'chebi', entity: 'compound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasOne' }
+        { alias: 'compound', description: 'The ChEBI entry of the participant', catalog: 'chebi', entity: 'compound', obo: 'chebi', type: 'hasOne' }
       ]
     }
   ]

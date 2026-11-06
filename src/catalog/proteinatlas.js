@@ -91,9 +91,9 @@ module.exports = {
       },
       example: { ensemblGeneId: 'ENSG00000141510' },
       relations: [
-        { alias: 'protein', description: 'UniProtKB protein', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-        { alias: 'tissueExpression', description: 'Median expression per tissue (GTEx)', catalog: 'gtex', entity: 'expression', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' }
+        { alias: 'protein', description: 'UniProtKB protein', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+        { alias: 'tissueExpression', description: 'Median expression per tissue (GTEx)', catalog: 'gtex', entity: 'expression', obo: 'ensembl', type: 'hasMany' }
       ]
     },
     {
@@ -112,7 +112,7 @@ module.exports = {
       fields: SUMMARY_FIELDS,
       example: { q: 'EGFR' },
       relations: [
-        { alias: 'gene', description: 'Full Protein Atlas record', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
+        { alias: 'gene', description: 'Full Protein Atlas record', entity: 'gene', obo: 'ensembl', type: 'hasOne' }
       ]
     }
   ]

@@ -1,5 +1,7 @@
 'use strict'
 
+const { ONTOLOGY_KEYS } = require('../database/obo')
+
 /**
  * OLS — EBI's Ontology Lookup Service (OLS4): one API over 250+ biomedical
  * ontologies, including MONDO, EFO, HP, GO, UBERON, CL, ChEBI, DOID and
@@ -39,13 +41,13 @@ const TERM_FIELDS = {
 }
 
 const TERM_RELATIONS = [
-  { alias: 'children', description: 'Direct is_a children of the term', entity: 'children', localKey: 'termId', foreignKey: 'termId', type: 'hasMany' },
-  { alias: 'parents', description: 'Direct is_a parents of the term', entity: 'parents', localKey: 'termId', foreignKey: 'termId', type: 'hasMany' },
-  { alias: 'disease', description: 'Open Targets disease record, for disease terms', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' },
-  { alias: 'monarch', description: 'Monarch Initiative entity (genes, phenotypes, associations), for disease and phenotype terms', catalog: 'monarch', entity: 'entity', localKey: 'diseaseId', foreignKey: 'id', type: 'hasOne' },
-  { alias: 'phenotype', description: 'HPO record, for HP terms', catalog: 'hpo', entity: 'term', localKey: 'hpoId', foreignKey: 'hpoId', type: 'hasOne' },
-  { alias: 'goTerm', description: 'QuickGO record, for GO terms', catalog: 'quickgo', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' },
-  { alias: 'compound', description: 'ChEBI record, for ChEBI terms', catalog: 'chebi', entity: 'compound', localKey: 'chebiId', foreignKey: 'chebiId', type: 'hasOne' }
+  { alias: 'children', description: 'Direct is_a children of the term', entity: 'children', localKey: 'termId', obo: '*', foreignKey: 'termId', type: 'hasMany' },
+  { alias: 'parents', description: 'Direct is_a parents of the term', entity: 'parents', localKey: 'termId', obo: '*', foreignKey: 'termId', type: 'hasMany' },
+  { alias: 'disease', description: 'Open Targets disease record, for disease terms', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', obo: '*', foreignKey: 'diseaseId', type: 'hasOne' },
+  { alias: 'monarch', description: 'Monarch Initiative entity (genes, phenotypes, associations), for disease and phenotype terms', catalog: 'monarch', entity: 'entity', localKey: 'diseaseId', obo: '*', foreignKey: 'id', type: 'hasOne' },
+  { alias: 'phenotype', description: 'HPO record, for HP terms', catalog: 'hpo', entity: 'term', obo: 'hp', type: 'hasOne' },
+  { alias: 'goTerm', description: 'QuickGO record, for GO terms', catalog: 'quickgo', entity: 'term', obo: 'go', type: 'hasOne' },
+  { alias: 'compound', description: 'ChEBI record, for ChEBI terms', catalog: 'chebi', entity: 'compound', obo: 'chebi', type: 'hasOne' }
 ]
 
 const TERM_PARAMS = {
@@ -87,6 +89,7 @@ module.exports = {
   entities: [
     {
       name: 'term',
+      obo: { termId: ONTOLOGY_KEYS },
       description: 'One ontology term by CURIE',
       params: TERM_PARAMS,
       resolve: findTerm,
@@ -96,6 +99,7 @@ module.exports = {
     },
     {
       name: 'children',
+      obo: { termId: ONTOLOGY_KEYS },
       description: 'Direct is_a children of a term',
       params: TERM_PARAMS,
       resolve: followLink('children'),
@@ -105,6 +109,7 @@ module.exports = {
     },
     {
       name: 'parents',
+      obo: { termId: ONTOLOGY_KEYS },
       description: 'Direct is_a parents of a term',
       params: TERM_PARAMS,
       resolve: followLink('parents'),
@@ -114,6 +119,7 @@ module.exports = {
     },
     {
       name: 'search',
+      obo: { termId: ONTOLOGY_KEYS },
       description: 'Search term labels and synonyms, across all ontologies or within one',
       path: '/search',
       params: {
@@ -139,7 +145,7 @@ module.exports = {
       paginate: { limit: 'rows', offset: 'start', max: 1000 },
       example: { q: 'breast carcinoma', ontology: 'mondo' },
       relations: [
-        { alias: 'term', description: 'The full term record', entity: 'term', localKey: 'termId', foreignKey: 'termId', type: 'hasOne' },
+        { alias: 'term', description: 'The full term record', entity: 'term', localKey: 'termId', obo: '*', foreignKey: 'termId', type: 'hasOne' },
         ...TERM_RELATIONS.filter((r) => r.catalog)
       ]
     },

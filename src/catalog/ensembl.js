@@ -34,25 +34,25 @@ const GENE_FIELDS = {
 }
 
 const GENE_RELATIONS = [
-  { alias: 'transcripts', description: 'Transcripts of this gene', entity: 'transcripts', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-  { alias: 'xrefs', description: 'Cross-references to other databases', entity: 'xrefs', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-  { alias: 'homologs', description: 'Orthologues in other species (Ensembl Compara)', entity: 'homologs', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-  { alias: 'hgnc', description: 'HGNC approved nomenclature record', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
-  { alias: 'proteins', description: 'UniProtKB proteins encoded by this gene', catalog: 'uniprot', entity: 'proteins', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-  { alias: 'target', description: 'Open Targets target record', catalog: 'opentargets', entity: 'target', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'diseases', description: 'Diseases associated with this gene (Open Targets)', catalog: 'opentargets', entity: 'targetDiseases', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-  { alias: 'constraint', description: 'Loss-of-function and missense constraint (gnomAD)', catalog: 'gnomad', entity: 'geneConstraint', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'expression', description: 'Median expression per tissue (GTEx)', catalog: 'gtex', entity: 'expression', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasMany' },
-  { alias: 'proteinAtlas', description: 'Human Protein Atlas summary', catalog: 'proteinatlas', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
+  { alias: 'transcripts', description: 'Transcripts of this gene', entity: 'transcripts', obo: 'ensembl', type: 'hasMany' },
+  { alias: 'xrefs', description: 'Cross-references to other databases', entity: 'xrefs', obo: 'ensembl', type: 'hasMany' },
+  { alias: 'homologs', description: 'Orthologues in other species (Ensembl Compara)', entity: 'homologs', obo: 'ensembl', type: 'hasMany' },
+  { alias: 'hgnc', description: 'HGNC approved nomenclature record', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
+  { alias: 'proteins', description: 'UniProtKB proteins encoded by this gene', catalog: 'uniprot', entity: 'proteins', obo: 'ensembl', type: 'hasMany' },
+  { alias: 'target', description: 'Open Targets target record', catalog: 'opentargets', entity: 'target', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'diseases', description: 'Diseases associated with this gene (Open Targets)', catalog: 'opentargets', entity: 'targetDiseases', obo: 'ensembl', type: 'hasMany' },
+  { alias: 'constraint', description: 'Loss-of-function and missense constraint (gnomAD)', catalog: 'gnomad', entity: 'geneConstraint', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'expression', description: 'Median expression per tissue (GTEx)', catalog: 'gtex', entity: 'expression', obo: 'ensembl', type: 'hasMany' },
+  { alias: 'proteinAtlas', description: 'Human Protein Atlas summary', catalog: 'proteinatlas', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
   { alias: 'gwasAssociations', description: 'GWAS Catalog associations mapped to this gene', catalog: 'gwas', entity: 'associationsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
   { alias: 'clinvarVariants', description: 'ClinVar variants in this gene', catalog: 'clinvar', entity: 'variantsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' },
   { alias: 'drugInteractions', description: 'Drug–gene interactions (DGIdb)', catalog: 'dgidb', entity: 'interactionsForGene', localKey: 'symbol', foreignKey: 'symbol', type: 'hasMany' }
 ]
 
 const VARIANT_RELATIONS = [
-  { alias: 'consequences', description: 'Predicted consequences per transcript (VEP)', entity: 'variantConsequences', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' },
-  { alias: 'annotations', description: 'Aggregated variant annotation (MyVariant.info)', catalog: 'myvariant', entity: 'variantByRsId', localKey: 'rsId', foreignKey: 'rsId', type: 'hasOne' },
-  { alias: 'gwasAssociations', description: 'GWAS Catalog associations for this variant', catalog: 'gwas', entity: 'associationsForVariant', localKey: 'rsId', foreignKey: 'rsId', type: 'hasMany' }
+  { alias: 'consequences', description: 'Predicted consequences per transcript (VEP)', entity: 'variantConsequences', obo: 'dbsnp', type: 'hasMany' },
+  { alias: 'annotations', description: 'Aggregated variant annotation (MyVariant.info)', catalog: 'myvariant', entity: 'variantByRsId', obo: 'dbsnp', type: 'hasOne' },
+  { alias: 'gwasAssociations', description: 'GWAS Catalog associations for this variant', catalog: 'gwas', entity: 'associationsForVariant', obo: 'dbsnp', type: 'hasMany' }
 ]
 
 module.exports = {
@@ -99,6 +99,7 @@ module.exports = {
     },
     {
       name: 'transcripts',
+      obo: { transcriptId: 'ensembl' },
       description: 'Transcripts of a gene',
       path: '/lookup/id/{ensemblGeneId}',
       params: {
@@ -121,7 +122,7 @@ module.exports = {
       },
       example: { ensemblGeneId: 'ENSG00000141510' },
       relations: [
-        { alias: 'gene', description: 'The parent gene', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
+        { alias: 'gene', description: 'The parent gene', entity: 'gene', obo: 'ensembl', type: 'hasOne' }
       ]
     },
     {
@@ -147,7 +148,7 @@ module.exports = {
       },
       example: { region: '17:7661779-7687546' },
       relations: [
-        { alias: 'gene', description: 'Full gene record', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
+        { alias: 'gene', description: 'Full gene record', entity: 'gene', obo: 'ensembl', type: 'hasOne' }
       ]
     },
     {
@@ -172,6 +173,7 @@ module.exports = {
     },
     {
       name: 'homologs',
+      obo: { homologProteinId: 'ensembl' },
       description: 'Orthologues (or paralogues) of a gene from Ensembl Compara',
       path: '/homology/id/{species}/{ensemblGeneId}',
       params: {
@@ -196,7 +198,7 @@ module.exports = {
       },
       example: { ensemblGeneId: 'ENSG00000141510', targetSpecies: 'mus_musculus' },
       relations: [
-        { alias: 'homolog', description: 'The homologous gene', entity: 'gene', localKey: 'homologEnsemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
+        { alias: 'homolog', description: 'The homologous gene', entity: 'gene', localKey: 'homologEnsemblGeneId', obo: 'ensembl', type: 'hasOne' }
       ]
     },
     {
@@ -256,7 +258,7 @@ module.exports = {
       },
       example: { rsId: 'rs28934578' },
       relations: [
-        { alias: 'gene', description: 'The affected gene', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' }
+        { alias: 'gene', description: 'The affected gene', entity: 'gene', obo: 'ensembl', type: 'hasOne' }
       ]
     }
   ]

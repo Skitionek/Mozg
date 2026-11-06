@@ -63,9 +63,9 @@ module.exports = {
       },
       example: { uniprotAccession: 'P04637' },
       relations: [
-        { alias: 'protein', description: 'The UniProtKB entry this model predicts', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-        { alias: 'experimentalStructures', description: 'Experimental PDB structures of the same protein, for comparison (PDBe SIFTS)', catalog: 'pdbe', entity: 'bestStructures', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' },
-        { alias: 'domains', description: 'InterPro entries matched on the protein', catalog: 'interpro', entity: 'proteinEntries', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasMany' }
+        { alias: 'protein', description: 'The UniProtKB entry this model predicts', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+        { alias: 'experimentalStructures', description: 'Experimental PDB structures of the same protein, for comparison (PDBe SIFTS)', catalog: 'pdbe', entity: 'bestStructures', obo: 'uniprot', type: 'hasMany' },
+        { alias: 'domains', description: 'InterPro entries matched on the protein', catalog: 'interpro', entity: 'proteinEntries', obo: 'uniprot', type: 'hasMany' }
       ]
     }
   ]

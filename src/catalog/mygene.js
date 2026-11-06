@@ -41,11 +41,11 @@ const GENE_FIELDS = {
 }
 
 const GENE_RELATIONS = [
-  { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasOne' },
-  { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId', type: 'hasOne' },
-  { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'gene', localKey: 'hgncId', foreignKey: 'hgncId', type: 'hasOne' },
-  { alias: 'protein', description: 'Reviewed UniProtKB protein', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' },
-  { alias: 'generifs', description: 'GeneRIF literature statements about this gene', entity: 'generifs', localKey: 'ncbiGeneId', foreignKey: 'ncbiGeneId', type: 'hasMany' }
+  { alias: 'ncbiGene', description: 'NCBI Gene record', catalog: 'ncbi-gene', entity: 'gene', obo: 'ncbigene', type: 'hasOne' },
+  { alias: 'ensembl', description: 'Ensembl gene record', catalog: 'ensembl', entity: 'gene', obo: 'ensembl', type: 'hasOne' },
+  { alias: 'hgnc', description: 'HGNC nomenclature record', catalog: 'hgnc', entity: 'gene', obo: 'hgnc', type: 'hasOne' },
+  { alias: 'protein', description: 'Reviewed UniProtKB protein', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' },
+  { alias: 'generifs', description: 'GeneRIF literature statements about this gene', entity: 'generifs', obo: 'ncbigene', type: 'hasMany' }
 ]
 
 module.exports = {
@@ -106,7 +106,7 @@ module.exports = {
       },
       example: { ncbiGeneId: '7157' },
       relations: [
-        { alias: 'article', description: 'The PubMed article behind this statement', catalog: 'pubmed', entity: 'article', localKey: 'pmid', foreignKey: 'pmid', type: 'hasOne' }
+        { alias: 'article', description: 'The PubMed article behind this statement', catalog: 'pubmed', entity: 'article', obo: 'pubmed', type: 'hasOne' }
       ]
     }
   ]

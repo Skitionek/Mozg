@@ -47,7 +47,7 @@ module.exports = {
       },
       example: { label: 'breast neoplasm' },
       relations: [
-        { alias: 'descriptor', description: 'The full descriptor record', entity: 'descriptor', localKey: 'meshId', foreignKey: 'meshId', type: 'hasOne' }
+        { alias: 'descriptor', description: 'The full descriptor record', entity: 'descriptor', obo: 'mesh', type: 'hasOne' }
       ]
     },
     {

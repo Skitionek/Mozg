@@ -58,9 +58,9 @@ module.exports = {
       },
       example: { uniprotAccession: 'P04637' },
       relations: [
-        { alias: 'entry', description: 'The RCSB PDB entry for this structure', catalog: 'pdb', entity: 'entry', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasOne' },
-        { alias: 'summary', description: 'PDBe summary of this structure', entity: 'entry', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasOne' },
-        { alias: 'ligands', description: 'Small molecules bound in this structure', entity: 'ligands', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasMany' }
+        { alias: 'entry', description: 'The RCSB PDB entry for this structure', catalog: 'pdb', entity: 'entry', obo: 'pdb', type: 'hasOne' },
+        { alias: 'summary', description: 'PDBe summary of this structure', entity: 'entry', obo: 'pdb', type: 'hasOne' },
+        { alias: 'ligands', description: 'Small molecules bound in this structure', entity: 'ligands', obo: 'pdb', type: 'hasMany' }
       ]
     },
     {
@@ -90,9 +90,9 @@ module.exports = {
       },
       example: { pdbId: '1TUP' },
       relations: [
-        { alias: 'rcsb', description: 'The same entry in the RCSB Data API', catalog: 'pdb', entity: 'entry', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasOne' },
-        { alias: 'ligands', description: 'Small molecules bound in this structure', entity: 'ligands', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasMany' },
-        { alias: 'uniprotMappings', description: 'Chain-to-UniProt residue mappings', entity: 'uniprotMappings', localKey: 'pdbId', foreignKey: 'pdbId', type: 'hasMany' }
+        { alias: 'rcsb', description: 'The same entry in the RCSB Data API', catalog: 'pdb', entity: 'entry', obo: 'pdb', type: 'hasOne' },
+        { alias: 'ligands', description: 'Small molecules bound in this structure', entity: 'ligands', obo: 'pdb', type: 'hasMany' },
+        { alias: 'uniprotMappings', description: 'Chain-to-UniProt residue mappings', entity: 'uniprotMappings', obo: 'pdb', type: 'hasMany' }
       ]
     },
     {
@@ -145,7 +145,7 @@ module.exports = {
       },
       example: { pdbId: '1TUP' },
       relations: [
-        { alias: 'protein', description: 'The mapped UniProtKB entry', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
+        { alias: 'protein', description: 'The mapped UniProtKB entry', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' }
       ]
     }
   ]

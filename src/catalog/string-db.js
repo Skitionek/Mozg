@@ -77,7 +77,7 @@ module.exports = {
       example: { identifier: 'TP53', taxonId: 9606 },
       relations: [
         { alias: 'partners', description: 'Highest-scoring interaction partners', entity: 'partners', localKey: 'stringId', foreignKey: 'identifier', type: 'hasMany' },
-        { alias: 'protein', description: 'The reviewed UniProtKB entry cross-referenced to this STRING protein', catalog: 'uniprot', entity: 'proteins', localKey: 'stringId', foreignKey: 'stringId', where: { reviewed: true }, type: 'hasOne' }
+        { alias: 'protein', description: 'The reviewed UniProtKB entry cross-referenced to this STRING protein', catalog: 'uniprot', entity: 'proteins', obo: 'string', where: { reviewed: true }, type: 'hasOne' }
       ]
     },
     {
@@ -101,7 +101,7 @@ module.exports = {
       paginate: { limit: 'limit' },
       example: { identifier: 'TP53', taxonId: 9606 },
       relations: [
-        { alias: 'partner', description: 'The reviewed UniProtKB entry for the partner protein', catalog: 'uniprot', entity: 'proteins', localKey: 'partnerStringId', foreignKey: 'stringId', where: { reviewed: true }, type: 'hasOne' }
+        { alias: 'partner', description: 'The reviewed UniProtKB entry for the partner protein', catalog: 'uniprot', entity: 'proteins', localKey: 'partnerStringId', obo: 'string', where: { reviewed: true }, type: 'hasOne' }
       ]
     },
     {
@@ -150,7 +150,7 @@ module.exports = {
       },
       example: { identifiers: ['TP53', 'MDM2', 'CDKN1A', 'BAX'], taxonId: 9606 },
       relations: [
-        { alias: 'goTerm', description: 'The enriched GO term (QuickGO), for GO categories', catalog: 'quickgo', entity: 'term', localKey: 'goId', foreignKey: 'goId', type: 'hasOne' }
+        { alias: 'goTerm', description: 'The enriched GO term (QuickGO), for GO categories', catalog: 'quickgo', entity: 'term', obo: 'go', type: 'hasOne' }
       ]
     },
     {

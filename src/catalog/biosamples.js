@@ -53,8 +53,8 @@ const SAMPLE_FIELDS = {
 
 const SAMPLE_RELATIONS = [
   { alias: 'runs', description: 'Sequencing runs of this sample in ENA', catalog: 'ena', entity: 'runs', localKey: 'accession', foreignKey: 'accession', type: 'hasMany' },
-  { alias: 'taxonomy', description: 'Taxonomy of the sample organism', catalog: 'uniprot', entity: 'taxonomy', localKey: 'taxonId', foreignKey: 'taxonId', type: 'hasOne' },
-  { alias: 'disease', description: 'Open Targets record of the annotated disease', catalog: 'opentargets', entity: 'disease', localKey: 'diseaseId', foreignKey: 'diseaseId', type: 'hasOne' }
+  { alias: 'taxonomy', description: 'Taxonomy of the sample organism', catalog: 'uniprot', entity: 'taxonomy', obo: 'ncbitaxon', type: 'hasOne' },
+  { alias: 'disease', description: 'Open Targets record of the annotated disease', catalog: 'opentargets', entity: 'disease', obo: '*', type: 'hasOne' }
 ]
 
 module.exports = {
@@ -74,6 +74,7 @@ module.exports = {
   entities: [
     {
       name: 'sample',
+      obo: { accession: 'biosample' },
       description: 'One sample by BioSamples accession',
       path: '/samples/{accession}',
       params: {
@@ -85,6 +86,7 @@ module.exports = {
     },
     {
       name: 'samples',
+      obo: { accession: 'biosample' },
       description: 'Samples matching free text, optionally for one organism',
       path: '/samples',
       params: {

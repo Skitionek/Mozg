@@ -60,3 +60,32 @@ describe('introspect', () => {
     assert.match(res.errors[0].message, /needs a connection or a source/)
   })
 })
+
+describe('OBO keys in the catalog query', () => {
+  test('lists the keys with their canonical forms', async () => {
+    const { oboKeys } = await run('{ oboKeys { key prefix form field pattern } }')
+    const chebi = oboKeys.find((k) => k.key === 'chebi')
+    assert.deepEqual({ ...chebi, pattern: undefined }, { key: 'chebi', prefix: 'CHEBI', form: 'curie', field: 'chebiId', pattern: undefined })
+    assert.ok(oboKeys.length > 40)
+  })
+
+  test('exposes keyed fields and params, relations declared by key, and undeclared links', async () => {
+    const { catalog } = await run(`{
+      catalog(name: "uniprot") {
+        selfHosted
+        entities { name fields { name obo } params { name obo } relations { alias obo localKey foreignKey } links { name obo localKey foreignKey } }
+      }
+    }`)
+    const protein = catalog[0].entities.find((e) => e.name === 'protein')
+    assert.equal(catalog[0].selfHosted, false)
+    assert.equal(protein.fields.find((f) => f.name === 'uniprotAccession').obo, 'uniprot')
+    assert.deepEqual(protein.params.find((p) => p.name === 'uniprotAccession').obo, ['uniprot'])
+
+    const structures = protein.relations.find((r) => r.alias === 'structures')
+    assert.deepEqual({ ...structures }, { alias: 'structures', obo: 'uniprot', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession' })
+
+    const link = protein.links.find((l) => l.name === 'gtex/expression')
+    assert.deepEqual({ ...link }, { name: 'gtex/expression', obo: 'ensembl', localKey: 'ensemblGeneId', foreignKey: 'ensemblGeneId' })
+    assert.ok(!protein.links.some((l) => l.name === 'pdbe/bestStructures'), 'declared relations are not repeated as links')
+  })
+})

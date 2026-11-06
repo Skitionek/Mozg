@@ -56,7 +56,7 @@ const GENE_FIELDS = {
 const GENE_RELATIONS = [
   { alias: 'regulators', description: 'Transcription factors regulating this gene, with their effect', entity: 'geneRegulators', localKey: 'regulondbGeneId', foreignKey: 'regulondbGeneId', type: 'hasMany' },
   { alias: 'regulon', description: 'The regulon this gene\'s product heads, when it is a transcription factor', entity: 'regulon', localKey: 'regulonId', foreignKey: 'regulonId', type: 'hasOne' },
-  { alias: 'protein', description: 'The UniProt entry of the gene product', catalog: 'uniprot', entity: 'protein', localKey: 'uniprotAccession', foreignKey: 'uniprotAccession', type: 'hasOne' }
+  { alias: 'protein', description: 'The UniProt entry of the gene product', catalog: 'uniprot', entity: 'protein', obo: 'uniprot', type: 'hasOne' }
 ]
 
 const REGULON_FIELDS = {
