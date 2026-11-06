@@ -5,6 +5,10 @@ name: Connectors
 # hasOne / belongsTo, nesting, introspection, a relation into an api source,
 # and bad-credential handling).  SQLite needs no server and runs too.
 #
+# Once per preset in .github/ci-presets.json: every server and Node at its
+# oldest supported line, at its LTS line, and at its newest (pre-)release.
+# The newest preset is experimental: its failure does not fail CI.
+#
 # The public-endpoint drivers (OpenAPI, OData, SOAP, REST, KEGG, BioCyc) are
 # not exercised here — their upstreams are third-party services; see
 # docs/connectors.md for how each was checked.
@@ -19,21 +23,30 @@ on:
 permissions: read-all
 
 jobs:
+  presets:
+    name: Version presets
+    uses: ./.github/workflows/presets.yml
+
   connectors:
-    name: Database connectors against real servers
+    name: Database connectors against real servers (${{ matrix.preset.name }})
     runs-on: ubuntu-latest
+    needs: presets
     timeout-minutes: 25
+    continue-on-error: ${{ matrix.preset.experimental }}
     permissions:
       contents: read
 
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: ${{ fromJSON(needs.presets.outputs.matrix) }}
+
     # Every server runs without a password — nothing secret, nothing for
     # secret scanners to trip over.  Bad-credential handling is still tested
-    # where the server refuses unknown users (Postgres, MySQL).  Versions are
-    # each engine's current LTS line where it has one (MySQL 8.4 — the newest
-    # its connector can reach — and Neo4j 5.26), else its newest release.
+    # where the server refuses unknown users (Postgres, MySQL, MariaDB).
     services:
       postgres:
-        image: postgres:18
+        image: postgres:${{ matrix.preset.postgres }}
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: mozg_it
@@ -42,8 +55,19 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 20
 
+      # MySQL's sibling: the server the Helm chart runs for the mysql engine.
+      mariadb:
+        image: mariadb:${{ matrix.preset.mariadb }}
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "1"
+          MARIADB_DATABASE: mozg_it
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 40
+
       neo4j:
-        image: neo4j:5.26
+        image: neo4j:${{ matrix.preset.neo4j }}
         env:
           NEO4J_AUTH: none
         ports: ["7687:7687"]
@@ -52,13 +76,13 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 40
 
       arangodb:
-        image: arangodb:3.12
+        image: arangodb:${{ matrix.preset.arangodb }}
         env:
           ARANGO_NO_AUTH: "1"
         ports: ["8529:8529"]
 
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
+        image: docker.elastic.co/elasticsearch/elasticsearch:${{ matrix.preset.elasticsearch }}
         env:
           discovery.type: single-node
           xpack.security.enabled: "false"
@@ -72,24 +96,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
+      - name: Set up Node.js ${{ matrix.preset.node }}
         uses: actions/setup-node@v7
         with:
-          node-version: "26"
+          node-version: ${{ matrix.preset.node }}
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Start MySQL 8.4 (LTS) with mysql_native_password
+      - name: Start MySQL ${{ matrix.preset.mysql }} with mysql_native_password
         # The MySQL driver goes through the graphql-mesh MySQL handler, whose
         # client (mysql 2.x) speaks only mysql_native_password: MySQL 8.4
-        # ships it switched off, and 9.x has removed it (docs/connectors.md).
-        # Service containers take no server arguments, so MySQL runs here.
+        # ships it switched off, and 9.x has removed it, so every preset pins
+        # 8.4 (docs/connectors.md).  Service containers take no server
+        # arguments, so MySQL runs here.
+        env:
+          MYSQL_IMAGE: mysql:${{ matrix.preset.mysql }}
         run: |
           docker run -d --name mysql -p 3306:3306 \
             -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=mozg_it \
-            mysql:8.4 --mysql-native-password=ON --authentication-policy=mysql_native_password
+            "$MYSQL_IMAGE" --mysql-native-password=ON --authentication-policy=mysql_native_password
           for _ in $(seq 1 60); do
             if docker exec mysql mysqladmin ping -h 127.0.0.1 --silent; then exit 0; fi
             sleep 2
@@ -109,6 +136,7 @@ jobs:
         env:
           MOZG_IT_POSTGRES_URL: postgres://postgres@localhost:5432/mozg_it
           MOZG_IT_MYSQL_URL: mysql://root@127.0.0.1:3306/mozg_it
+          MOZG_IT_MARIADB_URL: mysql://root@127.0.0.1:3307/mozg_it
           MOZG_IT_NEO4J_URL: bolt://neo4j@localhost:7687/neo4j
           MOZG_IT_ARANGO_URL: http://root@localhost:8529/mozg_it
           MOZG_IT_ELASTICSEARCH_URL: http://localhost:9200

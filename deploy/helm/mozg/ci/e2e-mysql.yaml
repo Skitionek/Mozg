@@ -1,5 +1,5 @@
 databases:
-  e2e:
+  mysql:
     enabled: true
     engine: mysql
     database: e2e
@@ -7,8 +7,8 @@ databases:
       CREATE TABLE proteins (id INT PRIMARY KEY, accession VARCHAR(16) NOT NULL, note TEXT);
       INSERT INTO proteins VALUES (1, 'P04637', 'tumour suppressor'), (2, 'P00533', 'EGFR');
     catalog:
-      name: e2e-proteins
-      label: E2E proteins
+      name: mysql-proteins
+      label: E2E proteins (mysql)
       entities:
         - name: proteins
           description: Two proteins of interest

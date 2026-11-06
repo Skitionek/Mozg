@@ -1,5 +1,5 @@
 databases:
-  e2e:
+  neo4j:
     enabled: true
     engine: neo4j
     database: e2e
@@ -18,8 +18,8 @@ databases:
         cpu: "2"
         memory: 1536Mi
     catalog:
-      name: e2e-proteins
-      label: E2E proteins
+      name: neo4j-proteins
+      label: E2E proteins (neo4j)
       entities:
         - name: proteins
           description: Two proteins of interest

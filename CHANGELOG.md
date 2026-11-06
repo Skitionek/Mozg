@@ -120,8 +120,9 @@ verified against the live APIs, and joined up across sources.
 
 - **Dependencies, runtimes and images on their current LTS lines** (as of
   November 2026):
-  - Node.js: the image runs Node 26 (active LTS), and CI tests 22, 24 and 26.
-    `engines` is `>=22`, since Node 20 reached end of life in April 2026.
+  - Node.js: the image runs Node 26 (active LTS); CI tests 22, 26 and the
+    28 nightly (see the version presets below). `engines` is `>=22`, since
+    Node 20 reached end of life in April 2026.
   - Database images:
     - MariaDB 12.3 LTS (was 11.4);
     - Neo4j 5.26 LTS, pinned in CI too;
@@ -142,6 +143,21 @@ verified against the live APIs, and joined up across sources.
       is a stray 1.0.0 from 2023.
     - Transitive packages stay pinned: refreshing them all broke the Neo4j
       handler ("Unknown argument kind on directive @transport").
+- **CI tests three version presets, not the product of every version**
+  (`.github/ci-presets.json`):
+  - `oldest`: each project's oldest supported line (Node 22, PostgreSQL 14,
+    MariaDB 10.11, Elasticsearch 8.19, Kubernetes 1.35, Helm 3, KEDA 2.20);
+  - `lts`: its current LTS line, or newest stable release;
+  - `newest`: its newest release, pre-releases included (Node 28 nightly,
+    PostgreSQL 19 RC1, MariaDB 13.1 RC, Neo4j 2026.10, an Elasticsearch 9.7
+    snapshot). This preset is allowed to fail.
+
+  Each preset runs the unit tests, the Docker image (now built
+  with `--build-arg NODE_IMAGE`), and the connector suite, which now covers
+  MariaDB too. It also runs the Helm chart's kind test, which now installs
+  all six engines into one cluster, with every image, Kubernetes, kind, Helm
+  and KEDA taken from the preset. A weekly workflow checks the presets
+  against endoflife.date (`scripts/ci-presets.js`).
 - KEGG requests go through the shared HTTP client (3 requests/s, as KEGG
   asks; timeouts; retries); a 404 is an empty result instead of an error.
 - Cross-catalog relations on a row are resolved concurrently.
@@ -208,7 +224,12 @@ verified against the live APIs, and joined up across sources.
   mounts the data directory there too.
 - The Docker image could not load SQLite: `sqlite3`'s prebuilt binding needs
   glibc 2.38, and the image was based on Debian 12 (glibc 2.36).  It is now
-  based on `node:22-trixie-slim`, and CI opens a SQLite database inside the
-  image.
+  based on Debian 13 (`node:26-trixie-slim`), and CI opens a SQLite database
+  inside the image.
+- Neo4j 2025 and later: numeric properties were typed as strings, so
+  filtering on a number failed. These releases name property types in
+  Cypher's terms (`INTEGER NOT NULL`), which the Neo4j handler's schema
+  introspector does not know. The adapter now translates them to the older
+  names first.
 
 [Unreleased]: https://github.com/Skitionek/Mozg/commits/main

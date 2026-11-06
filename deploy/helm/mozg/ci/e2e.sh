@@ -3,8 +3,10 @@
 #
 # Expects: a cluster with KEDA, the chart installed as release "mozg" in
 # namespace "bio" with ci/e2e-values.yaml and ci/e2e-$ENGINE.yaml (a database
-# named "e2e", registered as "e2e-proteins", holding P04637 and P00533), and
-# Mozg port-forwarded to localhost:4000.  Asserts that the database
+# named "$ENGINE", registered as "$ENGINE-proteins", holding P04637 and
+# P00533), and Mozg port-forwarded to localhost:4000 (MOZG overrides it).
+# Several engines can be checked at once, one run of this script each: they
+# share nothing but Mozg.  Asserts that the database
 #   1. scales to zero when idle,
 #   2. is woken by a query, which then answers,
 #   3. joins to the public UniProt API by OBO key (include uniprot/protein(accession)),
@@ -18,13 +20,13 @@ set -euo pipefail
 
 ENGINE=${ENGINE:-postgres}
 NS=bio
-DB=e2e
+DB=$ENGINE
 STS=mozg-db-$DB
-SOURCE=e2e-proteins
-MOZG=http://localhost:4000
+SOURCE=$ENGINE-proteins
+MOZG=${MOZG:-http://localhost:4000}
 
 replicas() { kubectl -n "$NS" get statefulset "$STS" -o jsonpath='{.spec.replicas}'; }
-pods() { kubectl -n "$NS" get pods -l mozg.io/database=$DB --no-headers 2>/dev/null | wc -l; }
+pods() { kubectl -n "$NS" get pods -l "mozg.io/database=$DB" --no-headers 2>/dev/null | wc -l; }
 
 wait_for_zero() {
   local deadline=$((SECONDS + $1))

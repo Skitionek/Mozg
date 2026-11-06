@@ -1,0 +1,55 @@
+{
+  "description": "Versions of everything Mozg runs on, tested as three presets rather than as the product of every version. oldest: the oldest release line each project still supports. lts: its current long-term-support line, or its newest stable release where it has no LTS. newest: its newest release, pre-releases included (allowed to fail: an early warning, not a gate). scripts/ci-presets.js checks the presets against endoflife.date every week (.github/workflows/presets-drift.yml). Checked on 2026-11-06.",
+  "pins": {
+    "mysql": "Mozg's mysql connector reaches MySQL 8.4 at most: 9.x removed mysql_native_password, the only login its client speaks (docs/connectors.md, finding 2).",
+    "arangodb": "3.12 is ArangoDB's only supported line, and it publishes no current pre-release images.",
+    "nodeImage": "Node nightlies are not published as container images, so the newest image is the newest released line."
+  },
+  "presets": {
+    "oldest": {
+      "experimental": false,
+      "node": "22",
+      "nodeImage": "node:22-trixie-slim",
+      "postgres": "14-alpine",
+      "mysql": "8.4",
+      "mariadb": "10.11",
+      "neo4j": "5.26-community",
+      "arangodb": "3.12.13",
+      "elasticsearch": "8.19.24",
+      "kubernetes": "v1.35.8",
+      "kind": "v0.33.0",
+      "helm": "v3.22.1",
+      "keda": "2.20.2"
+    },
+    "lts": {
+      "experimental": false,
+      "node": "26",
+      "nodeImage": "node:26-trixie-slim",
+      "postgres": "18-alpine",
+      "mysql": "8.4",
+      "mariadb": "12.3",
+      "neo4j": "5.26-community",
+      "arangodb": "3.12.13",
+      "elasticsearch": "9.5.6",
+      "kubernetes": "v1.37.0",
+      "kind": "v0.33.0",
+      "helm": "v4.3.1",
+      "keda": "2.21.0"
+    },
+    "newest": {
+      "experimental": true,
+      "node": "28-nightly",
+      "nodeImage": "node:26-trixie-slim",
+      "postgres": "19rc1-alpine",
+      "mysql": "8.4",
+      "mariadb": "13.1-rc",
+      "neo4j": "2026.10.1-community",
+      "arangodb": "3.12.13",
+      "elasticsearch": "9.7.0-SNAPSHOT",
+      "kubernetes": "v1.37.0",
+      "kind": "v0.33.0",
+      "helm": "v4.3.1",
+      "keda": "2.21.0"
+    }
+  }
+}
