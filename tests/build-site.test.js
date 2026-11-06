@@ -5,18 +5,33 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { createSlugger, rewriteHref, renderMarkdown, examplesMarkdown, withoutTitle, build } = require('../scripts/build-site')
+const { createSlugger, rewriteHref, renderMarkdown, examplesMarkdown, withoutTitle, tableOfContents, build } = require('../scripts/build-site')
 
 const PAGES = new Map([['README.md', 'index.html'], ['docs/connectors.md', 'connectors.html']])
 
 test('heading ids match GitHub\'s', () => {
   const slug = createSlugger()
   assert.equal(slug('Findings and fixes'), 'findings-and-fixes')
-  assert.equal(slug('Other databases &amp; APIs'), 'other-databases--apis')
-  assert.equal(slug('<code>api</code> driver'), 'api-driver')
+  assert.equal(slug('Other databases & APIs'), 'other-databases--apis')
   assert.equal(slug('🧬 Life-science sources'), '-life-science-sources')
   assert.equal(slug('Status'), 'status')
   assert.equal(slug('Status'), 'status-1')
+})
+
+test('headings are named by their plain text, without inline HTML', async () => {
+  const { headings, html } = await renderMarkdown(
+    '## `api` driver\n\n## Other databases &amp; APIs\n\n## Safe <b>bold</b> <scr<script>ipt>x</script>\n\n## `<b>` in code\n', 'README.md', PAGES)
+  assert.deepEqual(headings.map((h) => [h.id, h.text]), [
+    ['api-driver', 'api driver'],
+    ['other-databases--apis', 'Other databases & APIs'],
+    ['safe-bold-scriptx', 'Safe bold <script>x'],
+    ['b-in-code', '<b> in code']
+  ])
+  assert.match(html, /<h2 id="b-in-code">.*<code>&lt;b&gt;<\/code> in code<\/h2>/)
+  // Plain text can hold "<", so the contents column escapes it.
+  const toc = tableOfContents(headings)
+  assert.match(toc, /<a href="#safe-bold-scriptx">Safe bold &lt;script&gt;x<\/a>/)
+  assert.doesNotMatch(toc, /<script|<b>/)
 })
 
 test('links between Markdown files become links between pages', () => {

@@ -6,3 +6,13 @@
 # entry with the RNAcentral REST API; these are its two appearances in history.
 99c0955eb7e5feb2238ab8c8c64e94c0c26df02a:src/catalog/rnacentral.js:generic-api-key:20
 de4f5abbb39f93f769aa93e3842de24e17e44745:src/catalog/rnacentral.js:generic-api-key:20
+# The same RNAcentral password in an earlier draft of the paper's PostgreSQL
+# listing; the paper no longer shows it.
+d0299c0438f2ebbae9246e95adec858a7fcee97f:paper/mozg.tex:generic-api-key:678
+#
+# Throwaway passwords for the disposable Elasticsearch and ArangoDB service
+# containers in an earlier version of the connectors workflow.  Those
+# containers now run without authentication and the workflow sends no
+# credentials.
+a267f8ba1417d47187458f0ccdeac96de6ced8da:.github/workflows/connectors.yml:curl-auth-user:77
+a267f8ba1417d47187458f0ccdeac96de6ced8da:.github/workflows/connectors.yml:curl-auth-user:104
