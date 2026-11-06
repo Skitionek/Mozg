@@ -161,6 +161,32 @@ function resolveRelation (sourceEntry, entity, rel) {
   return out
 }
 
+/**
+ * Write the keyed fields of rows from a non-api source (a self-hosted SQL
+ * table or graph label) in their keys' canonical form — the api driver does
+ * this for its own rows — so the same-key-same-value rule holds whichever
+ * kind of source a row came from.  Same-source relation rows embedded by the
+ * driver are normalised too, following the relation tree.
+ */
+function normalizeKeyedRows (entry, entityName, rows, relations = []) {
+  const obo = require('./obo')
+  const entity = (entry.entities || []).find((e) => e.name === entityName)
+  if (!entity || !Array.isArray(rows)) return rows
+  const keyed = Object.entries(obo.entityKeys(entity, entityColumns(entity)))
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    for (const [field, key] of keyed) {
+      if (row[field] != null) row[field] = obo.normalize(key, row[field])
+    }
+    for (const rel of relations) {
+      if (rel.catalog) continue
+      const nested = row[rel.alias || rel.entity]
+      if (nested != null) normalizeKeyedRows(entry, rel.entity, Array.isArray(nested) ? nested : [nested], rel.relations || [])
+    }
+  }
+  return rows
+}
+
 const LINK_PATTERN = /^([a-z0-9][a-z0-9-]*)\/([A-Za-z_][A-Za-z0-9_/]*?)(?:\(([A-Za-z0-9_]+)\))?$/
 
 const linkCache = new Map()
@@ -385,6 +411,7 @@ module.exports = {
   implicitLinks,
   clearLinkCache,
   keyedParams,
+  normalizeKeyedRows,
   isServerHeld,
   isEnvValue
 }

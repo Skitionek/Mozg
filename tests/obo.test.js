@@ -344,3 +344,59 @@ describe('CURIEs from spaces the registry does not know', () => {
     assert.equal(obo.isCanonical('*', 'Xenbase:XB-GENE-484286'), true)
   })
 })
+
+describe('self-hosted rows keep the same-key-same-value rule', () => {
+  test('toForm writes a value the way a store keeps it', () => {
+    assert.equal(obo.toForm('chebi', 'CHEBI:15365', 'local'), '15365')
+    assert.equal(obo.toForm('chebi', '15365', 'curie'), 'CHEBI:15365')
+    assert.equal(obo.toForm('uniprot', 'P04637', 'curie'), 'uniprot:P04637')
+    assert.equal(obo.toForm('uniprot', 'uniprot:P04637'), 'P04637', 'no form: canonical')
+    assert.deepEqual(obo.toForm('chebi', ['CHEBI:1', 'CHEBI:2'], 'local'), ['1', '2'])
+  })
+
+  test('rows from a SQL source come out canonical, nested same-source rows too', async () => {
+    const sqlite = require('../src/database/drivers/sqlite3')
+    const dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mozg-obo-')), 'x.db')
+    const knex = require('knex')({ client: 'sqlite3', connection: { filename: dbPath }, useNullAsDefault: true })
+    await knex.schema.createTable('compound', (t) => { t.integer('id'); t.string('chebi') })
+    await knex.schema.createTable('xref', (t) => { t.integer('compound_id'); t.string('accession') })
+    await knex('compound').insert({ id: 1, chebi: '15365' })
+    await knex('xref').insert({ compound_id: 1, accession: 'uniprotkb:p04637' })
+    await knex.destroy()
+
+    const undo = registerCatalog({
+      name: 'obo-sql',
+      label: 'SQL',
+      driver: 'sqlite3',
+      connection: { database: dbPath },
+      entities: [
+        { name: 'compound', columns: ['id', 'chebi'], obo: { chebi: 'chebi' }, oboForm: { chebi: 'local' }, relations: [] },
+        { name: 'xref', columns: ['compound_id', 'accession'], obo: { accession: 'uniprot' }, relations: [] }
+      ]
+    })
+    try {
+      const { data } = await executeQuery({
+        source: 'obo-sql',
+        from: 'compound',
+        relations: [{ entity: 'xref', foreignKey: 'compound_id', localKey: 'id', alias: 'xrefs' }]
+      })
+      assert.equal(data[0].chebi, 'CHEBI:15365')
+      assert.equal(data[0].xrefs[0].accession, 'P04637')
+
+      // Joining back into the table converts to the stored form.
+      const { fetchRelation } = require('../src/database/relations')
+      const back = await fetchRelation(executeQuery, sources.connectionForSource('obo-sql'), { c: 'CHEBI:15365' }, { entity: 'compound', localKey: 'c', foreignKey: 'chebi', obo: 'chebi', type: 'hasMany' })
+      assert.equal(back.length, 1)
+    } finally {
+      undo()
+      await sqlite.destroyAll()
+    }
+  })
+})
+
+test('the lint checks oboForm', () => {
+  const entry = { name: 'x', driver: 'sqlite3', connection: {}, entities: [{ name: 't', columns: ['a', 'b'], obo: { a: 'chebi' }, oboForm: { a: 'bare', b: 'local' }, relations: [] }] }
+  const out = lintEntry(entry, () => null).join('\n')
+  assert.match(out, /oboForm.a must be "local" or "curie"/)
+  assert.match(out, /oboForm.b is set but "b" carries no OBO key/)
+})

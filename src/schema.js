@@ -560,7 +560,7 @@ const resolvers = {
       }
     }),
     links: (entity) => {
-      if (!entity.__entry || entity.__entry.driver !== 'api') return []
+      if (!entity.__entry) return []
       const declared = new Set((entity.relations || []).map((r) => `${r.catalog || entity.__entry.name}/${r.entity}`))
       return implicitLinks(entity.__entry, entity).filter((l) => !declared.has(`${l.catalog}/${l.entity}`))
     }

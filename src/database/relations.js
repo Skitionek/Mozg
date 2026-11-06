@@ -17,6 +17,25 @@ function joinValue (value, rel) {
 }
 
 /**
+ * A self-hosted table may store a keyed column in a form other than the
+ * canonical one (Reactome's graph keeps ChEBI ids as bare numbers); its entity
+ * says so with `oboForm: { column: 'local' | 'curie' }`, and the join value is
+ * written that way so the lookup matches.
+ */
+function storedForm (value, connection, rel) {
+  if (value == null || !rel.obo || rel.obo === '*' || !connection || !connection.source) return value
+  let entity
+  try {
+    const { getCatalog } = require('../catalog')
+    entity = (getCatalog(connection.source)[0].entities || []).find((e) => e.name === rel.entity)
+  } catch {
+    return value
+  }
+  const form = entity && entity.oboForm && entity.oboForm[rel.foreignKey]
+  return form ? require('./obo').toForm(rel.obo, value, form) : value
+}
+
+/**
  * Resolve one relation for one parent row by issuing a second query.
  *
  * Shared by the streaming endpoint, the connector's cross-catalog relation
@@ -56,7 +75,7 @@ async function fetchRelation (executeQuery, connection, row, rel) {
   }
 
   if (type === 'hasMany' || type === 'hasOne') {
-    const parentId = joinValue(row[localKey], rel)
+    const parentId = storedForm(joinValue(row[localKey], rel), connection, rel)
     if (parentId == null) return type === 'hasMany' ? [] : null
 
     const { data } = await executeQuery({

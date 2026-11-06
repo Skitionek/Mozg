@@ -158,7 +158,13 @@ and any relation joining identifiers from different spaces.
 **Self-hosted databases** (SQL tables, Neo4j labels — see `docs/deploy.md`)
 annotate their identifier columns the same way; a keyed column is both a
 field and a filter, so public sources link into the table and the table
-links out to them.
+links out to them.  Their rows are normalised to canonical form on the way
+out like api rows.  A column that *stores* a key differently (Reactome's
+graph keeps ChEBI ids as bare numbers) says so, and joins into it convert:
+
+```js
+obo: { identifier: 'chebi' }, oboForm: { identifier: 'local' }   // stored as 15365, served as CHEBI:15365
+```
 
 ## Conventions
 
