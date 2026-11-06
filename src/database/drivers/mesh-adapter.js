@@ -232,6 +232,9 @@ function getLeafFields (schema, typeName) {
  *   2. `all` + PascalCase prefix  (PostGraphile: `allUsers`)
  *   3. Case-insensitive exact     (Neo4j label casing)
  *   4. Case-insensitive `all` prefix
+ *   5. The list field of the type named so (a Neo4j node label: `Pathway`
+ *      for the handler's `pathways`)
+ *   6. A generated operation name ending in `_<entity>` (SOAP)
  */
 function findQueryField (queryFields, entityName) {
   if (queryFields[entityName]) return entityName
@@ -244,6 +247,17 @@ function findQueryField (queryFields, entityName) {
     (f) => f.toLowerCase() === lower || f.toLowerCase() === 'all' + lower
   )
   if (ci) return ci
+
+  // An entity named after its rows' type rather than the field: @neo4j/graphql
+  // pluralises labels into field names (Pathway -> pathways,
+  // ReferenceGeneProduct -> referenceGeneProducts), so a catalog naming its
+  // entities after the labels is matched here.  Single-row lookups returning
+  // the same type are not lists and are left alone.
+  const byType = Object.keys(queryFields).find((f) => {
+    const type = queryFields[f].type
+    return unwrap(type).name === entityName && wrapsList(type)
+  })
+  if (byType) return byType
 
   // Generated operation names (SOAP: Service_Service_Port_Operation): accept
   // the bare operation name when it identifies one operation, preferring the
