@@ -127,6 +127,8 @@ verified against the live APIs, and joined up across sources.
   (unreachable), and `brenda` (described a REST API BRENDA does not offer; it
   is SOAP-only behind registration).  Model-organism genes from ZFIN, WormBase,
   MGI, RGD and SGD are available through `alliance`.
+- `restcountries`: RestCountries retired the keyless v3.1 API it used, and
+  v5 needs an API key.
 
 ### Fixed
 

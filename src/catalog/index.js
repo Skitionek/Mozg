@@ -111,8 +111,7 @@ const REGISTRY = {
   openlibrary: () => require('./openlibrary'),
   openbrewery: () => require('./openbrewery'),
   opentrivia: () => require('./opentrivia'),
-  openmeteo: () => require('./openmeteo'),
-  restcountries: () => require('./restcountries')
+  openmeteo: () => require('./openmeteo')
 }
 
 /**
