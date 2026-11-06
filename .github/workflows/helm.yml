@@ -192,11 +192,11 @@ jobs:
           helm install keda kedacore/keda --version "$KEDA_VERSION" \
             --namespace keda --create-namespace --wait --timeout 5m
 
-      - name: Build the Mozg image on ${{ matrix.preset.nodeImage }} and load it into kind
+      - name: Build the Mozg image on node:${{ matrix.preset.nodeImageTag }} and load it into kind
         env:
-          NODE_IMAGE: ${{ matrix.preset.nodeImage }}
+          NODE_TAG: ${{ matrix.preset.nodeImageTag }}
         run: |
-          docker build --build-arg NODE_IMAGE="$NODE_IMAGE" -t mozg:e2e .
+          docker build --build-arg NODE_TAG="$NODE_TAG" -t mozg:e2e .
           kind load docker-image mozg:e2e --name mozg
 
       - name: Install the chart with a self-hosted database of every engine

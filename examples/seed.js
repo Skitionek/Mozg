@@ -155,7 +155,6 @@ async function insertRows () {
       )
     }
   }
-
 }
 
 async function report () {

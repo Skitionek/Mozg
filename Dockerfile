@@ -3,15 +3,16 @@
 #   docker run -p 4000:4000 mozg
 # Node 26, the active LTS line, on Debian 13 (trixie): sqlite3's prebuilt
 # binding needs glibc 2.38, which Debian 12 (glibc 2.36) lacks.  CI builds it
-# on every Node line in .github/ci-presets.json with --build-arg NODE_IMAGE.
-ARG NODE_IMAGE=node:26-trixie-slim
+# on every Node line in .github/ci-presets.json with --build-arg NODE_TAG
+# (a tag of the official node image, so the base stays that image).
+ARG NODE_TAG=26-trixie-slim
 
-FROM ${NODE_IMAGE} AS deps
+FROM node:${NODE_TAG} AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM ${NODE_IMAGE}
+FROM node:${NODE_TAG}
 ENV NODE_ENV=production PORT=4000
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
