@@ -1,45 +1,83 @@
-name: Deploy query builder to GitHub Pages
+name: Documentation site
+
+# Builds the documentation site (scripts/build-site.js): the README as the
+# overview, docs/, the runnable examples, the changelog, the demo recording
+# and the paper, and publishes it on GitHub Pages from main.  Pull requests
+# that touch any of it build the site without publishing it.
 
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "docs/**"
+      - "examples/queries.json"
+      - "paper/**"
+      - "scripts/build-site.js"
+      - "scripts/site/**"
+      - ".github/workflows/deploy-pages.yml"
+      - ".github/workflows/paper.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
+permissions: read-all
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  paper:
+    name: Paper
+    uses: ./.github/workflows/paper.yml
+
+  build:
+    name: Build the site
     runs-on: ubuntu-latest
+    needs: paper
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: "npm"
 
-      # The query builder fetches examples/queries.json at runtime, so the
-      # examples directory has to ship alongside public/.
-      - name: Stage site
-        run: |
-          mkdir -p _site
-          cp -r public/. _site/
-          mkdir -p _site/examples
-          cp examples/queries.json _site/examples/
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download the paper
+        uses: actions/download-artifact@v8
+        with:
+          name: mozg-paper
+          path: paper-pdf
+
+      - name: Build
+        run: node scripts/build-site.js --out _site --paper paper-pdf/mozg.pdf
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: _site/
+
+  deploy:
+    name: Publish on GitHub Pages
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
 
       - name: Deploy to GitHub Pages
         id: deployment

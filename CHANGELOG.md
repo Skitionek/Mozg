@@ -158,6 +158,11 @@ verified against the live APIs, and joined up across sources.
   all six engines into one cluster, with every image, Kubernetes, kind, Helm
   and KEDA taken from the preset. A weekly workflow checks the presets
   against endoflife.date (`scripts/ci-presets.js`).
+- **GitHub Pages is the documentation site** (`scripts/build-site.js`). It
+  publishes the overview, the source reference, the runnable examples, the
+  connector and deployment guides, the changelog, the demo recording and the
+  paper. It replaces a copy of the query builder, which cannot work without
+  a Mozg server behind it.
 - KEGG requests go through the shared HTTP client (3 requests/s, as KEGG
   asks; timeouts; retries); a 404 is an empty result instead of an error.
 - Cross-catalog relations on a row are resolved concurrently.

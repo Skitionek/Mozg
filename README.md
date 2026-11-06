@@ -49,7 +49,7 @@ Mozg has left the concept phase.  Some parts are production-ready; others are st
 | Self-hosted databases on Kubernetes (Helm, scale to zero) | **Beta.** Every engine (PostgreSQL, MySQL/MariaDB, Neo4j, ArangoDB, Elasticsearch, SQLite) exercised end to end on a kind cluster in CI. |
 | OWL ontology ingestion | **Experimental.** |
 
-Per-connector details, test coverage and known limitations: [docs/connectors.md](docs/connectors.md).  Deploying with self-hosted databases: [docs/deploy.md](docs/deploy.md).
+Per-connector details, test coverage and known limitations: [docs/connectors.md](docs/connectors.md).  Deploying with self-hosted databases: [docs/deploy.md](docs/deploy.md).  All of it, with the examples and the paper, is on the [documentation site](https://skitionek.github.io/Mozg/).
 
 ---
 
