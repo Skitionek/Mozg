@@ -1,0 +1,85 @@
+{
+  "label": "ChEMBL (self-hosted PostgreSQL)",
+  "description": "ChEMBL restored from EMBL-EBI's PostgreSQL dump and hosted with this deployment: bioactive molecules, their structures, protein targets, mechanisms of action, bioactivities and source documents. Identifier columns carry OBO keys, so rows join to UniProt, PubChem, PubMed and the other public sources without declared relations.",
+  "category": "Chemistry & drugs",
+  "homepage": "https://www.ebi.ac.uk/chembl/",
+  "docs": "https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/latest/schema_documentation.html",
+  "license": "CC BY-SA 3.0",
+  "entities": [
+    {
+      "name": "molecule_dictionary",
+      "description": "One curated compound (drug, clinical candidate or research compound)",
+      "columns": ["molregno", "pref_name", "chembl_id", "max_phase", "therapeutic_flag", "molecule_type", "first_approval", "oral", "parenteral", "topical", "black_box_warning", "natural_product", "first_in_class", "chirality", "prodrug", "withdrawn_flag", "availability_type", "chemical_probe", "orphan"],
+      "obo": { "chembl_id": "chembl.compound" },
+      "relations": [
+        { "alias": "structure", "entity": "compound_structures", "localKey": "molregno", "foreignKey": "molregno", "type": "hasOne", "description": "Standard InChI, InChIKey and SMILES" },
+        { "alias": "mechanisms", "entity": "drug_mechanism", "localKey": "molregno", "foreignKey": "molregno", "type": "hasMany", "description": "Mechanisms of action and the targets they act on" },
+        { "alias": "activities", "entity": "activities", "localKey": "molregno", "foreignKey": "molregno", "type": "hasMany", "description": "Every measured bioactivity of the compound (thousands for well-studied drugs)" }
+      ]
+    },
+    {
+      "name": "compound_structures",
+      "description": "The standard chemical representations of a compound",
+      "columns": ["molregno", "standard_inchi", "standard_inchi_key", "canonical_smiles"],
+      "obo": { "standard_inchi_key": "inchikey" },
+      "relations": [
+        { "alias": "molecule", "entity": "molecule_dictionary", "foreignKey": "molregno", "ownerKey": "molregno", "type": "belongsTo", "description": "The compound" }
+      ]
+    },
+    {
+      "name": "target_dictionary",
+      "description": "One drug target: a protein, complex, family, cell line or organism",
+      "columns": ["tid", "target_type", "pref_name", "tax_id", "organism", "chembl_id", "species_group_flag"],
+      "obo": { "chembl_id": "chembl.target", "tax_id": "ncbitaxon" },
+      "relations": [
+        { "alias": "components", "entity": "target_components", "localKey": "tid", "foreignKey": "tid", "type": "hasMany", "description": "The protein components making up the target" },
+        { "alias": "mechanisms", "entity": "drug_mechanism", "localKey": "tid", "foreignKey": "tid", "type": "hasMany", "description": "Drugs acting on this target, by mechanism" }
+      ]
+    },
+    {
+      "name": "target_components",
+      "description": "Links a target to one of its protein components",
+      "columns": ["targcomp_id", "tid", "component_id", "homologue"],
+      "relations": [
+        { "alias": "target", "entity": "target_dictionary", "foreignKey": "tid", "ownerKey": "tid", "type": "belongsTo", "description": "The target" },
+        { "alias": "sequence", "entity": "component_sequences", "foreignKey": "component_id", "ownerKey": "component_id", "type": "belongsTo", "description": "The protein, with its UniProt accession" }
+      ]
+    },
+    {
+      "name": "component_sequences",
+      "description": "One protein (or nucleic acid) target component, with its UniProt accession",
+      "columns": ["component_id", "component_type", "accession", "description", "tax_id", "organism", "db_source", "db_version", "sequence"],
+      "obo": { "accession": "uniprot", "tax_id": "ncbitaxon" },
+      "relations": [
+        { "alias": "targets", "entity": "target_components", "localKey": "component_id", "foreignKey": "component_id", "type": "hasMany", "description": "Targets this protein is part of" }
+      ]
+    },
+    {
+      "name": "drug_mechanism",
+      "description": "How a drug acts: its mechanism of action on a target",
+      "columns": ["mec_id", "record_id", "molregno", "mechanism_of_action", "tid", "action_type", "direct_interaction", "molecular_mechanism", "disease_efficacy", "mechanism_comment", "selectivity_comment", "binding_site_comment"],
+      "relations": [
+        { "alias": "molecule", "entity": "molecule_dictionary", "foreignKey": "molregno", "ownerKey": "molregno", "type": "belongsTo", "description": "The drug" },
+        { "alias": "target", "entity": "target_dictionary", "foreignKey": "tid", "ownerKey": "tid", "type": "belongsTo", "description": "The target it acts on" }
+      ]
+    },
+    {
+      "name": "activities",
+      "description": "One measured bioactivity of a compound in an assay",
+      "columns": ["activity_id", "assay_id", "doc_id", "record_id", "molregno", "standard_type", "standard_relation", "standard_value", "standard_units", "pchembl_value", "activity_comment", "data_validity_comment", "potential_duplicate", "type", "relation", "value", "units"],
+      "relations": [
+        { "alias": "molecule", "entity": "molecule_dictionary", "foreignKey": "molregno", "ownerKey": "molregno", "type": "belongsTo", "description": "The compound measured" },
+        { "alias": "document", "entity": "docs", "foreignKey": "doc_id", "ownerKey": "doc_id", "type": "belongsTo", "description": "The publication reporting it" }
+      ]
+    },
+    {
+      "name": "docs",
+      "description": "One source document: a publication, patent or deposited dataset",
+      "columns": ["doc_id", "chembl_id", "journal", "year", "volume", "issue", "first_page", "last_page", "pubmed_id", "doi", "title", "doc_type", "authors", "abstract", "patent_id"],
+      "obo": { "chembl_id": "chembl.document", "pubmed_id": "pubmed", "doi": "doi" },
+      "relations": [
+        { "alias": "activities", "entity": "activities", "localKey": "doc_id", "foreignKey": "doc_id", "type": "hasMany", "description": "Bioactivities extracted from the document" }
+      ]
+    }
+  ]
+}

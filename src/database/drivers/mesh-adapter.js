@@ -13,7 +13,6 @@ const {
 const { MeshStore, InMemoryStoreStorageAdapter } = require('@graphql-mesh/store')
 const { PubSub, DefaultLogger } = require('@graphql-mesh/utils')
 
-const { createHash } = require('node:crypto')
 const { assertSafeCypherIdentifier } = require('./neo4j-identifiers')
 
 // Cache: connection key → { schema, executor }
@@ -95,15 +94,28 @@ function buildHandlerDescriptor (driver, connection) {
 
 // ── Mesh source factory ───────────────────────────────────────────────────────
 
+/** Everything a handler is built from, except the password. */
+function connectionIdentity (connection) {
+  const { driver, host, port, database, user, path, scheme } = connection
+  return { driver, host, port, database, user, path, scheme }
+}
+
+/**
+ * The cache key for a connection's mesh source: everything the handler is
+ * built from, the password included.  Leaving the password out let a request
+ * with the wrong password ride on a source another caller had already
+ * authenticated (demonstrated against MySQL: a bad password still returned
+ * rows).  The key lives only in this process's memory, beside the connection
+ * object and source that hold the same password already.  path and scheme
+ * matter because the thrift handler builds its endpoint from them.
+ */
+function cacheKeyFor (connection) {
+  return JSON.stringify({ ...connectionIdentity(connection), password: connection.password || '' })
+}
+
 async function getOrCreateMeshSource (connection) {
-  const { driver, host, port, database, user, path, scheme, password } = connection
-  // The key covers everything the handler is built from — including a digest
-  // of the password.  Leaving the password out let a request with the wrong
-  // password ride on a source another caller had already authenticated
-  // (demonstrated against MySQL: a bad password still returned rows).  path
-  // and scheme matter because the thrift handler builds its endpoint from them.
-  const secret = password ? createHash('sha256').update(String(password)).digest('hex') : ''
-  const cacheKey = JSON.stringify({ driver, host, port, database, user, path, scheme, secret })
+  const { driver } = connection
+  const cacheKey = cacheKeyFor(connection)
 
   if (meshSourceCache.has(cacheKey)) return meshSourceCache.get(cacheKey)
 
@@ -111,8 +123,9 @@ async function getOrCreateMeshSource (connection) {
   const HandlerClass = require(pkg).default
 
   const storage = new InMemoryStoreStorageAdapter()
+  // Named without the password: handlers may log their store's name.
   const store = new MeshStore(
-    `${driver}/${cacheKey}`,
+    `${driver}/${JSON.stringify(connectionIdentity(connection))}`,
     storage,
     { readonly: false, validate: false }
   )
@@ -142,9 +155,7 @@ async function getOrCreateMeshSource (connection) {
  * @returns {Function} removes the registration again
  */
 function registerMeshSource (connection, source) {
-  const { driver, host, port, database, user, path, scheme, password } = connection
-  const secret = password ? createHash('sha256').update(String(password)).digest('hex') : ''
-  const cacheKey = JSON.stringify({ driver, host, port, database, user, path, scheme, secret })
+  const cacheKey = cacheKeyFor(connection)
   meshSourceCache.set(cacheKey, source)
   return () => meshSourceCache.delete(cacheKey)
 }

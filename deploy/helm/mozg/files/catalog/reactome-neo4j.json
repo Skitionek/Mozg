@@ -1,0 +1,38 @@
+{
+  "label": "Reactome (self-hosted Neo4j)",
+  "description": "Reactome's pathway knowledgebase loaded from its Neo4j graph database dump and hosted with this deployment. Node labels are entities; stable ids and reference identifiers carry OBO keys, so pathways join to the public Reactome API and gene products to UniProt (and on to every source keyed by UniProt accession). Graph edges (hasEvent, input, output, referenceEntity) are not traversed by the neo4j driver's property joins.",
+  "category": "Interactions & pathways",
+  "homepage": "https://reactome.org",
+  "docs": "https://reactome.org/dev/graph-database",
+  "license": "CC BY 4.0",
+  "entities": [
+    {
+      "name": "Pathway",
+      "description": "One pathway",
+      "columns": ["dbId", "stId", "displayName", "speciesName", "schemaClass", "isInDisease", "isInferred", "hasDiagram", "releaseDate"],
+      "obo": { "stId": "reactome" },
+      "relations": []
+    },
+    {
+      "name": "ReactionLikeEvent",
+      "description": "One reaction, binding, polymerisation or other reaction-like event",
+      "columns": ["dbId", "stId", "displayName", "speciesName", "schemaClass", "category", "isInDisease", "isInferred", "isChimeric", "releaseDate"],
+      "obo": { "stId": "reactome" },
+      "relations": []
+    },
+    {
+      "name": "ReferenceGeneProduct",
+      "description": "A protein referenced by Reactome's physical entities, by UniProt accession",
+      "columns": ["dbId", "identifier", "databaseName", "displayName", "geneName", "variantIdentifier", "url"],
+      "obo": { "identifier": "uniprot" },
+      "relations": []
+    },
+    {
+      "name": "ReferenceMolecule",
+      "description": "A small molecule referenced by Reactome's physical entities, by ChEBI id (stored without the CHEBI: prefix)",
+      "columns": ["dbId", "identifier", "databaseName", "displayName", "name", "formula", "url"],
+      "obo": { "identifier": "chebi" },
+      "relations": []
+    }
+  ]
+}
