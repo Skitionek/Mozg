@@ -1,46 +1,51 @@
-flowchart TD
-    Client["Client\n(Browser / API Consumer)"]
+flowchart LR
+    Client["Client<br/>query builder<br/>GraphiQL · API"]
 
-    HTTP["HTTP Server\nsrc/index.js · graphql-yoga\n/graphql · / · /examples"]
+    HTTP["HTTP server<br/>src/index.js<br/>graphql-yoga<br/>/graphql · /stream<br/>/demand · /healthz"]
 
-    Schema["GraphQL Schema\nsrc/schema.js\nquery | introspect | catalog | ingestOntology"]
+    Schema["GraphQL schema<br/>src/schema.js<br/>query · introspect<br/>catalog · oboKeys<br/>generateSchema<br/>ingestOntology"]
 
-    Connector["Query Connector\nsrc/database/connector.js"]
+    Ontology["Ontology pipeline<br/>src/ontology"]
 
-    Registry["Driver Registry\nsrc/database/registry.js"]
+    Catalog["Catalog and OBO keys<br/>src/catalog · obo.js<br/>source · include<br/>implicit links"]
 
-    subgraph Drivers["Driver Layer · src/database/drivers/"]
+    Connector["Connector and<br/>relation resolver<br/>withWake"]
+
+    Registry["Driver registry<br/>14 drivers"]
+
+    subgraph Drivers["Drivers"]
         direction TB
-        Mesh["GraphQL Mesh Adapter\npostgres · mysql · neo4j\nopenapi · soap · odata · thrift · mongodb"]
-        SQLite["SQLite3 Driver\n(Knex)"]
-        Arango["ArangoDB Driver"]
-        REST["REST Driver"]
-        BioCyc["BioCyc Driver"]
+        API["api<br/>catalog-described HTTP"]
+        Native["rest · kegg · biocyc<br/>elasticsearch · arango"]
+        Knex["postgres · sqlite3<br/>Knex"]
+        Mesh["GraphQL Mesh adapter<br/>mysql · neo4j · openapi<br/>soap · odata · thrift"]
     end
 
-    subgraph Sources["External Data Sources"]
+    HTTPC["Shared HTTP client<br/>timeouts · retries<br/>per-host limits<br/>dedupe"]
+
+    subgraph Public["Public sources"]
         direction TB
-        PG[("PostgreSQL")]
-        MY[("MySQL")]
-        NJ[("Neo4j")]
-        MDB[("MongoDB")]
-        APIs["REST · OpenAPI\nSOAP · OData · Thrift"]
-        SQ[("SQLite file")]
-        ADB[("ArangoDB")]
-        BC["BioCyc\nPathway DB"]
+        Life["47 life-science APIs"]
+        Demo["REST demo APIs<br/>KEGG · BioCyc"]
     end
 
-    Client -->|"HTTP"| HTTP
-    HTTP --> Schema
-    Schema --> Connector
-    Connector --> Registry
-    Registry --> Mesh
-    Registry --> SQLite
-    Registry --> Arango
-    Registry --> REST
-    Registry --> BioCyc
-    Mesh --> PG & MY & NJ & MDB & APIs
-    SQLite --> SQ
-    Arango --> ADB
-    REST --> APIs
-    BioCyc --> BC
+    subgraph Hosted["Self-hosted · Helm chart"]
+        direction TB
+        KEDA["KEDA<br/>0 ↔ 1 replica"]
+        DBs[("PostgreSQL · MariaDB<br/>Neo4j · ArangoDB<br/>Elasticsearch · SQLite")]
+    end
+
+    Client --> HTTP --> Schema
+    Schema --> Ontology
+    Schema --> Catalog --> Connector
+    Schema --> Connector --> Registry
+    Registry --> API & Native & Knex & Mesh
+    API --> HTTPC
+    Native --> HTTPC
+    HTTPC --> Life & Demo
+    HTTPC --> DBs
+    Native --> DBs
+    Knex --> DBs
+    Mesh --> DBs
+    KEDA -->|"scales"| DBs
+    HTTP -.->|"demand"| KEDA

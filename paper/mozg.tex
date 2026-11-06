@@ -11,6 +11,11 @@
 \usepackage{microtype}
 \usepackage{amsmath}
 \usepackage{balance}
+\usepackage{tabularx}
+
+% Long code identifiers in two narrow columns: allow a little extra
+% inter-word stretch rather than lines running into the margin.
+\setlength{\emergencystretch}{3em}
 
 % ---------------------------------------------------------------
 % Listings style
@@ -49,7 +54,8 @@
 % ---------------------------------------------------------------
 % Metadata
 % ---------------------------------------------------------------
-\title{Mozg: A ``Slow by Design'' Federated Query Layer\\
+\title[Mozg: A ``Slow by Design'' Federated Query Layer]
+      {Mozg: A ``Slow by Design'' Federated Query Layer\texorpdfstring{\\}{ }
        for Heterogeneous Data Sources via GraphQL}
 
 \author{Dominik Maszczyk}
@@ -61,28 +67,35 @@
 
 \begin{abstract}
 Modern data ecosystems fragment knowledge across relational databases,
-graph stores, document databases, REST services, and domain-specific
+graph stores, search engines, web APIs, and domain-specific
 repositories.  Integrating these silos typically requires either a costly
 centralised data warehouse or bespoke per-integration middleware.
 This paper presents \textbf{Mozg} (Polish: \emph{brain}), an open-source
-federated query layer that exposes a single GraphQL endpoint capable
-of routing queries to any supported backend at runtime, traversing
-user-defined cross-source relationships, and synthesising results
-without ever storing the underlying data.  Mozg deliberately trades
-query latency for data freshness, flexibility, and minimal operational
+federated query layer that exposes a single GraphQL endpoint over
+fourteen kinds of source, traverses user-defined and catalog-declared
+relationships across them at query time, and never stores the
+underlying data.  Mozg deliberately trades query latency for data
+freshness, flexibility, and minimal operational
 overhead---a philosophy called \emph{``slow by design''}.
 The architecture, driver model, ontology-ingestion pipeline,
-and browser-based visual query builder are described.  A curated catalog
-of 63 pre-configured public data sources---spanning relational databases,
-graph engines, REST APIs, and bioinformatics repositories---is included
-for immediate use.  The system is
-evaluated against representative public databases and REST APIs;
-scalability and security considerations are discussed; and Mozg is
-positioned relative to related federated-query systems.
+and browser-based query builder are described, together with a
+catalog of 90 ready-to-query sources.  Forty-seven of them are public
+life-science APIs described declaratively (206 entities, 663 relations,
+441 of which cross from one source to another) and joined through
+\emph{OBO keys}: identifier spaces named by their Bioregistry prefix,
+under the rule that two fields with the same key and the same value
+denote the same thing.  A Helm chart hosts copies of large databases on
+any of six engines next to Mozg, scales each to zero when idle, and
+wakes it on the next query.  The evaluation covers an automated suite of
+745 tests, a connector evaluation against real servers that found and
+fixed fifteen defects, static and live verification of the catalog,
+ontology ingestion up to 256\,680 triples, and server-side overhead
+below one millisecond per query.
 \end{abstract}
 
 \keywords{federated queries, GraphQL, heterogeneous data integration,
-          ontology mapping, data virtualisation, cross-database joins}
+          ontology mapping, data virtualisation, cross-database joins,
+          life-science identifiers, scale-to-zero}
 
 % ---------------------------------------------------------------
 \begin{document}
@@ -95,8 +108,8 @@ positioned relative to related federated-query systems.
 % ===============================================================
 
 The proliferation of specialised data stores---relational databases,
-property-graph engines, triple stores, document databases, column
-stores, and REST services---creates what is commonly called the
+property-graph engines, triple stores, document databases, search
+engines, and web APIs---creates what is commonly called the
 \emph{data silo} problem~\cite{halevy2006data}.  Organisations that
 need to ask questions spanning multiple silos face an uncomfortable
 choice: build a data warehouse that periodically copies and integrates
@@ -113,8 +126,8 @@ that mirrors familiar ORM conventions---and Mozg resolves these
 relationships at query time, returning a joined result without ever
 persisting a copy of the underlying records.  The single entry-point
 is a GraphQL endpoint; users supply their own database credentials
-as part of each query, keeping the server stateless with respect to
-authorisation.
+or API keys as part of each query, keeping the server stateless with
+respect to authorisation.
 
 This non-aggregating design has two important practical consequences
 that are absent from most existing solutions.  First, it substantially
@@ -128,6 +141,13 @@ licensed for read-only or non-commercial access---as a conventional
 data warehouse would---may violate those terms; Mozg avoids this
 entirely because data never leaves its origin server.
 
+The life sciences are the setting where this matters most, and the
+current version of Mozg is built around them.  Public biological
+databases are numerous, independently operated, and joined in practice
+by shared identifiers: a UniProt accession, an Ensembl gene, a ChEBI
+compound.  Mozg ships executable descriptions of 47 such services and a
+single rule for joining them, described in Section~\ref{sec:catalog}.
+
 The name alludes to the system's role as a \emph{cognitive layer}: like
 a brain, Mozg does not store memories---it connects them.  The
 ``slow by design'' label is not an apology but a deliberate design
@@ -140,8 +160,12 @@ The remainder of this paper is organised as follows.
 Section~\ref{sec:background} reviews related work.
 Section~\ref{sec:architecture} presents the overall architecture.
 Section~\ref{sec:drivers} describes the driver model.
+Section~\ref{sec:catalog} describes the source catalog, OBO keys, and
+how the catalog is verified.
 Section~\ref{sec:ontology} covers the OWL ontology pipeline.
-Section~\ref{sec:ui} describes the query-builder interface.
+Section~\ref{sec:ui} describes the query builder and streaming endpoint.
+Section~\ref{sec:selfhost} describes self-hosted databases that scale
+to zero.
 Section~\ref{sec:evaluation} reports an empirical evaluation.
 Section~\ref{sec:discussion} discusses limitations and future work.
 Section~\ref{sec:conclusion} concludes.
@@ -175,10 +199,10 @@ services.
 
 GraphQL Mesh~\cite{graphqlmesh} provides source handlers that translate
 a unified GraphQL schema into REST, gRPC, SOAP, OpenAPI and database
-calls.  Mozg uses GraphQL Mesh handlers for most relational and API
-backends while retaining custom drivers for specialised sources
-(ArangoDB, BioCyc) and providing its own relation-traversal layer on
-top.
+calls.  Mozg uses GraphQL Mesh handlers for six backends (MySQL, Neo4j,
+OpenAPI, SOAP, OData, Thrift), queries PostgreSQL and SQLite through
+Knex~\cite{knex}, keeps its own drivers for the remaining sources, and
+provides its own relation-traversal layer on top of all of them.
 
 Hasura~\cite{hasura} generates a GraphQL API automatically from
 PostgreSQL, MySQL, and a growing set of other relational sources and
@@ -197,22 +221,24 @@ over many independently-operated, heterogeneous sources.  Hasura's
 Remote Schemas feature and Prisma's multi-provider support edge towards
 federation, but both still require the operator to own and configure
 every connected backend.  Mozg, by contrast, queries sources that the
-server operator does not own or control---public REST APIs, third-party
+server operator does not own or control---public web APIs, third-party
 relational databases, domain-specific repositories---using credentials
 supplied at query time by the client.  This architecture is
 fundamentally different: \textbf{Mozg never aggregates data into a
-central store}.  As a result, it is the only system in this class that
-enables collaborative cross-organisation queries without requiring any
-party to share database access credentials, replicate data, or risk
-violating the read-only or non-commercial redistribution terms attached
-to many public scientific databases.
+central store}.  As a result, it enables collaborative
+cross-organisation queries without requiring any party to share
+database access credentials, replicate data, or risk violating the
+read-only or non-commercial redistribution terms attached to many
+public scientific databases.
 
 Table~\ref{tab:comparison} summarises the key capabilities.
 
 \begin{table*}[t]
 \caption{Capability comparison of Mozg and related systems.
   \checkmark~=~yes; $\circ$~=~partial / with configuration;
-  $\times$~=~no.}
+  $\times$~=~no.  Mozg's query optimisation is partial: same-source
+  relations are fetched in one batched query per level for SQL, AQL and
+  Elasticsearch sources, but there is no cross-source planning.}
 \label{tab:comparison}
 \small
 \begin{tabular}{lcccccc}
@@ -220,7 +246,7 @@ Table~\ref{tab:comparison} summarises the key capabilities.
 System & Het.\ sources & No central store & OWL ingestion
        & Credential delegation & Query optimisation & Open-source \\
 \midrule
-\textbf{Mozg}          & \checkmark & \checkmark & \checkmark & \checkmark & $\times$   & \checkmark \\
+\textbf{Mozg}          & \checkmark & \checkmark & \checkmark & \checkmark & $\circ$    & \checkmark \\
 Hasura                 & $\circ$    & $\times$   & $\times$   & $\times$   & \checkmark & $\circ$    \\
 GraphQL Mesh           & \checkmark & \checkmark & $\times$   & $\times$   & $\times$   & \checkmark \\
 Ontop                  & $\circ$    & \checkmark & \checkmark & $\times$   & \checkmark & \checkmark \\
@@ -235,8 +261,9 @@ Data virtualisation~\cite{datavirt} provides a logical, unified view of
 distributed data without physical integration.  Commercial products such
 as Denodo, TIBCO Data Virtualization, and IBM Federation Server occupy
 this space.  Mozg is a lightweight, open-source alternative positioned
-for exploratory use: it does not implement query optimisation, query
-pushdown strategies, or persistent schema registries.
+for exploratory use: it does not implement cost-based query
+optimisation, cross-source pushdown strategies, or persistent schema
+registries.
 
 \subsection{Semantic Web and Ontology Mapping}
 
@@ -248,208 +275,320 @@ pipeline moves in the opposite direction: given an OWL TBox, it
 generates GraphQL type definitions and entity maps that can then be
 used to drive its federated query layer.
 
+\subsection{Identifiers in the Life Sciences}
+
+Biological databases refer to one another through identifiers rather
+than through shared schemas.  The OBO Foundry~\cite{obofoundry}
+coordinates biomedical ontologies whose terms are written as compact
+URIs (CURIEs) such as \texttt{GO:0006915}, and the
+Bioregistry~\cite{bioregistry} records, for over a thousand identifier
+spaces, a canonical prefix, the preferred way to write it, and a
+pattern its local identifiers must match.  Mozg uses these prefixes as
+join keys (Section~\ref{sec:obo}): rather than mapping every pair of
+sources, it records which identifier space each field and parameter
+holds.
+
 % ===============================================================
 \section{Architecture}
 \label{sec:architecture}
 % ===============================================================
 
-\begin{figure}[h]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{mozg-architecture}
-\caption{High-level architecture of Mozg.  The diagram is defined in
+\includegraphics[width=\textwidth]{mozg-architecture}
+\caption{High-level architecture of Mozg.  Every driver that speaks
+  HTTP goes through one shared client; databases hosted with the Helm
+  chart are scaled between zero and one replica by KEDA, which reads
+  Mozg's demand.  The diagram is defined in
   \texttt{paper/mozg-architecture.mmd} (Mermaid source) and rendered to
   PNG by the \texttt{Build Paper PDF} GitHub Actions workflow using
   Mermaid CLI\@.}
+\Description{A left-to-right flowchart.  A client calls the HTTP
+  server, which hands requests to the GraphQL schema.  The schema uses
+  the ontology pipeline, the catalog with OBO keys, and the query
+  connector; the connector goes through the driver registry to four
+  groups of drivers.  The api, REST, KEGG, BioCyc and Elasticsearch
+  drivers use a shared HTTP client that reaches public sources and
+  self-hosted databases; the Knex, Mesh and ArangoDB drivers reach the
+  self-hosted databases directly.  KEDA reads demand from the HTTP
+  server and scales the self-hosted databases.}
 \label{fig:arch}
-\end{figure}
+\end{figure*}
 
-Figure~\ref{fig:arch} shows the five-layer architecture of Mozg.
+Figure~\ref{fig:arch} shows the layers of Mozg.
 
-\paragraph{HTTP Server (\texttt{src/index.js}).}
+\paragraph{HTTP Server (\textup{\texttt{src/index.js}}).}
 A Node.js server built on \emph{graphql-yoga}~\cite{graphqlyoga}
-listens on a configurable port (default 4000).  It exposes three
-URL namespaces: \texttt{/graphql} for the GraphQL endpoint and
-GraphiQL IDE, \texttt{/} for the browser query builder, and
-\texttt{/examples} for downloadable ontology samples.  A lightweight
-static-file handler serves the \texttt{public/} directory without
-external middleware.
+listens on a configurable port (default 4000).  It exposes
+\texttt{/graphql} for the GraphQL endpoint and GraphiQL IDE,
+\texttt{/stream} for progressive results (Section~\ref{sec:stream}),
+\texttt{/demand/<source>} for the autoscaler of self-hosted databases
+(Section~\ref{sec:selfhost}), \texttt{/healthz} for liveness probes,
+and the browser query builder at \texttt{/}.  A lightweight
+static-file handler serves the \texttt{public/} directory; it decodes
+each request path and checks that the resolved file lies inside the
+document root.
 
-\paragraph{GraphQL Schema (\texttt{src/schema.js}).}
-A hand-written SDL schema defines the full type system.  There are
-three root fields:
+\paragraph{GraphQL Schema (\textup{\texttt{src/schema.js}}).}
+A hand-written SDL schema defines the full type system.  Its root
+query fields are:
 \begin{itemize}
   \item \texttt{query(input: QueryInput!)} --- executes a federated
         multi-source query with optional relation traversal;
-  \item \texttt{introspect(connection)} --- returns the schema of a
-        remote database (tables, columns, types, nullability,
-        primary-key flags);
-  \item \texttt{catalog(name)} --- returns one or all entries from
-        the curated database catalog.
+  \item \texttt{introspect(connection, source)} --- returns the schema
+        of a remote database or catalog source (tables, columns, types,
+        nullability, primary-key flags);
+  \item \texttt{catalog(name, category, driver)} --- returns catalog
+        entries, with each entity's parameters, fields, relations and
+        implicit links;
+  \item \texttt{oboKeys} --- lists the identifier spaces Mozg knows
+        (Section~\ref{sec:obo});
+  \item \texttt{generateSchema(input)} --- maps an OWL ontology to
+        GraphQL SDL without side effects.
 \end{itemize}
-A single mutation, \texttt{ingestOntology(input)}, parses an OWL
-ontology and returns extracted classes, properties, and generated
-GraphQL SDL.  A custom \texttt{JSON} scalar accepts arbitrary
-structured values so that heterogeneous query results can be
-returned without a fixed schema.
+The mutation \texttt{ingestOntology(input)} parses an OWL ontology,
+caches the result, and can validate it against a live database.  A
+custom \texttt{JSON} scalar accepts arbitrary structured values so that
+heterogeneous query results can be returned without a fixed schema.
 
-\paragraph{Query Connector (\texttt{src/database/connector.js}).}
-A thin routing layer resolves the \texttt{driver} field of the
-supplied \texttt{ConnectionInput} via the driver registry and
-delegates execution.
+\paragraph{Query Connector (\textup{\texttt{src/database/connector.js}}).}
+A routing layer that turns a catalog \texttt{source} into a connection,
+resolves the \texttt{driver} of the connection through the driver
+registry, delegates execution, and follows relations that leave the
+source.  Queries to self-hosted databases are wrapped in
+\texttt{withWake} (Section~\ref{sec:selfhost}).
 
-\paragraph{Driver Registry (\texttt{src/database/registry.js}).}
-The single source of truth for driver bindings.  It maps the thirteen
+\paragraph{Driver Registry (\textup{\texttt{src/database/registry.js}}).}
+The single source of truth for driver bindings.  It maps the fourteen
 driver names (\texttt{postgres}, \texttt{mysql}, \texttt{sqlite3},
-\texttt{neo4j}, \texttt{arango}, \texttt{biocyc}, \texttt{rest},
-\texttt{kegg}, \texttt{openapi}, \texttt{soap}, \texttt{odata},
-\texttt{thrift}, \texttt{mongodb}) to their implementing modules.
+\texttt{neo4j}, \texttt{arango}, \texttt{elasticsearch},
+\texttt{biocyc}, \texttt{api}, \texttt{rest}, \texttt{kegg},
+\texttt{openapi}, \texttt{soap}, \texttt{odata}, \texttt{thrift}) to
+their implementing modules.
 
-\paragraph{Driver Implementations (\texttt{src/database/drivers/}).}
+\paragraph{Driver Implementations (\textup{\texttt{src/database/drivers/}}).}
 Each driver exposes a uniform interface: \texttt{executeQuery(input)}
-and, optionally, \texttt{introspect(connection)}.  Most drivers are
-thin wrappers around \emph{GraphQL Mesh} source handlers; three
-legacy/specialised drivers (SQLite3 via Knex, ArangoDB, BioCyc) use
-custom client libraries.
+and, optionally, \texttt{introspect(connection)}.
+Section~\ref{sec:drivers} describes them.
+
+\paragraph{Shared HTTP Client (\textup{\texttt{src/database/http.js}}).}
+Every driver that reaches a source over HTTP goes through one client.
+Public life-science APIs are shared infrastructure run on research
+budgets, and a query that fans out across relations can issue hundreds
+of requests, so the client is deliberately polite and patient:
+\begin{itemize}
+  \item every request has a timeout (30\,s by default), so one hung
+        upstream cannot hang a query;
+  \item transient failures (408, 429, 502--504, timeouts, resets) are
+        retried with exponential backoff, honouring
+        \texttt{Retry-After};
+  \item requests to one host are throttled to that host's published
+        rate limit and, by default, to four in flight at once;
+  \item identical GET requests already in flight share one round-trip,
+        which matters when many parent rows point at the same record;
+  \item API keys are masked in every error message, and an HTTP error
+        keeps its underlying network cause.
+\end{itemize}
+Responses are not cached by default; a short in-process cache can be
+enabled when latency matters more than freshness.
 
 \subsection{Query Execution Flow}
 
 When a client issues a \texttt{query} request, the server:
 \begin{enumerate}
-  \item Parses the \texttt{QueryInput} (connection, table/entity,
-        columns, predicates, limit/offset/orderBy, relations).
-  \item Resolves the driver and calls \texttt{executeQuery}.
+  \item Parses the \texttt{QueryInput}: a catalog \texttt{source} or an
+        explicit connection, the entity, columns, predicates,
+        limit/offset/orderBy, explicit \texttt{relations}, and catalog
+        relations to \texttt{include}.
+  \item Resolves the connection (from the catalog when \texttt{source}
+        is given; explicit connection fields override it) and the
+        driver, and calls \texttt{executeQuery}.
   \item The driver issues the primary query against the target source.
-  \item For each \texttt{RelationInput} in the relations array, the
-        driver issues one sub-query per relation, keyed on the
-        foreign-key values returned by the primary query.
+  \item Each relation is resolved by one shared routine, so every
+        driver agrees on what \texttt{hasMany}, \texttt{hasOne} and
+        \texttt{belongsTo} mean.  SQL, AQL and Elasticsearch drivers
+        fetch a same-source relation for all parent rows in one query;
+        the REST, Mesh and \texttt{api} drivers issue one request per
+        parent row, with at most four in flight (per host, for HTTP
+        sources).  Relations into another source are resolved through
+        that source's own driver.
   \item Results are merged and returned as a \texttt{QueryResult}
         with a \texttt{count} and a JSON \texttt{data} array.
 \end{enumerate}
 
-This is a straightforward nested-loop join executed in application
-code.  Semantically, relation resolution is a \emph{left outer join}:
+This is a nested-loop join executed in application code.
+Semantically, relation resolution is a \emph{left outer join}:
 the primary result set is always returned in full; each relation field
 is populated with a (possibly empty) array of matched sub-records.
-The design deliberately avoids query pushdown and cross-source
-optimisation; it is simple to implement, easy to debug, and
-independent of any particular source's query planner.  Relation
-definitions can be nested to arbitrary depth, enabling multi-hop
-traversals across heterogeneous sources.
+The design deliberately avoids cross-source optimisation; it is simple
+to implement, easy to debug, and independent of any particular source's
+query planner.  Relation definitions can be nested to arbitrary depth,
+enabling multi-hop traversals across heterogeneous sources.
 
 \subsection{Query Model Semantics}
 \label{sec:semantics}
 
-Let $Q = (\mathit{src}, F, \sigma, \pi, \rho, \lambda, o, R)$
+Let $Q = (\mathit{src}, F, \sigma, o, \rho, \lambda, R)$
 denote a \texttt{QueryInput}, where:
-$\mathit{src}$ is the entity name (table or API path);
+$\mathit{src}$ is the entity name (table, label, index, or API path);
 $F$ is the set of selected fields ($\emptyset$ means all);
-$\sigma$ is a conjunction of equality predicates applied to $\mathit{src}$
-  \emph{before} relation traversal;
-$\pi$ is a non-negative integer limit ($\infty$ if absent);
-$\rho$ is an offset;
+$\sigma$ is a conjunction of equality predicates on $\mathit{src}$;
 $o$ is an optional \textsc{orderby}/direction pair;
+$\rho$ is an offset;
+$\lambda$ is a non-negative integer limit ($\infty$ if absent);
 $R$ is a list of \emph{relation sub-queries}.
 
 The result of evaluating $Q$ against a source $S$ is defined as:
 
 \begin{enumerate}
-  \item $T \leftarrow \sigma\bigl(\pi(\rho(\text{scan}(S, \mathit{src})))\bigr)$
-        --- execute the primary query with predicates, offset, limit, and
-        ordering applied.
-  \item For each $r_i \in T$ and each $\text{Rel} = (\mathit{src'}, k_\ell, k_f, \tau, Q') \in R$:\\
-        \quad If $\tau \in \{\texttt{hasMany},\,\texttt{hasOne}\}$:
-          $r_i[\text{alias}] \leftarrow$
-          $\{r' \in \text{scan}(S', \mathit{src'}) \mid r'[k_f] = r_i[k_\ell]\}$\\
-        \quad If $\tau = \texttt{belongsTo}$:
-          $r_i[\text{alias}] \leftarrow$
-          $\{r' \in \text{scan}(S', \mathit{src'}) \mid r'[\text{id}] = r_i[k_f]\}[0]$\\
-        \quad If the sub-fetch fails, $r_i[\text{alias}]$ is set to an
+  \item The primary query, with predicates applied before ordering,
+        offset, and limit:
+        \[ T \leftarrow \Pi_F\bigl(\mathrm{lim}_\lambda(\mathrm{off}_\rho(\mathrm{sort}_o(\sigma(\text{scan}(S, \mathit{src})))))\bigr). \]
+  \item For each $r_i \in T$ and each relation
+        \[ (S', \mathit{src'}, k_\ell, k_f, k_o, \tau, \lambda', Q') \in R, \]
+        where $k_\ell$, $k_f$ and $k_o$ are the local, foreign and
+        owner keys, let $X' = \text{scan}(S', \mathit{src'})$.
+        If $\tau \in \{\texttt{hasMany},\,\texttt{hasOne}\}$,
+        \[ r_i[\text{alias}] \leftarrow \mathrm{lim}_{\lambda'}\{r' \in X' \mid r'[k_f] = r_i[k_\ell]\}, \]
+        with $\lambda' = 1$ for \texttt{hasOne}.
+        If $\tau = \texttt{belongsTo}$,
+        \[ r_i[\text{alias}] \leftarrow \{r' \in X' \mid r'[k_o] = r_i[k_f]\}[0]. \]
+        If the sub-fetch fails, $r_i[\text{alias}]$ is set to an
         \texttt{\{error\}} marker; the primary row is preserved.
   \item Step 2 recurses on $Q'$ if nested relations are present.
 \end{enumerate}
 
+When a relation is declared by an OBO key $\kappa$
+(Section~\ref{sec:obo}), equality is taken between canonical forms:
+$\nu_\kappa(r'[k_f]) = \nu_\kappa(r_i[k_\ell])$, where $\nu_\kappa$
+writes a value of identifier space $\kappa$ in its one canonical way,
+and a value from a different identifier space matches nothing.
+
 The predicate $\sigma$ is applied only to the \emph{primary} query.
-Predicates on related entities must be specified in the nested
-\texttt{RelationInput.where} field.  The \texttt{limit} applies to the
-primary entity only; each relation set may be of any size.  Recursive
-evaluation terminates when no further \texttt{RelationInput} nodes
-remain.
+Predicates on related entities are specified in the nested
+\texttt{RelationInput.where} field.  The limit $\lambda$ applies to the
+primary entity; $\lambda'$ bounds the related rows \emph{per parent
+row}, and is pushed into SQL with
+\texttt{row\_number() over (partition by \ldots)} and into AQL with a
+limited sub-query per parent.  Recursive evaluation terminates when no
+further \texttt{RelationInput} nodes remain.
 
 \subsection{Connection Model}
 
 Mozg is deliberately \emph{stateless} with respect to credentials.
 All connection parameters (host, port, database name, username,
-password, authentication scheme, HTTP headers) are supplied by the
-client on every request via \texttt{ConnectionInput}.  The server
-maintains an in-memory connection cache keyed on host and username
-to avoid re-establishing connections within a session, but it does
-not persist credentials to disk or a secrets store.  This design
+password, authentication scheme, HTTP headers) and optional API keys
+are supplied by the client on every request.  The server maintains
+in-memory connection caches whose keys include every connection
+parameter, password included, so a request with a wrong password can
+never reuse a connection authenticated by another caller.  Credentials
+are not persisted to disk or a secrets store.  This design
 simplifies the threat model: the server is not a credential vault and
-does not require secret-management infrastructure.  \textbf{Deployments
-must enforce HTTPS} to prevent credential interception in transit;
-running Mozg over plain HTTP should be restricted to loopback or
-private-network contexts only.
+does not require secret-management infrastructure.
+
+The one exception is a database hosted alongside Mozg
+(Section~\ref{sec:selfhost}): its catalog entry takes its connection
+from the server's environment, which the deployment fills from a
+Kubernetes Secret.  Such a \emph{server-held} connection is never
+returned to callers, and a query cannot override its fields.
+\textbf{Deployments must enforce HTTPS} to prevent credential
+interception in transit; running Mozg over plain HTTP should be
+restricted to loopback or private-network contexts only.
 
 % ===============================================================
 \section{Driver Model}
 \label{sec:drivers}
 % ===============================================================
 
+\subsection{Declarative API Driver}
+
+Public life-science APIs share almost nothing beyond HTTP.  Identifiers
+go in the path for one (\texttt{/uniprotkb/P04637}) and in the query
+string for the next; records arrive bare, under \texttt{results}, or
+keyed by the identifier requested; pagination is \texttt{size},
+\texttt{limit}, \texttt{rows}, \texttt{pageSize}, or absent.  A generic
+REST driver that guesses at these conventions gets most of them wrong,
+so the \texttt{api} driver guesses nothing.  Each catalog entry
+describes its entities, and the driver executes that description:
+\begin{itemize}
+  \item the request: a path with \texttt{\{placeholders\}}, the method,
+        query-string parameters, a JSON body, or a GraphQL query with
+        variables;
+  \item the response: its format (JSON, TSV, text, or XML), where the
+        records are, and which fields to keep under which names, written
+        in a small path language (nested properties \texttt{a.b},
+        indices \texttt{a[0].b}, mapping over arrays \texttt{a[].b},
+        and alternatives \texttt{a|b});
+  \item paging, the statuses that mean ``no records'', and, for
+        lookups that need several requests, a resolver function;
+  \item an example, which the verification tooling runs
+        (Section~\ref{sec:verification}).
+\end{itemize}
+\texttt{where} keys are the entity's declared parameters; an unknown key
+is an error, never a silently ignored filter.  This is what lets the
+generic relation resolver join across sources: a relation sets the
+target entity's parameter from a field of the parent row, and the
+target's description decides whether that becomes a path segment, a
+query parameter, or a GraphQL variable.
+
+\subsection{Knex Drivers: PostgreSQL and SQLite3}
+
+PostgreSQL and SQLite3 are queried through \emph{Knex}~\cite{knex}.
+User-supplied identifiers (table and column names) are passed as Knex
+identifiers, and every predicate value is bound as a query parameter.
+Same-source relations are fetched for all parent rows in one query,
+with per-parent limits applied in SQL.  PostgreSQL introspection reads
+\texttt{pg\_catalog}.
+
 \subsection{GraphQL Mesh Adapter}
 
 The \texttt{mesh-adapter.js} driver provides a unified implementation
-for the eight source types handled by GraphQL Mesh handlers:
-\texttt{postgres} (\texttt{@graphql-mesh/postgraphile}),
-\texttt{mysql} (\texttt{@graphql-mesh/mysql}),
-\texttt{neo4j} (\texttt{@graphql-mesh/neo4j}),
-\texttt{openapi} (\texttt{@graphql-mesh/openapi}),
-\texttt{soap} (\texttt{@graphql-mesh/soap}),
-\texttt{odata} (\texttt{@graphql-mesh/odata}),
-\texttt{thrift} (\texttt{@graphql-mesh/thrift}), and
-\texttt{mongodb} (\texttt{@graphql-mesh/mongoose}).
+for the six source types handled by GraphQL Mesh handlers:
+\texttt{mysql}, \texttt{neo4j} (\texttt{@neo4j/graphql}~7),
+\texttt{openapi}, \texttt{soap}, \texttt{odata}, and \texttt{thrift}.
+Each handler generates its own schema from the remote source's metadata
+(the MySQL information schema, an OpenAPI document, a WSDL); the
+adapter builds an operation over that schema and presents the uniform
+\texttt{executeQuery}/\texttt{introspect} interface.  Every
+filter value travels as a GraphQL variable coerced to the type the
+handler's schema declares, and field names are checked against that
+schema first.  OData requests push paging, ordering, and equality
+filters to the server.  Handler instances are cached per connection,
+password included.
 
-Each Mesh handler generates its own schema from the remote source's
-metadata (e.g., PostgreSQL information schema, OpenAPI spec, WSDL).
-The adapter wraps this schema to present the uniform
-\texttt{executeQuery}/\texttt{introspect} interface expected by the
-connector layer.  Handler instances are cached per unique connection
-string to avoid repeated metadata fetches.
-
-\subsection{SQLite3 Driver}
-
-The legacy SQLite3 driver uses \emph{Knex}~\cite{knex} for query
-building and connection management.  All user-supplied identifiers
-(table names, column names) are passed as Knex identifiers, and all
-predicate values are bound as parameterised query arguments.  This
-ensures that SQL injection via value parameters is not possible
-(identifier injection via maliciously crafted table/column names
-remains a known limitation tracked as a deferred issue).
-
-\subsection{ArangoDB Driver}
+\subsection{ArangoDB and Elasticsearch Drivers}
 
 The ArangoDB driver uses the official \emph{arangojs}~\cite{arangojs}
-client.  It translates \texttt{QueryInput} fields into AQL (ArangoDB
-Query Language) \texttt{FOR}/\texttt{FILTER}/\texttt{SORT}/\texttt{LIMIT}
-clauses, binding all predicate values through AQL bind parameters.
+client and translates \texttt{QueryInput} into AQL
+\texttt{FOR}/\texttt{FILTER}/\texttt{SORT}/\texttt{LIMIT} clauses.
+Collection names and attribute names travel as bind parameters
+(\texttt{@@coll}, \texttt{doc[@attr]}), like every value.  The
+Elasticsearch driver searches an index: \texttt{where} becomes
+exact-match filters on keyword forms, paging and ordering become
+\texttt{size}, \texttt{from} and \texttt{sort}, relations are one
+batched query each, and introspection reads the index mappings.
 
 \subsection{REST Driver}
 
 The plain REST driver maps \texttt{QueryInput} fields to HTTP GET
-requests against a base URL.  The entity name is appended as a path
-segment; \texttt{where} predicates are converted to query-string
-parameters.  Because there is no schema metadata, the driver returns
-the raw JSON response.  A known limitation is the N+1 sub-request
-pattern for relation traversal; each related entity produces one HTTP
-request per primary result row rather than a batched call.  This is
-tracked as a deferred performance issue.
+requests against a base URL.  \texttt{belongsTo} fetches the record a
+foreign key names (an id or a URL); \texttt{hasMany} passes the parent's
+local key as a query parameter named after the foreign key, or follows a
+list of ids or URLs held by the parent, and URLs found in data are followed only on the
+connection's own origin.  A catalog entry can name an API's paging
+parameters (a name set to null means that step is done client-side),
+envelope keys, default headers, and a rate limit; a foreign key can be a
+path into the parent (\texttt{types[].type.url}).
 
 \subsection{BioCyc Driver}
 
 The BioCyc driver integrates with the BioCyc~\cite{biocyc} collection
-of metabolic pathway databases via the BioCyc Web Services API.
-It supports pathway, reaction, compound, and organism queries.  Because
-the BioCyc API does not expose a machine-readable schema, the driver
-relies on hard-coded response field mappings.
+of metabolic pathway databases through the documented
+\texttt{apixml} web service (function
+\texttt{get-class-all-instances}).  Related frames
+are resolved from one listing of their class rather than one request
+per identifier.  Anonymous access is rationed by the provider, so real
+use needs a BioCyc account.
 
 \subsection{KEGG Driver}
 
@@ -474,10 +613,159 @@ Because KEGG encodes query terms as URL \emph{path} segments rather
 than query-string parameters (e.g.\ \texttt{/find/compound/glucose}),
 the driver introduces a special \texttt{where.\_pathSuffix} convention:
 any value supplied under that key is appended to the entity path
-before the HTTP request is issued.  This allows callers to use
-\texttt{/find/compound} as the entity name and pass
-\texttt{where: \{\ \_pathSuffix: "glucose"\ \}} without hard-coding
-the search term in the catalog.
+before the HTTP request is issued.
+
+% ===============================================================
+\section{Source Catalog and OBO Keys}
+\label{sec:catalog}
+% ===============================================================
+
+\subsection{Catalog Contents}
+
+Mozg ships a catalog of 90 sources, each described in one file under
+\texttt{src/catalog/}.  Forty-seven are public life-science APIs served
+by the \texttt{api} driver, in nine categories:
+
+\begin{itemize}
+  \item \textbf{Genes \& genomes}: Ensembl, NCBI Gene, HGNC, MyGene.info,
+        the Alliance of Genome Resources, FlyBase, GenBank, NCBI
+        E-utilities, ENA;
+  \item \textbf{Proteins \& structures}: UniProt, PDB, PDBe, AlphaFold
+        DB, InterPro, RNAcentral;
+  \item \textbf{Interactions \& pathways}: STRING, IntAct, Reactome,
+        Rhea, RegulonDB (and KEGG, through its own driver);
+  \item \textbf{Function \& ontologies}: QuickGO, the Gene
+        Ontology~\cite{go} API, OLS, HPO, MeSH;
+  \item \textbf{Chemistry \& drugs}: ChEMBL, PubChem, ChEBI, LIPID MAPS,
+        RxNorm, openFDA, DGIdb;
+  \item \textbf{Disease \& variants}: Open Targets, Monarch, the GWAS
+        Catalog, ClinVar, MyVariant.info, gnomAD, CIViC;
+  \item \textbf{Clinical}: ClinicalTrials.gov;
+  \item \textbf{Literature}: PubMed, Europe PMC;
+  \item \textbf{Expression \& samples}: GTEx, the Human Protein Atlas,
+        GEO, BioSamples, PRIDE.
+\end{itemize}
+
+Together these describe 206 entities and 663 relations; 441 relations
+lead from one source into another, and 529 are declared by OBO key
+rather than by field names.  The remaining 43 entries are 20 public
+REST demonstration APIs (PokéAPI, JSONPlaceholder, Open-Meteo, SWAPI,
+MusicBrainz, and others), KEGG, 18 BioCyc pathway/genome databases,
+two SQLite samples, the Rfam public MySQL server, and the Neo4j Movies
+demonstration graph.  Catalog files are loaded lazily on first access.
+
+A catalog source is queried by name; it supplies the connection, and
+four \texttt{QueryInput} fields build on it:
+\begin{itemize}
+  \item \texttt{source} names the catalog entry;
+  \item \texttt{include} follows catalog relations by alias; dots go
+        deeper (\texttt{"mechanisms.target"}), across sources where
+        needed;
+  \item \texttt{apiKeys} passes optional keys per source, applied to the
+        queried source and every related one, which raise a provider's
+        rate limit and never appear in error messages;
+  \item \texttt{raw} returns records exactly as the source sent them,
+        for fields the catalog does not map.
+\end{itemize}
+
+\begin{lstlisting}[language=GraphQL,caption={One protein, its structures, predicted model, pathways and drug-target record: five databases, one query.},label={lst:uniprot}]
+{ query(input: {
+  source: "uniprot"  from: "protein"
+  where: { uniprotAccession: "P04637" }
+  select: ["uniprotAccession", "symbol",
+           "name", "ensemblGeneId"]
+  include: ["structures", "alphafold",
+            "pathways", "target"]
+}) { count data } }
+\end{lstlisting}
+
+\subsection{OBO Keys}
+\label{sec:obo}
+
+An \emph{OBO key} is the Bioregistry~\cite{bioregistry} prefix of an
+identifier space---\texttt{uniprot}, \texttt{ensembl},
+\texttt{ncbigene}, \texttt{chebi}, \texttt{mondo}---as OBO
+files~\cite{obofoundry} use it in their cross-references.  Mozg defines
+56 keys, each with its preferred prefix, a pattern for its local
+identifiers, and, where they exist, synonyms seen in the wild.
+Annotating fields and parameters with these keys gives Mozg one rule
+that replaces most hand-written joins:
+\begin{quote}
+  \emph{Two fields with the same OBO key and the same value name the
+  same thing.}
+\end{quote}
+
+\paragraph{Canonical forms.}
+For the rule to hold, every keyed value must be written one way,
+whatever source it came from.  Each key therefore has a canonical form,
+to which the \texttt{api} driver normalises keyed fields:
+\texttt{curie} keys are written as OBO-style CURIEs with the registry's
+preferred prefix (\texttt{CHEBI:15365}, \texttt{GO:0006915},
+\texttt{HGNC:11998}), because that is how their own authorities write
+them; \texttt{local} keys are written as the bare local identifier
+(\texttt{P04637}, an unversioned \texttt{ENSG00000141510},
+\texttt{7157}).  A field that holds CURIEs from several identifier
+spaces (a disease identifier may be MONDO, EFO, Orphanet, or OMIM) has
+the key \texttt{*}: each value carries its own prefix, which names its
+key.  Rows from SQL tables and graph labels are normalised the same
+way, through the keys annotated on their columns.
+
+\paragraph{Relations by key.}
+A relation from UniProt to PDBe's \texttt{bestStructures} entity is
+declared only as \texttt{obo:~"uniprot"}; it names no fields.  Mozg
+finds the parent's field carrying the key and the target's parameter
+accepting it, and refuses to guess when either is ambiguous.  Before the join, the value
+is converted to the form the target expects; a value from an identifier
+space the target cannot take resolves to nothing rather than to a query
+that would match something else.
+
+\paragraph{Implicit links.}
+Because the rule holds everywhere, relations need not be declared at
+all.  Every entity, in any source, whose one required parameter accepts
+a key that a field of the current entity carries is an \emph{implicit
+link}, named \texttt{source/entity}, or \texttt{source/entity(field)}
+when the value comes from a field other than the key's canonical one.
+The \texttt{catalog} query lists each entity's links, and
+\texttt{include} follows them like declared relations:
+
+\begin{lstlisting}[language=GraphQL,caption={Rows of a self-hosted database joined to two public sources by OBO key, with no relation declared.},label={lst:implicit}]
+{ query(input: {
+  source: "my-targets"  from: "target"
+  include: ["uniprot/protein(uniprot_ac)",
+    "opentargets/target(ensembl_gene)"]
+}) { count data } }
+\end{lstlisting}
+
+\paragraph{Stored forms.}
+A self-hosted table may store a keyed column in a form other than the
+canonical one; Reactome's graph, for example, keeps ChEBI identifiers
+as bare numbers.  Its entity says so with
+\texttt{oboForm: \{column: "local"\}}, and join values are written that
+way so the lookup matches.
+
+\subsection{Verification}
+\label{sec:verification}
+
+A catalog that describes hundreds of relations can describe many that
+never resolve.  Two layers of checks guard against that.
+
+\paragraph{Static lint.}
+\texttt{src/database/catalog-lint.js} checks, with no network access,
+that every entry is executable as described and that its relations can
+resolve: a relation sets the target's parameter from a field of the
+parent row, so the foreign key must be a parameter the target declares
+and the local key a field the parent carries; OBO keys must be known,
+and a relation declared by key must find exactly one field and one
+parameter.  The lint runs in the unit-test suite.
+
+\paragraph{Live verification.}
+\texttt{scripts/verify-sources.js} runs each entity's declared example
+through the real query path, checks that rows come back and which
+declared fields were populated, then follows every relation from the
+first row.  Outcomes distinguish a catalog error (\emph{empty} or
+\emph{broken}) from an upstream that is having a bad day
+(\emph{unavailable}: 5xx, 429, or timeout), so provider downtime never
+fails the check.  Section~\ref{sec:eval-catalog} reports the result.
 
 % ===============================================================
 \section{OWL Ontology Pipeline}
@@ -510,6 +798,11 @@ Turtle prefix declarations) in that order.  Parsed quads are
 normalised into a common internal representation before being passed
 to the extraction stage.
 
+An ontology can be supplied as content or as a URL that the server
+fetches.  URL fetches accept only \texttt{http} and \texttt{https},
+refuse literal private IPv4 addresses and loopback host names, time out
+after 10\,s, and stop reading at 10\,MiB.
+
 \subsection{Extraction}
 
 The extractor walks the quad set and collects:
@@ -540,9 +833,9 @@ all others $\to$ \texttt{String}.
 \subsection{Caching}
 
 To avoid re-parsing the same ontology repeatedly within a session,
-the pipeline maintains an in-memory cache keyed on the SHA-256 hash
+the pipeline maintains an in-memory cache keyed on a SHA-256 digest
 of the raw ontology content.  Cache hits return the stored result
-immediately; misses trigger a full parse/extract/map cycle.
+without parsing; misses trigger a full parse/extract/map cycle.
 
 \subsection{Validation}
 
@@ -554,7 +847,7 @@ column.  Validation errors and warnings are returned in a structured
 \texttt{ValidationReport}.
 
 % ===============================================================
-\section{Query Builder UI}
+\section{Query Builder and Streaming}
 \label{sec:ui}
 % ===============================================================
 
@@ -562,159 +855,355 @@ To lower the barrier to entry for non-technical users, Mozg ships a
 browser-based visual query builder served at the root path
 (\texttt{/}).  The interface allows users to:
 \begin{enumerate}
-  \item Select a driver and fill in connection parameters via a form;
+  \item Pick a catalog source and one of its entities, or select a
+        driver and fill in connection parameters via a form;
   \item Pick a table or API endpoint from an auto-populated dropdown
-        (populated via the \texttt{introspect} query);
+        (populated via the \texttt{introspect} or \texttt{catalog}
+        query);
   \item Choose columns to select from a checklist;
-  \item Add filter conditions (column, operator, value);
-  \item Add relation traversals (entity, foreign key, relation type);
+  \item Add filter conditions (column or declared parameter, value);
+  \item Choose catalog relations to include, or add explicit relation
+        traversals (entity, foreign key, relation type);
   \item Set pagination and sort parameters.
 \end{enumerate}
 The form state is continuously serialised to a GraphQL query string
 and displayed in a read-only textarea so users can see and copy the
 equivalent raw query.  Submitting the form issues the query and
-renders the JSON response in a collapsible tree view.
+renders the JSON response in a collapsible tree view.  An
+\emph{examples} dropdown loads pre-built queries, making it easy to
+explore public datasets without any prior configuration.
 
-An \emph{examples} dropdown loads pre-built queries from the curated
-catalog (Section~\ref{sec:catalog}), making it easy to explore public
-datasets without any prior configuration.
+\subsection{Progressive Results}
+\label{sec:stream}
+
+Relations that fan out over many rows, and over slow public APIs, make
+a complete answer slow to arrive.  \texttt{POST /stream} accepts the same
+\texttt{QueryInput} as JSON and answers with newline-separated JSON
+chunks, following the progressive-JSON pattern described by
+Abramov~\cite{progressivejson}.  The first chunk is the envelope, whose
+data is a placeholder string \texttt{"\$1"}; the main rows follow as
+\texttt{\$1}, each carrying placeholders for its relations, and each
+relation's rows arrive as their own chunk as soon as that round-trip
+completes.  One placeholder corresponds to one data-source query, so a
+client can render the primary rows while their relations are still in
+flight.
 
 % ===============================================================
-\section{Database Catalog}
-\label{sec:catalog}
+\section{Self-Hosted Databases That Scale to Zero}
+\label{sec:selfhost}
 % ===============================================================
 
-Mozg ships a curated catalog of 63 pre-configured database and API
-entries spanning several categories:
+Mozg itself is stateless: the 47 life-science APIs need nothing
+deployed.  A copy of a large database is worth hosting when it is
+queried heavily, needs to be close, or has a full schema that an API
+exposes only in part.  The Helm~\cite{helm} chart in
+\texttt{deploy/helm/mozg} runs Mozg on Kubernetes and, optionally,
+such databases next to it, on any of the six engines Mozg can query:
+PostgreSQL~18, MariaDB~12.3 (for the \texttt{mysql} driver),
+Neo4j~5.26, ArangoDB~3.12, Elasticsearch~9.5, and SQLite.  Presets
+restore ChEMBL from its PostgreSQL dump and Reactome from its Neo4j
+graph dump.
 
-\begin{itemize}
-  \item \textbf{Relational databases}: Chinook (SQLite music-store
-        sample), Blog (SQLite), RNAcentral (PostgreSQL at EBI),
-        RFAM (MySQL at EBI);
-  \item \textbf{Graph databases}: Neo4j Movies demo;
-  \item \textbf{REST / OpenAPI}: PokéAPI, Jikan (anime),
-        Rick and Morty, SWAPI, GitHub, SpaceX, NASA,
-        Open-Meteo, RestCountries, CoinGecko, MusicBrainz,
-        OpenFoodFacts, Open Library, Art Institute of Chicago,
-        Dog CEO, Fake Store, Open Brewery DB, Open Trivia, JSONPlaceholder;
-  \item \textbf{Bioinformatics (NCBI family)}: NCBI E-utilities,
-        GenBank, PubMed, RefSeq (NCBI Datasets v2), GEO;
-  \item \textbf{Bioinformatics (protein \& structure)}: UniProt,
-        PDB (Protein Data Bank), InterPro, BRENDA, HMDB,
-        STRING protein interactions;
-  \item \textbf{Bioinformatics (genome browsers \& pathways)}:
-        Ensembl, Reactome, KEGG (via the dedicated \texttt{kegg} driver
-        that converts KEGG's \texttt{text/plain} responses to JSON);
-  \item \textbf{Bioinformatics (nucleotide archives)}: EMBL-EBI/ENA,
-        DDBJ;
-  \item \textbf{Bioinformatics (model organism databases)}: FlyBase
-        (Drosophila), WormBase (C.~elegans), ZFIN (zebrafish);
-  \item \textbf{BioCyc metabolic pathway databases (18 organisms)}:
-        MetaCyc, EcoCyc, HumanCyc, YeastCyc, AraCyc, LeishCyc,
-        TrypanoCyc, plus eleven Tier~2 databases covering
-        \textit{B.~subtilis}, \textit{M.~tuberculosis},
-        \textit{P.~aeruginosa}, \textit{V.~cholerae},
-        \textit{S.~enterica}, \textit{L.~monocytogenes},
-        \textit{C.~crescentus}, \textit{C.~elegans},
-        \textit{D.~melanogaster}, \textit{B.~burgdorferi}, and
-        \textit{C.~jejuni}.
-\end{itemize}
+\paragraph{First start.}
+Each server engine runs as a StatefulSet with a persistent volume.  On
+its first start an init container downloads the dump (resuming after
+interruptions and verifying a checksum when one is configured), the
+engine loads it and any inline data, and only then is a ready marker
+written and the database reported ready.  A first start that dies
+part-way is detected, cleared, and retried from the dump; later starts
+skip all of it.  A generated password is kept in a Secret that
+survives upgrades.  A SQLite file is instead fetched by init containers
+of each Mozg pod.
 
-Each catalog entry defines the connection parameters, a list of known
-entities (tables or API paths), the columns of interest, and the
-cross-entity relations.  All public entries require no registration
-and are suitable for immediate exploration.  Catalog data are loaded
-lazily via CommonJS \texttt{require()} to keep startup time low.
+\paragraph{Registration and isolation.}
+Each hosted database is registered with Mozg as a catalog entry whose
+connection comes from the server's environment, so
+\texttt{source: "chembl-postgres"} works in any query while the
+connection itself stays hidden (Section~\ref{sec:architecture}).  Its
+columns are annotated with OBO keys, which joins it, in both
+directions, to every public source that uses those keys
+(Listing~\ref{lst:implicit}).  A NetworkPolicy admits only Mozg to the
+database.
+
+\paragraph{Scale to zero.}
+With KEDA~\cite{keda} installed, each database scales between zero and
+one replica.  Mozg counts every query against a hosted source as
+\emph{demand} while it runs and for a window afterwards (60\,s by
+default), and reports it at \texttt{GET /demand/<source>}, which KEDA's
+\texttt{metrics-api} trigger polls.  Each Mozg pod also asks its peers,
+so scaling Mozg out does not hide demand.  After a cooldown with no
+demand (15 minutes by default) the database is scaled back to zero.
+Without KEDA the chart runs one replica permanently.
+
+\paragraph{Wake on query.}
+A query to a database at zero replicas finds nothing listening.
+Instead of failing, \texttt{withWake} keeps retrying, backing off to
+5\,s, for up to three minutes by default, while the query's own
+in-flight count is what makes KEDA bring the database back.  Only
+errors recognised as ``not up yet'' are retried: refused connections,
+DNS failures and timeouts (\texttt{ECONNREFUSED} and related codes);
+pooled connections the database closed when it scaled down (undici's
+\texttt{UND\_ERR\_SOCKET}, MySQL's \texttt{PROTOCOL\_CONNECTION\_LOST});
+a MySQL server that has accepted a connection but not yet greeted;
+PostgreSQL's ``shutting down'' and ``starting up'' states
+(\texttt{57P01}--\texttt{57P03}); and Neo4j's
+\texttt{ServiceUnavailable}.  Errors that mean the query is wrong, such
+as bad credentials or an unknown table, fail at once.  Introspection
+waits in the same way.  ``Slow by design'' includes a cold start.
+
+\paragraph{End-to-end tests.}
+For each engine, CI deploys the chart on a kind~\cite{kind} cluster
+with KEDA and a small database holding two UniProt accessions, and
+asserts that the database (1)~scales to zero when idle, (2)~is woken by
+a query that is then answered, (3)~joins to the public UniProt API by
+OBO key, (4)~keeps its connection hidden from callers, (5)~scales back
+to zero once the demand window and cooldown have passed, and (6)~is
+woken again, when the query after a second cold start finds the pooled
+connections of the first one dead and must still be answered.  Steps
+1, 5, and 6 do not apply to SQLite, which has no server.
+
+\paragraph{An upstream entrypoint defect.}
+The ArangoDB image's entrypoint, from version 3.12.5 on, starts its
+first-start server with the command word as a positional argument,
+which \texttt{arangod} takes as its database directory:
+\texttt{./arangod}, relative to \texttt{/}.  That server then created
+the database and restored the dump into a directory the real server
+never reads.  The chart mounts the data volume at \texttt{/arangod} as
+well, so the first-start server works on the real data; on an image
+with a fixed entrypoint the extra mount is simply unused.
 
 % ===============================================================
 \section{Evaluation}
 \label{sec:evaluation}
 % ===============================================================
 
+Unless stated otherwise, measurements were taken on a virtual machine
+with four vCPUs (Intel Xeon, 2.1\,GHz) and 15\,GB of RAM, running
+Node.js 22.23.4.  The production image runs Node.js~26, the active LTS
+line, and CI runs the unit tests on Node.js 22, 24, and 26.
+
+\subsection{Automated Tests}
+
+The unit-test suite (\texttt{node --test tests/*.test.js}) has 745 tests
+in 120 suites, all of which pass.  It covers every driver against
+in-memory stand-ins or recorded response shapes, the HTTP client, OBO
+key normalisation, the catalog lint, the schema, the streaming endpoint,
+and the ontology pipeline.  With the coverage settings CI enforces
+(\texttt{src/catalog} excluded, because its field-mapping functions run
+only against real responses), line coverage is 97.57\%, branch coverage
+91.21\%, and function coverage 96.22\%, against thresholds of 80\%,
+90\%, and 70\%.
+
+\subsection{Catalog Verification}
+\label{sec:eval-catalog}
+
+All 47 \texttt{api} entries pass the static lint.  A full live
+verification run made 868 checks that succeeded---entity examples, and
+relations followed from their first row---and one that failed, in an
+identifier involving Xenbase; the catalog has since been corrected.
+The run is a snapshot: public services change, and the check is
+designed to be repeated.
+
+\subsection{Connector Evaluation}
+\label{sec:eval-connectors}
+
+The database connectors share one behavioural suite
+(\path{tests/integration/suite.js}), which CI runs against a real
+server of each kind: PostgreSQL~18, MySQL~8.4 (LTS), Neo4j~5.26 (LTS),
+ArangoDB~3.12, and Elasticsearch~9.5.6, plus a SQLite file.  It covers
+select, where, ordering, limit and offset; \texttt{hasMany},
+\texttt{hasOne}, and \texttt{belongsTo}, including a per-parent relation
+limit; relations nested three deep; introspection; a relation from a
+database row into an \texttt{api} source (a UniProt accession); and
+bad-credential errors that leak nothing.  The remaining connectors
+were checked against public endpoints or local fixtures.
+Table~\ref{tab:connectors} summarises the result.
+
+\begin{table*}[t]
+\caption{Connector matrix.  ``Batched'' relations fetch all parent rows'
+  related records in one query; ``per row'' relations issue one request
+  per parent row, with at most four in flight.}
+\label{tab:connectors}
+\small
+\begin{tabularx}{\textwidth}{llXll}
+\toprule
+Driver & Backend & Tested against & Relations & Status \\
+\midrule
+\texttt{postgres} & PostgreSQL (Knex) & Integration suite (PostgreSQL 18); Helm end-to-end on kind & batched & Stable \\
+\texttt{sqlite3} & SQLite file (Knex) & Integration suite; inside the Docker image; Helm end-to-end & batched & Stable \\
+\texttt{mysql} & MySQL via Mesh & Integration suite (MySQL 8.4); Helm end-to-end (MariaDB 12.3) & per row & Beta \\
+\texttt{neo4j} & Neo4j via Mesh & Shape tests; integration suite (Neo4j 5.26); Helm end-to-end & per row & Beta \\
+\texttt{arango} & ArangoDB (arangojs) & Unit tests on generated AQL; integration suite (3.12); Helm end-to-end & batched & Beta \\
+\texttt{elasticsearch} & Elasticsearch REST & In-memory stand-in; integration suite (9.5.6); Helm end-to-end & batched & Beta \\
+\texttt{rest} & JSON HTTP APIs & Unit tests; every demo-source relation followed live & per row & Stable \\
+\texttt{kegg} & rest.kegg.jp & Unit tests; live \texttt{/list}, \texttt{/get}, \texttt{/link} & via path suffix & Stable \\
+\texttt{openapi} & OpenAPI via Mesh & Live Petstore v3; shape tests & per row & Beta \\
+\texttt{odata} & OData v4 via Mesh & Live TripPin; shape tests & per row & Beta \\
+\texttt{soap} & SOAP/WSDL via Mesh & Live NumberConversion WSDL; shape tests & --- & Experimental \\
+\texttt{thrift} & Thrift via Mesh & Schema built from a local IDL; transport only & --- & Experimental \\
+\texttt{biocyc} & BioCyc web services & Unit tests on the documented format; one live EcoCyc listing & via frame references & Beta \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+The evaluation found fifteen defects, all fixed:
+\begin{enumerate}
+  \item \textbf{Every Mesh connector was broken.}  A global npm override
+        of \texttt{@graphql-tools/utils}, added for a security advisory
+        that affects only older versions, removed a function the Mesh
+        utilities call, so every Mesh query failed.  Dropping the
+        override lets npm resolve a patched version for the Mesh tree.
+  \item \textbf{MySQL authentication.}  The Mesh MySQL handler's client
+        speaks only \texttt{mysql\_native\_password}.  MariaDB uses it by
+        default; MySQL~8.4 ships it switched off and needs server flags
+        to enable it; MySQL~9 has removed it, so the connector cannot
+        reach MySQL~9 at all.
+  \item \textbf{MySQL paging was swapped}: the handler rendered
+        \texttt{LIMIT limit,offset}, which MySQL reads as offset first.
+        The adapter now asks only for a row count and skips the offset
+        itself.
+  \item \textbf{Mesh filters fitted one handler only.}  Raw literals
+        were spliced into query text; values are now typed variables,
+        and OData pushes paging, ordering and filters to the server.
+  \item \textbf{Credential-blind caches.}  The Mesh and ArangoDB caches
+        were keyed without the password, so a request with a wrong
+        password reused a source another caller had authenticated;
+        against MySQL it returned rows.
+  \item \textbf{AQL injection.}  Collection names, \texttt{where} keys,
+        \texttt{orderBy}, and \texttt{select} were spliced into AQL;
+        they are now bind parameters.
+  \item \textbf{BioCyc} called an endpoint that no longer exists.
+  \item \textbf{Elasticsearch} read index metadata instead of searching,
+        and dropped relations and ordering.
+  \item \textbf{REST \texttt{hasMany}} fetched
+        \texttt{/\{entity\}/\{parent.id\}} and so returned the wrong
+        records.
+  \item \textbf{Per-parent relation limits} were not honoured; they now
+        are, by every connector.
+  \item \textbf{Introspection} did not wait for a self-hosted database
+        to wake.
+  \item \textbf{The REST demo sources' relations}, followed live, mostly
+        returned the wrong records, an error, or nothing; each was fixed
+        and checked live, or removed where the API cannot serve the join.
+  \item \textbf{Neo4j integers.}  The Mesh Neo4j transport reads
+        integers as native BigInts, which the \texttt{@neo4j/graphql}~7
+        BigInt scalar rejects, so any node with an integer property
+        could not be read.  The integration fixture, seeded from
+        JavaScript numbers that Neo4j stores as floats, missed it; the
+        Helm end-to-end test, which creates its nodes in Cypher, found
+        it.  BigInts are now serialised as numbers while they are safe
+        integers, else as strings.
+  \item \textbf{Wake errors.}  The HTTP client dropped the network cause
+        of an error, and pooled connections closed by a database
+        scaling down were not recognised as a cold start.
+  \item \textbf{The Docker image could not load SQLite}: the prebuilt
+        binding needs glibc 2.38, and the image was based on Debian~12
+        (glibc 2.36).  It is now based on Debian~13, and CI opens a
+        SQLite database inside the image.
+\end{enumerate}
+Two further cold-start defects surfaced in the Helm end-to-end tests
+and were fixed: a PostgreSQL connection terminated by the server's
+shutdown (\texttt{57P01}) was not treated as a cold start, and the
+ArangoDB entrypoint defect described in Section~\ref{sec:selfhost}.
+
 \subsection{Functional Evaluation}
 
-Mozg was exercised against the eight public data sources listed in
-Table~\ref{tab:sources}.  For each source, the following properties were verified:
-(a)~schema introspection returns correct metadata,
-(b)~a simple entity query returns expected rows,
-(c)~at least one relation traversal produces a valid joined result.
+Table~\ref{tab:sources} lists representative sources and how each was
+exercised in this revision.  For each, the checks are that
+(a)~schema introspection or the catalog returns correct metadata,
+(b)~a simple entity query returns rows, and (c)~at least one relation
+traversal produces a valid joined result.  The connectors behind the
+Rfam and Neo4j Movies entries were verified against servers of their
+kind (Section~\ref{sec:eval-connectors}); the public servers themselves
+were not re-verified in this revision.
 
-All eight sources passed all three tests without modification to the
-source data.  The cross-source join between RNAcentral (PostgreSQL)
-and RFAM (MySQL) correctly joined RNA sequences with their family
-annotations using a shared accession identifier.
-
-The test protocol is automated and reproducible.  The file
-\texttt{tests/examples.test.js} validates every query in
-\texttt{examples/queries.json} against the live Mozg schema; the SQLite
-portions are seeded from \texttt{examples/seed.js} and exercised against
-\texttt{examples/sample.db}.  A representative query for each category
-is shown below.
+The file \texttt{tests/examples.test.js} validates every query in
+\texttt{examples/queries.json} against the Mozg schema; the SQLite
+portions are seeded from \texttt{examples/seed.js} and executed against
+\texttt{examples/sample.db}.  Two representative queries are shown
+below, alongside Listings~\ref{lst:uniprot} and~\ref{lst:implicit}.
 
 \begin{lstlisting}[language=GraphQL,caption={SQLite: users with nested posts (hasMany)}]
 { query(input: {
-    connection: { driver: sqlite3, database: "examples/sample.db" }
-    from: "users"  limit: 5
-    relations: [{ entity: "posts", foreignKey: "user_id",
-                  type: hasMany, select: ["id","title"] }]
-  }) { count data } }
+  connection: { driver: sqlite3,
+    database: "examples/sample.db" }
+  from: "users"  limit: 5
+  relations: [{ entity: "posts",
+    foreignKey: "user_id", type: hasMany,
+    select: ["id", "title"] }]
+}) { count data } }
 \end{lstlisting}
 
 \begin{lstlisting}[language=GraphQL,caption={REST: JSONPlaceholder posts with comments}]
 { query(input: {
-    connection: { driver: rest,
-                  database: "https://jsonplaceholder.typicode.com" }
-    from: "/posts"  limit: 5
-    relations: [{ entity: "comments", foreignKey: "id",
-                  type: hasMany, alias: "comments" }]
-  }) { count data } }
-\end{lstlisting}
-
-\begin{lstlisting}[language=GraphQL,caption={PostgreSQL: RNAcentral sequences (limit 10)}]
-{ query(input: {
-    connection: { driver: postgres,
-                  host: "hh-pgsql-public.ebi.ac.uk", port: 5432,
-                  database: "pfmegrnargs",
-                  user: "reader", password: "NWDMCE5xdipIjRrp" }
-    from: "rna"  select: ["upi","length","seq_short"]  limit: 10
-  }) { count data } }
+  connection: { driver: rest, database:
+    "https://jsonplaceholder.typicode.com" }
+  from: "/posts"  limit: 5
+  relations: [{ entity: "comments",
+    foreignKey: "postId", type: hasMany,
+    alias: "comments" }]
+}) { count data } }
 \end{lstlisting}
 
 \begin{table}[h]
-\caption{Public data sources used in functional evaluation.}
+\caption{Representative sources and how each was exercised.}
 \label{tab:sources}
 \small
-\begin{tabular}{llll}
+\begin{tabularx}{\columnwidth}{llX}
 \toprule
-Source & Driver & Host & Data Domain \\
+Source & Driver & Exercised by \\
 \midrule
-RNAcentral & postgres & ebi.ac.uk & RNA sequences \\
-RFAM & mysql & ebi.ac.uk & RNA families \\
-Neo4j Movies & neo4j & demo.neo4jlabs.com & Film graph \\
-PokéAPI & rest & pokeapi.co & Pokémon data \\
-JSONPlaceholder & rest & jsonplaceholder.typicode.com & Fake posts \\
-RestCountries & rest & restcountries.com & Country data \\
-Open-Meteo & rest & api.open-meteo.com & Weather data \\
-Chinook & sqlite3 & (local file) & Music store \\
+UniProt & api & Live verification \\
+RNAcentral & api & Live verification \\
+ChEMBL & api & Live verification \\
+JSONPlaceholder & rest & Relations followed live \\
+PokéAPI & rest & Relations followed live \\
+Blog (sample.db) & sqlite3 & Examples test; benchmark \\
+Rfam & mysql & Connector suite (MySQL 8.4) \\
+Neo4j Movies & neo4j & Connector suite (Neo4j 5.26) \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \subsection{Ontology Evaluation}
 
-Three ontologies of increasing complexity were ingested:
-(1) the project's own \texttt{blog.ttl} (11 triples, 3 classes);
-(2) the Friend of a Friend (FOAF) ontology~\cite{foaf}
-(Turtle, $\sim$400 triples, 14 classes);
-(3) a fragment of the Gene Ontology~\cite{go}
-(OWL/XML, $\sim$50\,000 triples).
+Three ontologies of increasing size were ingested
+(Table~\ref{tab:ontology}): the project's own \texttt{blog.ttl}; the
+Friend of a Friend (FOAF) vocabulary~\cite{foaf} in RDF/XML; and the
+Phenotype And Trait Ontology (PATO)~\cite{pato} in RDF/XML, at 20\,MiB.
+Times are single runs in one fresh process, so the first includes
+loading the parser modules; ``cached'' is a second call with the same
+content.  PATO exceeds the 10\,MiB limit on URL fetches and was
+supplied as content.
 
-Parse times on a mid-range laptop (Intel Core i7-8750H, 2.2\,GHz base,
-16\,GB RAM) were
-$<$1\,ms, 12\,ms, and 3.1\,s respectively.  The SHA-256 cache
-reduces repeat parse overhead to $<$0.1\,ms in all cases.  The
-generated GraphQL SDL was syntactically valid in all three cases
-as verified by graphql-js schema validation.
+\begin{table*}[t]
+\caption{Ontology ingestion.  SDL validity is checked by building the
+  generated SDL with graphql-js.}
+\label{tab:ontology}
+\small
+\begin{tabular}{llrrrrrrrl}
+\toprule
+Ontology & Format & Size & Triples & Classes & Obj.\ props & Data props
+         & Parse & Cached & SDL valid \\
+\midrule
+\texttt{blog.ttl} & Turtle  & 1\,KiB      & 27        & 3        & 2   & 4  & 4.3\,ms    & 0.04\,ms & yes \\
+FOAF              & RDF/XML & 43\,KiB     & 635       & 15       & 33  & 27 & 16.1\,ms   & 0.09\,ms & no  \\
+PATO              & RDF/XML & 20\,409\,KiB & 256\,680 & 13\,388  & 255 & 0  & 1\,890\,ms & 89.6\,ms & no  \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Parsing scales to a quarter of a million triples in under two seconds,
+and a cache hit avoids it; for PATO the hit still costs 89.6\,ms, most
+of it hashing 20\,MiB of content.  The generated SDL, however, is valid
+only for \texttt{blog.ttl}.  For FOAF, graphql-js reports four
+duplicate field definitions (\texttt{Person.familyName}, among others):
+FOAF declares several properties that map to the same GraphQL field
+name.  For PATO, the SDL does not parse, because type names are derived
+from labels that can begin with a digit (\texttt{1DExtent}), which
+GraphQL names may not.  Both are limitations of the mapper's naming,
+listed in Section~\ref{sec:limitations}; the earlier claim that all
+generated SDL was valid does not hold for real-world ontologies.
 
 \subsection{Server-Side Processing Overhead}
 
@@ -725,95 +1214,57 @@ Table~\ref{tab:bench} reports measurements over a local SQLite database
 the automated benchmark in \texttt{tests/bench.test.js}.
 
 \begin{table}[h]
-\caption{Server-side processing overhead (local SQLite, $n=100$).}
+\caption{Server-side processing overhead in milliseconds (local SQLite,
+  $n=100$).}
 \label{tab:bench}
 \small
 \begin{tabular}{lrrr}
 \toprule
-Query & Median (ms) & IQR (ms) & p99 (ms) \\
+Query & Median & IQR & p99 \\
 \midrule
-Simple SELECT (users, no relations) & 0.25 & 0.07 & 2.1 \\
-\texttt{hasMany} join (users→posts) & 0.54 & 0.20 & 4.0 \\
-3-level join (users→posts→comments) & 0.80 & 0.15 & 2.9 \\
+Simple SELECT (users) & 0.43 & 0.29 & 3.88 \\
+\texttt{hasMany} (users$\to$posts) & 0.44 & 0.13 & 2.48 \\
+3-level (users$\to$posts$\to$comments) & 0.84 & 0.28 & 3.72 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Mozg adds sub-millisecond overhead per query for local sources.  The
-dominant cost in real-world deployments is therefore network latency to
-the remote data source, not server-side processing.
-
-\subsection{End-to-End Latency Analysis}
-
-Table~\ref{tab:latency} reports round-trip latency (client-to-server
-and back) for representative queries over the public sources.  All
-measurements are medians over 100 requests from a residential broadband
-connection (100 Mbit/s); IQR is reported to characterise spread.  These
-figures are illustrative: they reflect both network conditions and remote
-database response time and are not intended as definitive benchmarks.
-
-\begin{table}[h]
-\caption{End-to-end round-trip latency for representative queries
-  (median and IQR over 100 requests, residential broadband).}
-\label{tab:latency}
-\small
-\begin{tabular}{lrrr}
-\toprule
-Query & Median (ms) & IQR (ms) & Rows \\
-\midrule
-Chinook Artists (local SQLite) & 8 & 2 & 275 \\
-JSONPlaceholder /posts & 142 & 18 & 100 \\
-PokéAPI /pokemon with types (relation) & 1\,840 & 120 & 20 \\
-RNAcentral sequences (limit 50) & 290 & 35 & 50 \\
-RFAM families (limit 20) & 340 & 40 & 20 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The PokéAPI latency demonstrates the N+1 problem: fetching 20 Pokémon
-plus their types requires 41 sequential HTTP requests (1 list + 20
-detail + 20 type requests).  This is expected behaviour under the
-current REST driver design and is documented as a deferred
-performance issue.
-
-\subsection{Baseline Comparison}
-
-To contextualise the overhead introduced by Mozg, the same
-cross-source join (5 JSONPlaceholder posts with their comments) was
-performed using a manual \texttt{curl}/\texttt{jq} pipeline:
-
-\begin{verbatim}
-posts=$(curl -s "https://jsonplaceholder.typicode.com/posts?_limit=5")
-echo "$posts" | jq -r '.[].id' | while read id; do
-  curl -s "https://jsonplaceholder.typicode.com/posts/$id/comments"
-done
-\end{verbatim}
-
-The \texttt{curl}/\texttt{jq} pipeline took a median of 148\,ms (5
-sequential HTTP calls).  The equivalent Mozg query took 163\,ms.  The
-15\,ms difference is attributable to GraphQL parsing, schema validation,
-and JSON serialisation in Mozg.  Both approaches exhibit the same N+1
-request pattern; Mozg adds negligible overhead while providing a
-structured, schema-validated, composable query interface.
+Mozg adds sub-millisecond median overhead per query for local sources.
+The dominant cost in real-world deployments is therefore network latency
+to the remote data source and, for public APIs, the per-host rate limits
+Mozg observes, not server-side processing.  End-to-end latency over
+public services was not re-measured for this revision: it depends on
+the provider, the network path, and the number of relation round-trips,
+each of which is bounded below by one network round-trip and, for
+providers with published limits, by the client's throttling.
 
 \subsection{Concurrency Characteristics}
 
-Mozg is a \textbf{single-process Node.js application designed for
-single-user or single-instance use}.  It is not intended to be deployed
-as a high-throughput multi-tenant service; each user or team is expected
-to run their own instance.  Under this usage model the event-loop
-constraint is not a practical limitation.
+Mozg is a \textbf{single-process Node.js application}, intended to be
+run per user, per team, or as a small replicated deployment behind the
+Helm chart.  To document the observed concurrency behaviour, 10
+simultaneous requests were issued against the local SQLite source over
+20 rounds.  The median wall-clock time for completing all 10 concurrent
+queries was 3.05\,ms; p99 was 5.87\,ms.  Because the Node.js event loop
+serialises CPU work, concurrent queries interleave around their I/O.
+For CPU-bound workloads such as large ontology parsing, the event loop
+would become a bottleneck; running several replicas is the recommended
+mitigation.  Results are reproducible via \texttt{tests/bench.test.js}.
 
-To document the observed concurrency behaviour, 10 simultaneous
-requests were issued against the local SQLite source over 20 rounds.
-The median wall-clock time for completing all 10 concurrent queries
-was 3.0\,ms; p99 was 8.8\,ms.  Because the Node.js event loop
-serialises CPU work, concurrent queries do not contend with each other
-for database I/O; SQLite handles each connection independently.  For
-CPU-bound workloads (e.g., large ontology parsing), the event loop
-would become a bottleneck; horizontal scaling (one process per user)
-is the recommended mitigation.  Results are reproducible via
-\texttt{tests/bench.test.js}.
+\subsection{Self-Hosting End to End}
+
+The per-engine kind tests (Section~\ref{sec:selfhost}) passed for all
+six engines: each database scaled to zero, was woken by a query,
+answered it, joined to UniProt by OBO key, kept its connection hidden,
+returned to zero, and was woken a second time.  One wake of the MariaDB
+database was observed to take 18\,s from query to answer, of which up to
+15\,s can be KEDA's default polling interval.  Cold starts of the other
+engines were not timed; they are expected to be longer for engines that
+start a JVM or replay a large store, and each is bounded by the
+three-minute wake timeout.  The chart was additionally rendered and
+validated with Helm~4.3.1 and kubeconform~0.8.0 against the Kubernetes
+1.35 and 1.37 schemas, and a static scan with checkov reported 593
+passed and no failed checks.
 
 % ===============================================================
 \section{Discussion}
@@ -832,7 +1283,7 @@ for:
   \item \textbf{Simplicity}: no ETL pipelines, no data warehouse,
         no schema registry;
   \item \textbf{Minimal server state}: the server holds no persistent
-        data beyond an in-memory connection cache and ontology cache,
+        data beyond in-memory connection and ontology caches,
         simplifying deployment;
   \item \textbf{License compliance}: because data never leaves its
         origin server, queries against databases governed by read-only
@@ -845,51 +1296,79 @@ for:
         queries become possible without any party surrendering direct
         database credentials or agreeing to data-transfer agreements,
         because each source answers only queries presented with the
-        credentials its owner chooses to share.
+        credentials its owner chooses to share;
+  \item \textbf{Politeness}: throttling to each provider's published
+        limit, retrying only what is transient, and caching nothing by
+        default make Mozg a well-behaved client of shared public
+        infrastructure, at the cost of speed.
 \end{itemize}
-These properties are valuable for exploratory analytics, scientific
-workloads, and multi-tenant exploration tools where data ownership
-prevents centralisation.
+Self-hosting with scale to zero extends the same trade-off to
+infrastructure: a large database costs no compute while idle, and is
+paid for with a cold start on the first query (18\,s in the one wake
+that was timed, Section~\ref{sec:evaluation}).
 
-\subsection{Known Limitations and Deferred Issues}
+\subsection{Known Limitations}
+\label{sec:limitations}
 
-\textbf{Deployment disclaimer.}  Mozg is intended for \emph{local use}
-or deployment within a trusted private network.  It should \emph{not}
-be exposed to the public internet in its current form.  The recommended
-deployment model is one Mozg instance per user or per trusted team, run
-locally or behind a VPN.  The known security issues listed below are
-the primary reasons for this recommendation.
+\textbf{Deployment model.}  Mozg has no authentication of its own: it
+runs any query a client sends, with the credentials the client sends.
+It is intended for local use, for deployment within a trusted private
+network, or behind an authenticating ingress.  The Helm chart confines
+hosted databases to Mozg with a NetworkPolicy, but does not
+authenticate Mozg's own callers.
 
-Several security and performance issues are tracked but intentionally
-deferred, with interim severity assessments below:
-
+\paragraph{Resolved since the previous version.}
+The security issues listed in the previous version of this paper have
+been addressed:
 \begin{description}
-  \item[SSRF (High / CVSSv3~$\approx$8.6)] The ontology URL fetch in
-    \texttt{src/ontology/index.js} accepts arbitrary URLs, enabling
-    server-side request forgery.  Mitigation requires an allowlist and
-    a per-request timeout.
-
-  \item[Cypher injection (High / CVSSv3~$\approx$8.1)] The Neo4j driver passes user-supplied
-    identifiers (\texttt{from}, \texttt{orderBy}, \texttt{alias})
-    directly into Cypher queries without escaping.
-
-  \item[Path traversal (Medium / CVSSv3~$\approx$5.3)] The static-file server does not decode
-    percent-encoded path segments before resolving them against the
-    document root.
-
-  \item[Connection-cache collision (Medium / CVSSv3~$\approx$4.8)] The in-memory connection cache is
-    keyed on host and username without the password, so two users
-    with the same username but different passwords on the same host
-    could share a connection.
-
-  \item[N+1 REST requests (Low / performance)] The REST driver issues one HTTP request
-    per row of the primary result to fetch related entities.
-    Batching or parallelisation would significantly reduce latency.
-
-  \item[BioCyc re-fetch (Low / performance)] The BioCyc driver re-fetches the full
-    class/instance list for every related entity ID rather than
-    building an index.
+  \item[SSRF (mitigated)] Ontology URL fetches are restricted to HTTP(S),
+    refuse literal private IPv4 and loopback addresses, and are bounded
+    in time and size.  Host names are not resolved before the check, and
+    redirects are followed without re-checking, so the mitigation is
+    partial.
+  \item[Cypher injection] Neo4j identifiers are checked against a safe
+    pattern before use, and every value is a typed GraphQL variable.
+  \item[Path traversal] The static-file server decodes each request path
+    and checks that the resolved file lies inside the document root.
+  \item[Connection-cache collision] Cache keys include every connection
+    parameter, password included.
+  \item[AQL injection] Found by the connector evaluation; identifiers
+    now travel as bind parameters.
+  \item[BioCyc re-fetch] Related frames resolve from one listing of
+    their class.
 \end{description}
+
+\paragraph{Open limitations.}
+\begin{itemize}
+  \item \textbf{Per-row relations.}  REST, Mesh, and \texttt{api}
+        relations issue one request per parent row, with at most four
+        in flight:
+        REST has no generic batch filter, and the Mesh handlers' filter
+        types share no \texttt{in} operator.  Wide \texttt{include}s
+        over many rows are slow; \texttt{limit} on the parent query is
+        the remedy.
+  \item \textbf{MySQL} accounts must use the authentication plugin
+        \texttt{mysql\_native\_password}, and MySQL~9, which has removed
+        it, cannot be reached.
+        Replacing the Mesh handler with Knex and a modern client, as was
+        done for PostgreSQL, would remove the limitation.
+  \item \textbf{SOAP} has no read/write distinction: naming an operation
+        runs it, whatever its side effects.
+  \item \textbf{Thrift} is verified only up to the transport; no public
+        server was available for a round trip.
+  \item \textbf{APIs that page but cannot sort} (PokéAPI) are sorted
+        only within the page they return.
+  \item \textbf{Ontology SDL names}: the mapper can emit duplicate field
+        names and names that begin with a digit, so the SDL generated
+        for real-world ontologies such as FOAF and PATO is not valid
+        GraphQL.
+  \item \textbf{Dependencies}: \texttt{npm audit} reports four
+        moderate-severity advisories, reached through
+        \texttt{@graphql-mesh/openapi}.
+  \item \textbf{Public upstreams} change and fail independently of Mozg;
+        live verification detects broken descriptions but cannot
+        prevent them.
+\end{itemize}
 
 \paragraph{Partial-failure behaviour.}
 When a relation sub-query fails (e.g., because a remote source is
@@ -904,30 +1383,37 @@ sources in the same query.
 \subsection{Scalability}
 
 As a single-process Node.js application, Mozg's throughput is limited
-by the event loop.  CPU-intensive ontology parsing blocks the loop;
-large ontologies ($>$50\,000 triples) may cause noticeable latency
-spikes.  Horizontal scaling is straightforward because the server
-holds only in-memory caches that can be cold-started per instance;
-queries are independently routable.  The recommended deployment model
-is \textbf{one instance per user or per trusted team}; see
-Section~\ref{sec:evaluation} for empirical concurrency measurements.
+by the event loop.  CPU-intensive ontology parsing blocks the loop:
+the 256\,680-triple PATO parse took 1.9\,s.  Horizontal scaling is
+straightforward because the server holds only in-memory caches that
+can be cold-started per instance, and queries are independently
+routable; the Helm chart can run several Mozg replicas, which share
+demand for self-hosted databases with each other.  The per-host limits
+of the HTTP client are, however, enforced per process, so replicas
+together can exceed a provider's limit.
 
-Query-level parallelism is partially exploited: within a single query,
-sub-queries for independent relation branches could be issued
-concurrently, though the current implementation issues them
-sequentially.
+Within a query, relations of one level run concurrently, bounded per
+host by the HTTP client, and the streaming endpoint delivers each as it
+completes, but there is no
+planning across sources: a relation is never reordered, merged with
+another, or pushed into the source it came from.
 
 \subsection{Future Work}
 
 \begin{itemize}
-  \item \textbf{Query optimisation}: pushdown filtering to source
-        databases and parallel sub-query execution;
-  \item \textbf{Schema registry}: persistent storage of discovered
-        schemas and ontology results to accelerate repeated queries;
+  \item \textbf{Query optimisation}: batched relation fetches for APIs
+        that accept several identifiers per request, and cross-source
+        planning;
+  \item \textbf{Shared rate limits}: coordinating per-host limits
+        across replicas;
+  \item \textbf{A Knex-based MySQL driver}, removing the
+        authentication limits of the Mesh handler;
+  \item \textbf{Ontology naming}: GraphQL-safe, collision-free names
+        derived from labels and IRIs;
   \item \textbf{Authentication middleware}: JWT or OAuth2 bearer
-        token validation to replace per-query credential passing;
-  \item \textbf{Streaming results}: cursor-based pagination and
-        incremental JSON streaming for large result sets;
+        token validation in front of the endpoint;
+  \item \textbf{More sources and keys}: further life-science APIs and
+        self-hosted presets, joined by the same OBO-key rule;
   \item \textbf{SPARQL interface}: expose a SPARQL endpoint
         translating to the driver layer for triple-store
         compatibility;
@@ -944,25 +1430,29 @@ This paper presented Mozg, a ``slow by design'' federated query layer that
 provides a single GraphQL interface over heterogeneous data sources.
 Mozg's key contributions are:
 \begin{enumerate}
-  \item A \emph{driver model} that abstracts thirteen source types
+  \item A \emph{driver model} that abstracts fourteen source types
         behind a uniform \texttt{executeQuery}/\texttt{introspect}
-        interface, including a dedicated KEGG driver that converts
-        \texttt{text/plain} responses to JSON;
+        interface, including a declarative \texttt{api} driver that
+        executes catalog descriptions of web APIs;
   \item A \emph{relation-traversal engine} that joins entities across
-        source boundaries at query time;
+        source boundaries at query time, with one shared definition of
+        each relation type;
+  \item \emph{OBO keys}, which join sources by identifier space under
+        the rule that the same key and value name the same thing,
+        including links nobody declared;
+  \item A \emph{verified catalog} of 90 sources, including 47 public
+        life-science APIs with 663 relations, checked statically and
+        against the live services;
+  \item \emph{Self-hosted databases that scale to zero} on six engines,
+        woken by the query that needs them;
   \item An \emph{OWL ontology pipeline} that converts OWL TBox
-        definitions into executable GraphQL schemas;
-  \item A \emph{browser-based visual query builder} that democratises
-        cross-database exploration for non-programmers;
-  \item A \emph{curated catalog} of 63 publicly accessible data
-        sources — including 19 major bioinformatics repositories
-        and 18 BioCyc metabolic pathway databases — ready for
-        immediate use.
+        definitions into GraphQL schemas, and a \emph{browser-based
+        query builder} for non-programmers.
 \end{enumerate}
 
 Mozg is designed for scenarios where data freshness, source
 heterogeneity, and operational simplicity outweigh the need for
-sub-millisecond latency.  By embracing this trade-off explicitly,
+low latency.  By embracing this trade-off explicitly,
 it enables a class of data-integration use cases that are poorly
 served by traditional data warehouses or per-integration middleware.
 The system is open-source and available at
@@ -974,7 +1464,8 @@ The system is open-source and available at
 \begin{acks}
 The author thanks the open-source maintainers of GraphQL Yoga,
 GraphQL Mesh, N3.js, Knex, and arangojs whose libraries form the
-foundation of Mozg.
+foundation of Mozg, and the teams behind the public databases in the
+catalog, whose services make live federation possible.
 
 Portions of the code and documentation in this project were developed
 with the assistance of \textbf{GitHub Copilot}, an AI-powered coding
