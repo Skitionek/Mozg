@@ -166,12 +166,23 @@ no relation has to be declared:
 not the identifier's canonical name.  The `catalog` query lists every
 entity's links.
 
-Store identifiers the way the key writes them: bare accessions and ids
-(`P04637`, `ENSG00000141510`, `CHEMBL25`), and `PREFIX:id` CURIEs for OBO
-ontologies (`CHEBI:15365`, `GO:0006915`).  Mozg converts what it sends to a
-public source, but filters your tables with the value as given — a column
-storing ChEBI ids without the `CHEBI:` prefix (as Reactome's does) joins
-*out* correctly but will not be found by a link coming *in*.
+Each key has one canonical form: bare accessions and ids for most
+(`P04637`, `ENSG00000141510`, `CHEMBL25`) and `PREFIX:id` CURIEs for OBO
+ontologies (`CHEBI:15365`, `GO:0006915`).  Mozg normalises keyed columns to
+that form when it reads your rows, so the values it returns always compare
+equal across sources.  When a column *stores* a key differently, say so with
+`oboForm`, and joins into it are converted to the stored form:
+
+```yaml
+- name: ReferenceMolecule              # Reactome stores ChEBI ids bare: 15365
+  columns: [dbId, identifier, name]
+  obo:     { identifier: chebi }
+  oboForm: { identifier: local }       # "local" (bare) or "curie" (PREFIX:id)
+```
+
+With that, a link from `CHEBI:15365` finds the row storing `15365`.  The
+chart's catalog entries are checked by Mozg's own catalog lint in CI, so an
+unknown key or a malformed `oboForm` fails the build.
 
 ## Security
 
@@ -183,12 +194,27 @@ storing ChEBI ids without the `CHEBI:` prefix (as Reactome's does) joins
 - **Connections cannot be redirected.**  A query may name a self-hosted
   source but may not override its connection — otherwise a caller could send
   the server's password to a host of their choosing.
-- Databases are reachable only inside the cluster by default
-  (`service.type: ClusterIP`).  Restrict further with a NetworkPolicy
-  allowing only the Mozg pods if your cluster enforces them.
-- Mozg runs as a non-root user with a read-only root filesystem and no
-  Kubernetes API access; database pods run as their image's unprivileged
-  user, without privilege escalation.
+- **Only Mozg reaches a database.**  NetworkPolicies (on by default,
+  `networkPolicy.enabled`) let each self-hosted database accept connections
+  from Mozg pods alone; Mozg accepts traffic from anyone (narrow it with
+  `networkPolicy.ingressFrom`) and may call out freely, since it queries
+  public APIs.  Services are `ClusterIP` unless you choose otherwise.  The
+  policies need a CNI that enforces them.
+- **Secrets are files, not environment variables, for the databases.**
+  PostgreSQL reads `POSTGRES_PASSWORD_FILE` and Neo4j `NEO4J_AUTH_FILE`
+  (composed in memory from the Secret by an init container).  Mozg receives
+  the passwords as environment variables, which its catalog names; they are
+  never returned by its API.
+- Mozg runs as UID 10001 with a read-only root filesystem, no Kubernetes API
+  access, all capabilities dropped and every container resource-limited.
+  Database pods run as their image's own unprivileged user (which owns the
+  data volume); PostgreSQL and every init container run with a read-only
+  root filesystem (Neo4j's entrypoint writes its configuration, so it
+  cannot).
+- The chart passes checkov with no failures at its defaults and with every
+  preset enabled.  The few checks that do not fit a chart are skipped with
+  their reason on the resource: the namespace comes from `helm install -n`,
+  and image tags and pull policy are values you control.
 
 ## Reference
 
@@ -209,6 +235,8 @@ storing ChEBI ids without the `CHEBI:` prefix (as Reactome's does) joins
 | `mozg.wakeTimeoutMs` | `180000` | How long a query waits for a cold start |
 | `mozg.demandWindowMs` | `60000` | Demand persists this long after the last query |
 | `mozg.extraSourcesConfigMaps` | `[]` | ConfigMaps of extra catalog entries (`*.json`) |
+| `networkPolicy.enabled` | `true` | Databases accept only Mozg; Mozg ingress per `networkPolicy.ingressFrom` |
+| `databaseDefaults.resources` / `initResources` | modest | Requests and limits for database and init containers |
 
 The chart is validated in CI (`.github/workflows/helm.yml`): lint, rendering
 of every configuration against the Kubernetes and KEDA schemas, and an

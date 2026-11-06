@@ -316,7 +316,9 @@ databases:
       # columns, the OBO key of every identifier column, and relations.
       # Annotating `accession` with `uniprot` is all it takes to join these
       # rows to UniProt, AlphaFold, PDBe, Reactome, … via
-      # include: ["uniprot/protein(accession)"].
+      # include: ["uniprot/protein(accession)"].  If a column stores a key
+      # in a non-canonical form (e.g. ChEBI ids without "CHEBI:"), add
+      # `oboForm: { <column>: local | curie }`.
       entities:
         - name: proteins
           description: One protein of interest
