@@ -51,7 +51,7 @@
     "name": "REST – JSONPlaceholder: posts with comments",
     "description": "Fetch the first 5 posts from JSONPlaceholder and embed their comments.",
     "category": "REST",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://jsonplaceholder.typicode.com\" }\n    from: \"/posts\"\n    limit: 5\n    relations: [{ entity: \"comments\", foreignKey: \"id\", type: hasMany, alias: \"comments\" }]\n  }) { count data }\n}"
+    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://jsonplaceholder.typicode.com\" }\n    from: \"/posts\"\n    limit: 5\n    relations: [{ entity: \"comments\", foreignKey: \"postId\", type: hasMany, alias: \"comments\" }]\n  }) { count data }\n}"
   },
   {
     "name": "REST – Art Institute of Chicago: artworks with artist",

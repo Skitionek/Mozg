@@ -30,7 +30,7 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
 | `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5) | ✓ | ✓ per row | ✓ | **Beta** (see finding 1) |
 | `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12) | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
 | `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.15) | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
-| `rest` | Any JSON HTTP API | Unit tests; live JSONPlaceholder and SWAPI | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
+| `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12) | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
 | `kegg` | rest.kegg.jp (text) | Unit tests; live `/list`, `/get`, `/link` | ✓ | ✓ via `_pathSuffix` | from catalog | **Stable** |
 | `openapi` | OpenAPI / Swagger via graphql-mesh | Live Petstore v3; shape tests | ✓ | ✓ per row | ✓ operations | **Beta** (see finding 1) |
 | `odata` | OData v4 via graphql-mesh | Live TripPin; shape tests | ✓ server-side `$top/$skip/$orderby/$filter` | ✓ per row | ✓ entry points | **Beta** (see finding 1) |
@@ -110,14 +110,53 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
    - paging and sorting fall back to client-side when the API ignores
      JSONPlaceholder's parameters.
 
-   Several REST catalog entries describe relations in the old shape and should
-   be updated; see below.
+   The REST catalog entries written for the old behaviour are fixed in
+   finding 12.
 10. **Per-parent relation `limit`.** It is now honoured by every connector:
     in SQL with `row_number() over (partition by …)`, in AQL with a LIMITed
     subquery per parent, and after grouping elsewhere. `hasOne` is a limit of
     one.
 11. **Introspection waits for self-hosted databases.** It now waits out a
     scale-from-zero, as queries do (`withWake`).
+12. **The REST demo sources' relations, and their paging.** Followed live,
+    most relations in `jsonplaceholder`, `fakestore`, `coingecko`, `pokeapi`,
+    `musicbrainz`, `ghibli`, `swapi`, `metmuseum`, `jikan`, `artic` and
+    `opentrivia` returned the wrong records, an error, or nothing:
+    - some joined on the wrong key (jsonplaceholder `users → posts` by `id`);
+    - some depended on behaviour the API lacks (Fake Store ignores
+      `?userId=`);
+    - some joined fields that hold no identifier (Open Trivia names
+      categories in words);
+    - PokéAPI answers 403 to any query parameter except `limit` and
+      `offset`, so a plain `limit: 10` failed;
+    - MusicBrainz and the Met wrap rows in envelope keys the driver did not
+      know.
+
+    The REST driver gained what those APIs need:
+    - per-source `paging` parameter names: a name set to null means that
+      step is done client-side;
+    - extra `unwrap` envelope keys;
+    - default `headers`;
+    - an entry-level `rateLimit`.
+
+    These settings apply whether a query names the `source` or spells out the
+    same base URL. Relations gained:
+    - a `foreignKey` that is a path into the parent (`owner.login`,
+      `types[].type.url`, `artist-credit[].artist.id`);
+    - entity paths with `{field}` placeholders (`/carts/user/{id}`);
+    - `belongsTo` over a list of references.
+
+    A reference to the collection itself names no record and is skipped
+    (Ghibli writes `/locations/` where it has no list). Each relation was
+    then fixed or removed:
+    - **fixed and checked live:** jsonplaceholder, fakestore, coingecko,
+      pokeapi, musicbrainz, opentrivia, ghibli, swapi and rickandmorty;
+    - **removed:** metmuseum (no join the API can serve), jikan's genre
+      relations (genres are embedded in each record) and artic's
+      artist → artworks;
+    - **not checked live:** artic, jikan and spacex were unreachable from the
+      test environment, so their remaining relations were checked against
+      the API documentation only.
 
 ## Known limitations
 
@@ -127,8 +166,5 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
   operator. They run four at a time.
 - SOAP has no read/write distinction: naming an operation in `from` runs it.
 - Thrift is verified only up to the transport.
-- The REST catalog entries for `jsonplaceholder`, `pokeapi`, `jikan`,
-  `musicbrainz`, `coingecko`, `fakestore`, `artic` and `opentrivia` declare
-  relations whose `foreignKey` assumed the old path-fetch behaviour (for
-  example jsonplaceholder `/users → /posts` with `foreignKey: 'id'`; it should
-  be `'userId'`).
+- A REST API that pages by default but cannot sort (PokéAPI) is sorted only
+  within its first page.

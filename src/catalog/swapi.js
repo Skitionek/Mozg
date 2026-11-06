@@ -6,11 +6,9 @@
  *
  * No credentials required. All data is publicly accessible.
  *
- * Note on relationships: SWAPI uses full URLs (e.g.
- * "https://swapi.dev/api/planets/1/") as foreign key values rather than plain
- * integer IDs. Native cross-entity resolution via the REST driver therefore
- * requires extracting the trailing ID segment from each URL. The entity
- * relationships are documented below for reference.
+ * Relationships: SWAPI links records by full URL (e.g.
+ * "https://swapi.dev/api/planets/1/"), single or in lists, and the REST
+ * driver follows those URLs on the same origin.
  *
  * List responses are wrapped in `{count, next, results: [...]}`.
  * The REST driver automatically unwraps the `results` key.
@@ -27,20 +25,26 @@ module.exports = {
     {
       name: '/films',
       columns: ['title', 'episode_id', 'opening_crawl', 'director', 'producer', 'release_date', 'characters', 'planets', 'starships', 'vehicles', 'species', 'url'],
-      relations: []
+      relations: [
+        { entity: '/people', foreignKey: 'characters', type: 'hasMany', alias: 'characters' },
+        { entity: '/planets', foreignKey: 'planets', type: 'hasMany', alias: 'planets' }
+      ]
     },
     {
       name: '/people',
       columns: ['name', 'height', 'mass', 'hair_color', 'skin_color', 'eye_color', 'birth_year', 'gender', 'homeworld', 'films', 'species', 'vehicles', 'starships', 'url'],
       relations: [
         { entity: '/planets', foreignKey: 'homeworld', type: 'belongsTo', alias: 'homeworld' },
-        { entity: '/species', foreignKey: 'url', type: 'hasMany', alias: 'species' }
+        { entity: '/species', foreignKey: 'species', type: 'hasMany', alias: 'species' },
+        { entity: '/films', foreignKey: 'films', type: 'hasMany', alias: 'films' }
       ]
     },
     {
       name: '/planets',
       columns: ['name', 'rotation_period', 'orbital_period', 'diameter', 'climate', 'gravity', 'terrain', 'surface_water', 'population', 'residents', 'films', 'url'],
-      relations: []
+      relations: [
+        { entity: '/people', foreignKey: 'residents', type: 'hasMany', alias: 'residents' }
+      ]
     },
     {
       name: '/species',

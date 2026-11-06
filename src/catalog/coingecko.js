@@ -13,9 +13,7 @@
  *  - /exchanges/{id} accepts the exchange id (e.g. "binance").
  *
  * Relationship map:
- *  - /asset_platforms  → /coins/list  (native_coin_id FK, belongsTo)
- *  - /coins/list       → /asset_platforms (platforms map keys are platform IDs)
- *  - /coins/markets    → /asset_platforms (via atl_change_percentage, conceptual)
+ *  - /asset_platforms  → /coins/{native_coin_id}  (the platform's native coin)
  */
 module.exports = {
   name: 'coingecko',
@@ -25,13 +23,12 @@ module.exports = {
   connection: {
     database: 'https://api.coingecko.com/api/v3'
   },
+  rateLimit: { requestsPerSecond: 0.5, maxConcurrent: 2 },
   entities: [
     {
       name: '/coins/list',
       columns: ['id', 'symbol', 'name', 'platforms'],
-      relations: [
-        { entity: '/asset_platforms', foreignKey: 'id', type: 'hasMany', alias: 'platforms' }
-      ]
+      relations: []
     },
     {
       name: '/coins/markets',
@@ -47,7 +44,13 @@ module.exports = {
       name: '/asset_platforms',
       columns: ['id', 'chain_identifier', 'name', 'shortname', 'native_coin_id'],
       relations: [
-        { entity: '/coins/list', foreignKey: 'native_coin_id', type: 'belongsTo', alias: 'nativeCoin' }
+        {
+          entity: '/coins/{native_coin_id}',
+          foreignKey: 'native_coin_id',
+          type: 'belongsTo',
+          alias: 'nativeCoin',
+          where: { localization: false, tickers: false, market_data: false, community_data: false, developer_data: false }
+        }
       ]
     },
     {

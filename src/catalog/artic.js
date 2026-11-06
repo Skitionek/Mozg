@@ -9,7 +9,8 @@
  *
  * Relationship map:
  *  - /artworks  → /artists      (artist_id FK, belongsTo)
- *  - /artists   → /artworks     (id FK on artworks, hasMany)
+ * Artworks by an artist need the Elasticsearch-style search endpoint
+ * (`/artworks/search?query[term][artist_id]=…`), not a plain filter.
  */
 module.exports = {
   name: 'artic',
@@ -30,9 +31,7 @@ module.exports = {
     {
       name: '/artists',
       columns: ['id', 'title', 'birth_date', 'death_date', 'birth_place', 'death_place', 'description'],
-      relations: [
-        { entity: '/artworks', foreignKey: 'id', type: 'hasMany', alias: 'artworks' }
-      ]
+      relations: []
     },
     {
       name: '/exhibitions',

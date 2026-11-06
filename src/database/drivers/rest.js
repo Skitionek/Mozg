@@ -2,8 +2,37 @@
 
 const { introspectFromCatalog } = require('../catalog-schema')
 const http = require('../http')
+const { getPath } = require('./api')
 
 const UNWRAP_KEYS = ['data', 'results', 'items', 'records', 'list', 'entries']
+
+/** JSONPlaceholder / json-server paging and sorting parameters. */
+const PAGING = { limit: '_limit', offset: '_start', sort: '_sort', order: '_order' }
+
+/**
+ * Settings a catalog entry declares for its API, applied whether a query
+ * names the source or spells out the same base URL:
+ *   paging   query parameter names for limit / offset / sort / order; a name
+ *            set to null is done here instead (PokéAPI answers 403 to any
+ *            parameter it does not know)
+ *   unwrap   extra envelope keys holding the rows (MusicBrainz: `artists`)
+ *   headers  default request headers (the caller's win)
+ * and, beside the connection, `rateLimit` ({ requestsPerSecond,
+ * maxConcurrent }) as `api` entries declare it.
+ */
+function sourceSettings (connection) {
+  const { getCatalog, findCatalogsByDatabase } = require('../../catalog')
+  const named = connection.source ? getCatalog(connection.source)[0] : null
+  const entry = named || findCatalogsByDatabase(connection.database).find((e) => e.driver === 'rest')
+  const declared = (entry && entry.connection) || {}
+  const pick = (key) => connection[key] !== undefined ? connection[key] : declared[key]
+  return {
+    paging: { ...PAGING, ...(pick('paging') || {}) },
+    unwrap: [...UNWRAP_KEYS, ...(pick('unwrap') || [])],
+    headers: { ...(declared.headers || {}), ...(connection.headers && typeof connection.headers === 'object' ? connection.headers : {}) },
+    rateLimit: entry ? entry.rateLimit : undefined
+  }
+}
 
 /**
  * Build the Authorization / API-key header or query-param for the request.
@@ -30,19 +59,25 @@ function buildAuth (connection, url) {
   return { url, headers: { Authorization: `Basic ${encoded}` } }
 }
 
+const isPlainObject = (v) => v != null && typeof v === 'object' && !Array.isArray(v)
+
 /**
  * Normalise a parsed JSON response into an array.
  * Unwraps common envelope keys; wraps scalars/objects.
  */
-function normalise (response) {
+function normalise (response, unwrap = UNWRAP_KEYS) {
   if (Array.isArray(response)) return response
 
   if (response && typeof response === 'object') {
-    for (const key of UNWRAP_KEYS) {
+    for (const key of unwrap) {
       if (Object.prototype.hasOwnProperty.call(response, key) && Array.isArray(response[key])) {
         return response[key]
       }
     }
+    // One record in an envelope (`{data: {...}}` from Jikan and the Art
+    // Institute); a record that merely has such a field carries its own id.
+    const key = unwrap.find((k) => Object.hasOwn(response, k))
+    if (key && !Object.hasOwn(response, 'id') && isPlainObject(response[key])) return [response[key]]
     return [response]
   }
 
@@ -69,10 +104,10 @@ function applySelect (rows, select) {
  * Fetch a URL and return a normalised array of rows, through the shared HTTP
  * client (timeouts, retries on transient failures, per-host throttling).
  */
-async function fetchAndNormalise (url, headers) {
+async function fetchAndNormalise (url, headers, settings = {}) {
   try {
-    const { body } = await http.request(url, { headers })
-    return normalise(body)
+    const { body } = await http.request(url, { headers, rateLimit: settings.rateLimit })
+    return normalise(body, settings.unwrap)
   } catch (err) {
     throw new Error(`REST fetch failed: ${err.message}`, { cause: err })
   }
@@ -115,37 +150,43 @@ async function executeQuery (input) {
     }
   }
 
-  // JSONPlaceholder-style pagination and sorting
-  if (limit != null) rawUrl.searchParams.set('_limit', String(limit))
-  if (offset != null) rawUrl.searchParams.set('_start', String(offset))
-  if (orderBy) {
-    rawUrl.searchParams.set('_sort', String(orderBy))
-    rawUrl.searchParams.set('_order', String(orderDirection || 'asc'))
+  // Paging and sorting, under the parameter names the API uses.  Without an
+  // offset parameter the server is asked for everything up to the end of the
+  // page; without a sort parameter, for everything, since only a sorted
+  // whole can be paged.
+  const settings = sourceSettings(connection)
+  const { paging } = settings
+  const start = offset || 0
+  const serverSorts = Boolean(orderBy && paging.sort)
+  const serverPages = !orderBy || serverSorts
+  const serverSkips = Boolean(serverPages && start > 0 && paging.offset)
+  if (serverPages && limit != null && paging.limit) {
+    rawUrl.searchParams.set(paging.limit, String(serverSkips ? limit : start + limit))
+  }
+  if (serverSkips) rawUrl.searchParams.set(paging.offset, String(start))
+  if (serverSorts) {
+    rawUrl.searchParams.set(paging.sort, String(orderBy))
+    if (paging.order) rawUrl.searchParams.set(paging.order, String(orderDirection || 'asc'))
   }
 
   const { url: authedUrl, headers: authHeaders } = buildAuth(connection, rawUrl.toString())
+  const headers = { Accept: 'application/json', ...settings.headers, ...authHeaders }
 
-  // Merge extra headers from connection
-  const extraHeaders =
-    connection.headers && typeof connection.headers === 'object'
-      ? connection.headers
-      : {}
+  let rows = await fetchAndNormalise(authedUrl, headers, settings)
 
-  const headers = { Accept: 'application/json', ...extraHeaders, ...authHeaders }
-
-  let rows = await fetchAndNormalise(authedUrl, headers)
-
-  // Most APIs ignore JSONPlaceholder's paging and sorting parameters.  Sorting
-  // here is harmless when the server already did it; more rows than `limit`
-  // means the server ignored paging, so page here too.
+  // Many APIs ignore paging and sorting parameters.  Sorting here is harmless
+  // when the server already did it; more rows than `limit` means the server
+  // ignored paging, so page here too.
   if (orderBy) rows = sortRows(rows, orderBy, orderDirection)
-  if (limit != null && rows.length > limit) rows = rows.slice(offset || 0, (offset || 0) + limit)
+  const ignoredPaging = limit != null && rows.length > limit
+  const skip = serverSkips && !ignoredPaging ? 0 : start
+  if (skip > 0 || ignoredPaging) rows = rows.slice(skip, limit != null ? skip + limit : undefined)
 
   rows = applySelect(rows, select)
 
   // Load relations
   if (relations && relations.length > 0) {
-    await loadRelations({ connection, base, headers }, rows, relations)
+    await loadRelations({ connection, base, headers, settings }, rows, relations)
   }
 
   return { data: rows, count: rows.length }
@@ -156,15 +197,19 @@ async function executeQuery (input) {
  * absolute URL as-is (SWAPI, Ghibli and Rick and Morty link records that
  * way), otherwise `{base}/{entity}/{value}`.  URLs found in data are only
  * followed on the connection's own origin, so an API response cannot steer
- * the server at another host.
+ * the server at another host.  A URL of the whole collection names no record
+ * (Ghibli puts `/people/` where it has no list) and gives null.
  */
 function recordUrl (base, entityPath, value) {
   const text = String(value)
   if (/^https?:\/\//i.test(text)) {
-    if (new URL(text).origin !== new URL(base).origin) {
-      throw new Error(`refusing to follow ${new URL(text).origin}: not this connection's origin`)
+    const url = new URL(text)
+    const collection = new URL(`${base}${entityPath}`)
+    if (url.origin !== collection.origin) {
+      throw new Error(`refusing to follow ${url.origin}: not this connection's origin`)
     }
-    return text
+    const trim = (path) => path.replace(/\/+$/, '')
+    return trim(url.pathname) === trim(collection.pathname) && !url.search ? null : text
   }
   return `${base}${entityPath}/${encodeURIComponent(text)}`
 }
@@ -181,19 +226,31 @@ async function mapLimited (items, limit, fn) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
+/** A field of the row, or a path into it (`owner.login`, `types[].type.url`). */
+function valueAt (row, key) {
+  if (row == null || key == null) return null
+  return Object.hasOwn(row, key) ? row[key] : getPath(row, key)
+}
+
 /**
  * Relations, as RelationInput documents them:
  *   belongsTo         the parent's `foreignKey` value identifies the record
- *                     (an id → /entity/{id}, or a URL to fetch)
+ *                     (an id → /entity/{id}, or a URL to fetch; of a list,
+ *                     the first)
  *   hasMany / hasOne  related records whose `foreignKey` equals the parent's
  *                     `localKey` → /entity?{foreignKey}={value}; or, when the
  *                     parent's `foreignKey` field holds a list of ids or URLs
  *                     (SpaceX `launches`), those records
+ * `foreignKey` may be a path into the parent (`location.url`,
+ * `types[].type.url`): the parent then names the records itself.  An entity
+ * path with `{field}` placeholders is filled from the parent and fetched as
+ * is (Fake Store: `/carts/user/{id}`).
  * Lookups for different rows run a few at a time.
  */
 async function loadRelations (ctx, rows, relations) {
   if (!rows.length) return
-  const { connection, base, headers } = ctx
+  const { connection, base, headers, settings } = ctx
+  const fetchRows = (url) => fetchAndNormalise(buildAuth(connection, url).url, headers, settings)
 
   for (const rel of relations) {
     // A relation naming another catalog entry is resolved against that
@@ -219,23 +276,42 @@ async function loadRelations (ctx, rows, relations) {
 
     const resultKey = alias || entity
     const entityPath = entity.startsWith('/') ? entity : `/${entity}`
+    const placeholders = [...entityPath.matchAll(/\{([^{}]+)\}/g)].map((m) => m[1])
+    const withWhere = (url) => {
+      const u = new URL(url)
+      for (const [k, v] of Object.entries(where || {})) u.searchParams.set(k, String(v))
+      return u
+    }
+    const isScalar = (v) => v != null && v !== '' && typeof v !== 'object'
 
     await mapLimited(rows, 4, async (row) => {
+      const none = () => { row[resultKey] = type === 'hasMany' ? [] : null }
       try {
         let related
-        const refs = row[foreignKey]
-        if (type === 'belongsTo') {
-          if (refs == null) { row[resultKey] = null; return }
-          related = await fetchAndNormalise(buildAuth(connection, recordUrl(base, entityPath, refs)).url, headers)
-        } else if (Array.isArray(refs)) {
-          related = (await Promise.all(refs.filter((r) => r != null).map((r) => fetchAndNormalise(buildAuth(connection, recordUrl(base, entityPath, r)).url, headers)))).flat()
+        if (placeholders.length > 0) {
+          const values = Object.fromEntries(placeholders.map((p) => [p, valueAt(row, p)]))
+          if (!Object.values(values).every(isScalar)) return none()
+          const path = entityPath.replace(/\{([^{}]+)\}/g, (_, p) => encodeURIComponent(String(values[p])))
+          related = await fetchRows(withWhere(`${base}${path}`).toString())
         } else {
-          const parentValue = row[localKey]
-          if (parentValue == null) { row[resultKey] = type === 'hasMany' ? [] : null; return }
-          const url = new URL(`${base}${entityPath}`)
-          for (const [k, v] of Object.entries(where || {})) url.searchParams.set(k, String(v))
-          url.searchParams.set(foreignKey, String(parentValue))
-          related = await fetchAndNormalise(buildAuth(connection, url.toString()).url, headers)
+          const refs = valueAt(row, foreignKey)
+          const named = !Object.hasOwn(row, foreignKey) && /[.[]/.test(foreignKey)
+          if (Array.isArray(refs)) {
+            const urls = refs.filter(isScalar).map((r) => recordUrl(base, entityPath, r)).filter(Boolean)
+            const cap = type !== 'hasMany' ? 1 : limit
+            const wanted = cap != null ? urls.slice(0, cap) : urls
+            related = (await Promise.all(wanted.map(fetchRows))).flat()
+          } else if (type === 'belongsTo' || named) {
+            const url = isScalar(refs) && recordUrl(base, entityPath, refs)
+            if (!url) return none()
+            related = await fetchRows(url)
+          } else {
+            const parentValue = row[localKey]
+            if (!isScalar(parentValue)) return none()
+            const url = withWhere(`${base}${entityPath}`)
+            url.searchParams.set(foreignKey, String(parentValue))
+            related = await fetchRows(url.toString())
+          }
         }
 
         if (type === 'hasMany' && limit != null) related = related.slice(0, limit)

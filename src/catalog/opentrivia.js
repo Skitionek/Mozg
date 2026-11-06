@@ -15,7 +15,10 @@
  * The REST driver automatically unwraps the `results` key.
  *
  * Relationship map:
- *  - /api.php questions → /api_category.php (category int FK, belongsTo)
+ *  - /api_category.php → /api.php  (questions in a category, 10 per category)
+ * Questions name their category in words, so there is no way back.  The API
+ * allows one request every five seconds per IP and answers faster ones with
+ * `response_code: 5` and no results.
  */
 module.exports = {
   name: 'opentrivia',
@@ -23,23 +26,23 @@ module.exports = {
   description: 'Free trivia questions API with multiple categories, difficulties and question types.',
   driver: 'rest',
   connection: {
-    database: 'https://opentdb.com'
+    database: 'https://opentdb.com',
+    unwrap: ['trivia_categories']
   },
+  rateLimit: { requestsPerSecond: 0.2, maxConcurrent: 1 },
   // Health-probe hint: the API returns an empty body without amount.
   probe: { params: { amount: '1' } },
   entities: [
     {
       name: '/api.php',
       columns: ['type', 'difficulty', 'category', 'question', 'correct_answer', 'incorrect_answers'],
-      relations: [
-        { entity: '/api_category.php', foreignKey: 'category', type: 'belongsTo', alias: 'category' }
-      ]
+      relations: []
     },
     {
       name: '/api_category.php',
       columns: ['id', 'name'],
       relations: [
-        { entity: '/api.php', foreignKey: 'id', type: 'hasMany', alias: 'questions' }
+        { entity: '/api.php', foreignKey: 'category', type: 'hasMany', alias: 'questions', where: { amount: 10 } }
       ]
     }
   ]
