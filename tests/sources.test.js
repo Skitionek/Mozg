@@ -180,3 +180,18 @@ describe('streaming a catalog source', () => {
     assert.deepEqual(JSON.parse(lines[2].replace(/^\/\* \$2 \*\/ /, '')), { proteinId: 'P1', length: 393 })
   })
 })
+
+describe('stripTags', () => {
+  const { stripTags } = require('../src/database/text')
+
+  test('removes markup, including tags built to survive a single pass', () => {
+    assert.equal(stripTags('<p>Kinase <i>domain</i></p>'), 'Kinase domain')
+    assert.equal(stripTags('<scr<script>ipt>alert(1)</script>'), 'alert(1)')
+    assert.ok(!/<[a-z/][^<>]*>/i.test(stripTags('<<b>p>x</b>')))
+  })
+
+  test('keeps text that merely contains angle brackets, and passes null through', () => {
+    assert.equal(stripTags('p < 0.05 and q > 1'), 'p < 0.05 and q > 1')
+    assert.equal(stripTags(null), null)
+  })
+})

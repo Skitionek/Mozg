@@ -1,5 +1,7 @@
 'use strict'
 
+const { stripTags } = require('../database/text')
+
 /**
  * InterPro — protein families, domains and functional sites, integrating
  * Pfam, PROSITE, PANTHER, CDD, SMART and other member databases.
@@ -10,7 +12,7 @@
 
 const upper = (v) => (v == null ? v : String(v).toUpperCase())
 
-const stripHtml = (text) => (text == null ? null : String(text).replace(/<[^>]+>/g, '').replace(/\[\[cite:[^\]]+\]\]/g, '').replace(/\s+/g, ' ').trim())
+const stripHtml = (text) => (text == null ? null : stripTags(String(text).replace(/\[\[cite:[^\]]+\]\]/g, '')))
 
 const locations = (r) => ((r.proteins && r.proteins[0] && r.proteins[0].entry_protein_locations) || [])
   .flatMap((loc) => (loc.fragments || []).map((f) => ({ start: f.start, end: f.end })))
