@@ -744,6 +744,7 @@ Identifier spaces Mozg recognises, with the form values are written in.  `curie`
 | `wormbase` | `WB` | local |  | WormBase entity |
 | `flybase` | `FB` | local |  | FlyBase entity |
 | `sgd` | `SGD` | local |  | SGD entity |
+| `xenbase` | `Xenbase` | local |  | Xenbase entity |
 | `biosample` | `biosample` | local |  | BioSamples accession |
 | `bioproject` | `bioproject` | local |  | BioProject / ENA study accession |
 | `geo` | `geo` | local |  | GEO series, sample, platform or dataset |

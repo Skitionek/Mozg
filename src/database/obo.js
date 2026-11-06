@@ -81,6 +81,7 @@ const KEYS = {
   wormbase: { label: 'WormBase entity', prefix: 'WB', form: 'local', pattern: /^WB[A-Z][a-z]+\d+$/, synonyms: ['wb'] },
   flybase: { label: 'FlyBase entity', prefix: 'FB', form: 'local', pattern: /^FB[a-z]{2}\d{7}$/, synonyms: ['fb'] },
   sgd: { label: 'SGD entity', prefix: 'SGD', form: 'local', pattern: /^S\d+$/ },
+  xenbase: { label: 'Xenbase entity', prefix: 'Xenbase', form: 'local', pattern: /^XB-[A-Z]+-\d+$/ },
   biosample: { label: 'BioSamples accession', prefix: 'biosample', form: 'local', pattern: /^SAM[NED][A-Z]?\d+$/, upper: true },
   bioproject: { label: 'BioProject / ENA study accession', prefix: 'bioproject', form: 'local', pattern: /^PRJ[DEN][A-Z]\d+$/, upper: true },
   geo: { label: 'GEO series, sample, platform or dataset', prefix: 'geo', form: 'local', pattern: /^G(PL|SM|SE|DS)\d+$/, upper: true },
@@ -150,7 +151,7 @@ const DISEASE_KEYS = ['mondo', 'efo', 'orpha', 'omim', 'doid', 'ncit', 'mesh']
 
 // Gene identifiers of the model-organism databases (Alliance of Genome
 // Resources, GO, Monarch), written as CURIEs: HGNC:11998, MGI:98834, …
-const GENE_CURIE_KEYS = ['hgnc', 'mgi', 'rgd', 'zfin', 'wormbase', 'flybase', 'sgd']
+const GENE_CURIE_KEYS = ['hgnc', 'mgi', 'rgd', 'zfin', 'wormbase', 'flybase', 'sgd', 'xenbase']
 
 // OBO ontologies served by the Ontology Lookup Service and Monarch.
 const ONTOLOGY_KEYS = ['go', 'chebi', 'hp', 'mondo', 'efo', 'uberon', 'cl', 'doid', 'ncit']
@@ -297,7 +298,10 @@ function isCanonical (key, value) {
   if (Array.isArray(value)) return value.every((v) => isCanonical(key, v))
   if (key === '*') {
     const k = keyOfCurie(value)
-    return Boolean(k) && normalizeCurie(value) === value && KEYS[k].pattern.test(String(value).split(':').slice(1).join(':'))
+    // A well-formed CURIE from a space the registry does not know yet is
+    // still unambiguous — it just cannot be re-cased — so it passes.
+    if (!k) return typeof value === 'string' && /^[A-Za-z][\w.-]*:\S+$/.test(value)
+    return normalizeCurie(value) === value && KEYS[k].pattern.test(String(value).split(':').slice(1).join(':'))
   }
   const spec = KEYS[key]
   if (!spec) return true
