@@ -87,6 +87,30 @@ verified against the live APIs, and joined up across sources.
   `include` checkboxes.  The "Work in Progress" banner is gone.
 - `/healthz` endpoint, graceful shutdown on SIGTERM/SIGINT, a production
   `Dockerfile`, and a CI job that builds the image and checks `/healthz`.
+- **Helm chart** (`deploy/helm/mozg`, [docs/deploy.md](docs/deploy.md)) for
+  Mozg and the databases you choose to host beside it.
+  - Presets: ChEMBL (PostgreSQL dump) and Reactome (Neo4j dump). A
+    `databases:` entry adds your own, restored on first start from a dump
+    URL.
+  - Each database is a StatefulSet with a volume behind a stable Service,
+    scaled to zero by KEDA when idle and woken by the first query that needs
+    it. Mozg waits out the cold start (`MOZG_WAKE_TIMEOUT_MS`).
+  - Each is registered as a catalog source with OBO-keyed fields, so it
+    joins the public APIs.
+  - Generated passwords live in Secrets mounted as files. A NetworkPolicy
+    and a restricted security context apply throughout.
+  - CI lints and validates every configuration. A kind cluster runs the
+    whole path: restore, scale to zero, wake on query, OBO join to UniProt,
+    and back to zero.
+- **Connector evaluation** ([docs/connectors.md](docs/connectors.md)): every
+  non-`api` driver was tested against a real server or service and given a
+  status. A shared behavioural suite runs against PostgreSQL, MySQL, Neo4j,
+  ArangoDB and Elasticsearch in the new Connectors workflow.
+- REST driver: per-source `paging` parameter names, extra `unwrap` envelope
+  keys, default `headers` and `rateLimit`, applied whether a query names the
+  source or its base URL. Relations take a path as `foreignKey`
+  (`owner.login`, `types[].type.url`) and entity paths with `{field}`
+  placeholders (`/carts/user/{id}`).
 
 ### Changed
 
@@ -113,5 +137,29 @@ verified against the live APIs, and joined up across sources.
   JSONPlaceholder's `_limit`, which they ignore).
 - The query builder generated invalid GraphQL for any `where` clause or
   connection `headers` (it pasted JSON, whose quoted keys GraphQL rejects).
+- Every graphql-mesh connector (mysql, neo4j, openapi, odata, soap, thrift)
+  failed with `getArgumentValues is not a function`. An npm override of
+  `@graphql-tools/utils` caused it and is removed. The advisories it targeted
+  affect `<=12.0.1`, and the tree now resolves to 12.1.0 and 13.2.0.
+- Mesh connectors: values are sent as typed GraphQL variables instead of
+  spliced into query text; MySQL paging had limit and offset swapped; Neo4j
+  filters and sorting use `@neo4j/graphql` 7's input shapes; OData pushes
+  paging, ordering and filters to the server.
+- A request with a wrong password could reuse a MySQL or ArangoDB connection
+  another caller had opened with the right one; the caches now key on the
+  password.
+- ArangoDB: collection names, `where` keys, `orderBy` and `select` were
+  spliced into AQL (an injection); they are bind parameters now.
+- Elasticsearch searches the index named in `from`, with `where`, paging,
+  sorting and relations, instead of returning index metadata.
+- BioCyc uses the documented `apixml` endpoint; the one it called no longer
+  exists.
+- REST `hasMany` filters related records by their foreign key instead of
+  fetching `/{entity}/{parent id}`.  The demo REST sources' relations were
+  rewritten to what each API can serve and followed live. PokéAPI, which
+  rejects unknown query parameters, works with `limit`. MusicBrainz and the
+  Met return rows instead of one envelope.
+- A relation `limit` is honoured by every connector, and introspection of a
+  self-hosted database waits for it to wake, as queries do.
 
 [Unreleased]: https://github.com/Skitionek/Mozg/commits/main
