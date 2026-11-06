@@ -135,6 +135,14 @@ describe('isWakeError', () => {
     assert.ok(selfHosted.isWakeError(Object.assign(new Error('wrapped'), { cause: refused() })))
   })
 
+  test('recognises a pooled connection the database closed when it scaled down', () => {
+    // arangojs: its own error, around undici's TypeError, around the socket error
+    const socket = Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' })
+    const arango = new Error('Fetch failed: other side closed', { cause: new TypeError('fetch failed', { cause: socket }) })
+    assert.ok(selfHosted.isWakeError(arango))
+    assert.ok(selfHosted.isWakeError(Object.assign(new Error('Connection lost: The server closed the connection.'), { code: 'PROTOCOL_CONNECTION_LOST' })))
+  })
+
   test('does not mistake real errors for a cold start', () => {
     assert.ok(!selfHosted.isWakeError(Object.assign(new Error('relation "nope" does not exist'), { code: '42P01' })))
     assert.ok(!selfHosted.isWakeError(new Error('Unknown entity "x"')))

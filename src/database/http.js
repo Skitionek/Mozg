@@ -43,8 +43,8 @@ const RETRYABLE_STATUS = new Set([408, 429, 502, 503, 504])
 const SECRET_PARAMS = new Set(['api_key', 'apikey', 'api-key', 'key', 'token', 'access_token', 'auth', 'password'])
 
 class HttpError extends Error {
-  constructor (message, { status, url, body } = {}) {
-    super(message)
+  constructor (message, { status, url, body, cause } = {}) {
+    super(message, cause ? { cause } : undefined)
     this.name = 'HttpError'
     this.status = status
     this.url = url
@@ -262,7 +262,9 @@ async function request (url, options = {}) {
         })
       } catch (err) {
         const reason = err && err.name === 'AbortError' ? `timed out after ${timeoutMs} ms` : (err && err.message) || String(err)
-        lastError = new HttpError(`${method} ${displayUrl} failed: ${reason}`, { url: displayUrl })
+        // The network error stays attached: its code (ECONNREFUSED, …) is how
+        // a caller tells a server that is not up yet from a wrong request.
+        lastError = new HttpError(`${method} ${displayUrl} failed: ${reason}`, { url: displayUrl, cause: err })
         if (i < retries) {
           await sleep(retryDelay(i, null, backoffMs))
           continue

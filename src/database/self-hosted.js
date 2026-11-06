@@ -78,13 +78,16 @@ function allDemand (now = Date.now()) {
 
 // Error codes and messages that mean "nothing is answering yet" rather than
 // "the request is wrong": refused or unresolvable while the pod is starting,
-// Postgres still recovering, Neo4j's driver finding no server.
+// Postgres still recovering, Neo4j's driver finding no server, and a pooled
+// connection the database closed when it scaled down (undici's "other side
+// closed" for ArangoDB and Elasticsearch, MySQL's lost connection).
 const WAKE_CODES = new Set([
   'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
+  'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'PROTOCOL_CONNECTION_LOST',
   '57P03', // Postgres: the database system is starting up
   'ServiceUnavailable', 'SessionExpired', 'Neo.TransientError.General.DatabaseUnavailable'
 ])
-const WAKE_MESSAGE = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ServiceUnavailable|starting up|Connection terminated unexpectedly|Could not perform discovery|Failed to connect to server|getaddrinfo|socket hang up|DatabaseUnavailable/i
+const WAKE_MESSAGE = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ServiceUnavailable|starting up|Connection terminated unexpectedly|Could not perform discovery|Failed to connect to server|getaddrinfo|socket hang up|DatabaseUnavailable|other side closed|Connection lost/i
 
 /** Whether an error means the database is not up yet (as opposed to the query being wrong). */
 function isWakeError (err) {
