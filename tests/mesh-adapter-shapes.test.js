@@ -44,11 +44,12 @@ function register (connection, typeDefs, resolvers) {
 
 // ── Neo4j (@neo4j/graphql 7) ────────────────────────────────────────────────
 
+// As strict as @neo4j/graphql's own: variables must be strings.
 const BigInt_ = new GraphQLScalarType({
   name: 'BigInt',
   serialize: (v) => String(v),
   parseValue: (v) => {
-    if (typeof v !== 'number' && typeof v !== 'string') throw new TypeError('BigInt needs a number or string')
+    if (typeof v !== 'string') throw new TypeError('BigInt values are not JSON serializable. Please pass as a string in variables')
     return Number(v)
   }
 })
@@ -320,5 +321,26 @@ describe('mesh adapter: source cache', () => {
     mesh.registerMeshSource({ driver: 'mysql', host: 'dispose-test' }, { schema: makeExecutableSchema({ typeDefs: 'type Query { x: Int }' }), executor })
     await mesh.destroyAll()
     assert.equal(disposed, 1)
+  })
+})
+
+describe('Neo4j integer properties', () => {
+  test('BigInts become numbers while safe, strings beyond', () => {
+    assert.equal(mesh.bigIntOutput(1n), 1)
+    assert.equal(mesh.bigIntOutput(-9007199254740991n), -9007199254740991)
+    assert.equal(mesh.bigIntOutput(2n ** 60n), '1152921504606846976')
+  })
+
+  test('the Neo4j transport\'s BigInt scalar serializes the native BigInts its driver returns', () => {
+    // The transport opens its driver with useBigInt, and @neo4j/graphql's
+    // scalar rejected those: "BigInt cannot represent value: 1".
+    const path = require('node:path')
+    const transport = path.dirname(require.resolve('@graphql-mesh/transport-neo4j'))
+    const scalars = path.join(path.dirname(require.resolve('@neo4j/graphql', { paths: [transport] })), 'graphql', 'scalars', 'BigInt.js')
+    const { GraphQLBigInt } = require(scalars)
+    mesh.patchNeo4jBigInt()
+    assert.equal(GraphQLBigInt.serialize(1n), 1)
+    assert.equal(GraphQLBigInt.serialize(2n ** 60n), '1152921504606846976')
+    assert.equal(GraphQLBigInt.serialize('42'), '42', 'other values are serialized as before')
   })
 })
