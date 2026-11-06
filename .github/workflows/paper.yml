@@ -10,6 +10,8 @@ on:
       - "paper/**"
       - ".github/workflows/paper.yml"
   workflow_dispatch:
+  # The documentation site (deploy-pages.yml) publishes the PDF.
+  workflow_call:
 
 permissions: read-all
 
