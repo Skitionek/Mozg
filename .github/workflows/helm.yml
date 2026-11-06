@@ -62,16 +62,16 @@ jobs:
       - name: Render and validate every configuration
         run: |
           set -euo pipefail
-          all="--set databases.chembl.enabled=true --set databases.reactome.enabled=true --set databases.example.enabled=true"
+          all=(--set databases.chembl.enabled=true --set databases.reactome.enabled=true --set databases.example.enabled=true)
           validate() {
             kubeconform -strict -summary -kubernetes-version 1.30.0 \
               -schema-location default \
               -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' -
           }
           echo "defaults";                 helm template m "$CHART" | validate
-          echo "all databases, KEDA";      helm template m "$CHART" $all --api-versions keda.sh/v1alpha1 | validate
-          echo "all databases, no KEDA";   helm template m "$CHART" $all | validate
-          echo "scale-to-zero off";        helm template m "$CHART" $all --api-versions keda.sh/v1alpha1 --set databaseDefaults.scaleToZero.enabled=false | validate
+          echo "all databases, KEDA";      helm template m "$CHART" "${all[@]}" --api-versions keda.sh/v1alpha1 | validate
+          echo "all databases, no KEDA";   helm template m "$CHART" "${all[@]}" | validate
+          echo "scale-to-zero off";        helm template m "$CHART" "${all[@]}" --api-versions keda.sh/v1alpha1 --set databaseDefaults.scaleToZero.enabled=false | validate
           echo "ingress, HPA, extra sources"
           helm template m "$CHART" --set ingress.enabled=true --set autoscaling.enabled=true --set 'mozg.extraSourcesConfigMaps[0]=my-sources' | validate
           echo "e2e values";               helm template m "$CHART" -f "$CHART/ci/e2e-values.yaml" --api-versions keda.sh/v1alpha1 | validate
