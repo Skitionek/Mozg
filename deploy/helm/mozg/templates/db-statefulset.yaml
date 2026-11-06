@@ -347,6 +347,17 @@ spec:
               mountPath: {{ $layout.engineData }}
               subPath: data
             {{- end }}
+            {{- if eq $engine "arango" }}
+            # The image's entrypoint (3.12.5 and later) starts its first-start
+            # server with the command word as a positional argument, which
+            # arangod takes as its database directory: ./arangod, from /.  The
+            # same directory mounted there keeps that server on the real data
+            # (the database it creates and the dump it restores); on a fixed
+            # entrypoint the mount is simply unused.
+            - name: data
+              mountPath: /arangod
+              subPath: data
+            {{- end }}
             - name: tmp
               mountPath: /tmp
             - name: credentials
