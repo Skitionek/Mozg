@@ -1,0 +1,11 @@
+# LaTeX and Mermaid build outputs (the paper workflow builds them in CI)
+*.pdf
+*.png
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+comment.cut
