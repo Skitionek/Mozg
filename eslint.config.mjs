@@ -34,6 +34,7 @@ export default [
         decodeURIComponent: 'readonly',
         globalThis: 'readonly',
         AbortController: 'readonly',
+        AbortSignal: 'readonly',
         TextDecoder: 'readonly'
       }
     },

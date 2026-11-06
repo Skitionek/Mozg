@@ -1,5 +1,5 @@
 databases:
-  e2e:
+  elasticsearch:
     enabled: true
     engine: elasticsearch
     initBulk: |
@@ -20,8 +20,8 @@ databases:
         cpu: "2"
         memory: 2Gi
     catalog:
-      name: e2e-proteins
-      label: E2E proteins
+      name: elasticsearch-proteins
+      label: E2E proteins (elasticsearch)
       entities:
         - name: proteins
           description: Two proteins of interest

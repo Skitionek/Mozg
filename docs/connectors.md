@@ -20,16 +20,45 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
 (if any) in `MOZG_IT_<DRIVER>_PASSWORD`, and run
 `node --test tests/integration/*.test.js`.
 
+### Versions tested
+
+CI tests three version presets, kept in one file,
+[`.github/ci-presets.json`](../.github/ci-presets.json). It does not test the
+product of every version. The connector suite, the unit tests, the Docker
+image and the Helm chart's kind test (all six engines in one cluster) each
+run once per preset:
+
+| Component | `oldest`: oldest still supported | `lts`: current LTS (else newest stable) | `newest`: newest, pre-releases included |
+|-----------|----------------------------------|-----------------------------------------|-----------------------------------------|
+| Node.js | 22 | 26 | 28 nightly (image: 26) |
+| PostgreSQL | 14 | 18 | 19 RC1 |
+| MariaDB (the chart's `mysql` engine) | 10.11 | 12.3 | 13.1 RC |
+| MySQL | 8.4 | 8.4 | 8.4 (pinned, finding 2) |
+| Neo4j | 5.26 | 5.26 | 2026.10.1 |
+| ArangoDB | 3.12.13 | 3.12.13 | 3.12.13 (its only supported line) |
+| Elasticsearch | 8.19.24 | 9.5.6 | 9.7.0 snapshot |
+| Kubernetes (kind) | 1.35.8 | 1.37.0 | 1.37.0 |
+| Helm | 3.22.1 | 4.3.1 | 4.3.1 |
+| KEDA | 2.20.2 | 2.21.0 | 2.21.0 |
+
+The `newest` preset is an early warning: its jobs may fail without failing
+CI. Once a week,
+[`scripts/ci-presets.js`](../scripts/ci-presets.js) checks the presets against
+[endoflife.date](https://endoflife.date)
+([Presets drift](../.github/workflows/presets-drift.yml) workflow). It fails
+when a preset is on the wrong release line, for example once PostgreSQL 14
+reaches its end of life on 2026-11-12.
+
 ## Matrix
 
 | Driver | Backend | Tested against | Query | Relations | Introspect | Status |
 |--------|---------|----------------|:-----:|:---------:|:----------:|--------|
-| `postgres` | PostgreSQL (knex + pg) | Integration suite: local PostgreSQL 18, CI service container; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
+| `postgres` | PostgreSQL (knex + pg) | Integration suite on PostgreSQL 14, 18 and 19 RC1 (the three presets); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
 | `sqlite3` | SQLite file (knex) | Integration suite on a temp file, locally and in CI; unit tests; inside the Docker image; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ | **Stable** |
-| `mysql` | MySQL via graphql-mesh | Integration suite: MySQL 8.4 LTS in CI; Helm chart end to end on kind (MariaDB 12.3 LTS) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
-| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see finding 1) |
-| `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
-| `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 9.5); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
+| `mysql` | MySQL via graphql-mesh | Integration suite: MySQL 8.4 LTS, and MariaDB 10.11, 12.3 and 13.1 RC, in CI; Helm chart end to end on kind (MariaDB) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
+| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS and 2026.10.1); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see findings 1, 13 and 16) |
+| `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12.13); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
+| `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.19, 9.5 and a 9.7 snapshot); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
 | `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12) | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
 | `kegg` | rest.kegg.jp (text) | Unit tests; live `/list`, `/get`, `/link` | ✓ | ✓ via `_pathSuffix` | from catalog | **Stable** |
 | `openapi` | OpenAPI / Swagger via graphql-mesh | Live Petstore v3; shape tests | ✓ | ✓ per row | ✓ operations | **Beta** (see finding 1) |
@@ -192,9 +221,20 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
     Each engine's kind test wakes its database a second time to cover them.
 15. **The Docker image could not load SQLite.** `sqlite3`'s prebuilt binding
     needs glibc 2.38; the image was Debian 12 (2.36). It is now Debian 13
-    (`node:22-trixie-slim`), and the Docker CI job opens a SQLite database
-    inside the image. `/healthz`, all that job checked before, never loads
-    a native module.
+    (`node:26-trixie-slim`; CI also builds it on Node 22), and the Docker CI
+    job opens a SQLite database inside the image. `/healthz`, all that job
+    checked before, never loads a native module.
+16. **Neo4j 2025 and later lost numeric filters.** Since the calendar
+    releases, `db.schema.nodeTypeProperties()` names property types in
+    Cypher's terms (`INTEGER NOT NULL`, `LIST<FLOAT NOT NULL> NOT NULL`),
+    not the driver's (`Long`, `DoubleArray`). The Neo4j handler's schema
+    introspector (`@neo4j/introspector` 5) knows only the older names and
+    typed every such property as `String`, so a filter on a number failed
+    against Neo4j 2026.10.1 (4 of the 7 connector tests).
+    - The adapter now translates the new names back before the introspector
+      maps them, so both generations produce the same schema.
+    - Found by the `newest` CI preset. Neo4j 5.26 and 2026.10.1 both pass
+      the connector suite.
 
 ## Known limitations
 

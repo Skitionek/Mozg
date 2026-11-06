@@ -1,6 +1,8 @@
 # Base values for the kind end-to-end test (.github/workflows/helm.yml), used
-# with one ci/e2e-<engine>.yaml per job.  Two Mozg replicas exercise demand
-# combined across pods; the database scales to zero quickly so the test can
+# with every ci/e2e-<engine>.yaml at once: one release hosts a database of
+# each engine (databases.<engine>, registered as <engine>-proteins), each at
+# the version of the CI preset under test.  Two Mozg replicas exercise demand
+# combined across pods; the databases scale to zero quickly so the test can
 # watch full cycles.
 replicaCount: 2
 image:

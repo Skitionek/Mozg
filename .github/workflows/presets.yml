@@ -1,0 +1,36 @@
+name: Presets
+
+# Reads .github/ci-presets.json for the other workflows, so every version
+# Mozg is tested against lives in one file.  Each preset is one matrix entry
+# (oldest, lts, newest), never the product of every version.
+
+on:
+  workflow_call:
+    outputs:
+      matrix:
+        description: JSON list of presets, each with its name and every version
+        value: ${{ jobs.read.outputs.matrix }}
+
+permissions: read-all
+
+jobs:
+  read:
+    name: Read the version presets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/ci-presets.json
+          sparse-checkout-cone-mode: false
+
+      - name: Read presets
+        id: read
+        run: |
+          matrix=$(jq -c '[.presets | to_entries[] | .value + {name: .key}]' .github/ci-presets.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          jq -r '.[] | "\(.name): node \(.node), postgres \(.postgres), mariadb \(.mariadb), mysql \(.mysql), neo4j \(.neo4j), arangodb \(.arangodb), elasticsearch \(.elasticsearch), kubernetes \(.kubernetes), helm \(.helm), keda \(.keda)"' <<<"$matrix"

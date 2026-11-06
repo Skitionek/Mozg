@@ -1,13 +1,13 @@
 databases:
-  e2e:
+  sqlite3:
     enabled: true
     engine: sqlite3
     initSQL: |
       CREATE TABLE proteins (id INTEGER PRIMARY KEY, accession TEXT NOT NULL, note TEXT);
       INSERT INTO proteins VALUES (1, 'P04637', 'tumour suppressor'), (2, 'P00533', 'EGFR');
     catalog:
-      name: e2e-proteins
-      label: E2E proteins
+      name: sqlite3-proteins
+      label: E2E proteins (sqlite3)
       entities:
         - name: proteins
           description: Two proteins of interest
