@@ -303,7 +303,6 @@ describe('api driver: paging and ordering', () => {
     assert.deepEqual(data.map((r) => r.id), [6, 7])
   })
 
-
   const many = Array.from({ length: 10 }, (_, i) => ({ acc: `P${i}`, kind: 'k', score: 10 - i }))
 
   test('passes limit and offset to an API that supports both', async () => {

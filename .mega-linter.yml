@@ -15,6 +15,13 @@ REPOSITORY_TRIVY_DISABLE_ERRORS: true # MEDIUM CVE in fast-xml-parser tracked in
 LATEX_CHKTEX_DISABLE_ERRORS: true # paper/mozg.tex uses intentional LaTeX formatting (aligned table spacing, code-listing quotes)
 REPOSITORY_GRYPE_DISABLE_ERRORS: true # those are handled by dependabot
 
+# Helm chart templates are Go templates that render to YAML, not YAML
+# themselves, so YAML linters cannot parse them; `helm lint` and checkov's helm
+# framework check the chart instead (.github/workflows/helm.yml, checkov below).
+YAML_YAMLLINT_FILTER_REGEX_EXCLUDE: "deploy/helm/.*/templates/"
+YAML_PRETTIER_FILTER_REGEX_EXCLUDE: "deploy/helm/.*/templates/"
+YAML_V8R_FILTER_REGEX_EXCLUDE: "deploy/helm/.*/templates/"
+
 # Exclude JSONC files (which support comments) from strict JSON linting
 JSON_JSONLINT_FILTER_REGEX_EXCLUDE: "(devcontainer\\.json|\\.vscode/)"
 
