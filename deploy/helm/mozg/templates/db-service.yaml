@@ -11,10 +11,11 @@ metadata:
   name: {{ include "mozg.db.fullname" $ctx }}
   labels:
     {{- include "mozg.db.labels" $ctx | nindent 4 }}
-  {{- with $db.service.annotations }}
   annotations:
+    {{- include "mozg.checkov.resource" $ | trim | nindent 4 }}
+    {{- with $db.service.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   type: {{ $db.service.type }}
   ports:

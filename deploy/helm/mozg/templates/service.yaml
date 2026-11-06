@@ -4,10 +4,11 @@ metadata:
   name: {{ include "mozg.fullname" . }}
   labels:
     {{- include "mozg.labels" . | nindent 4 }}
-  {{- with .Values.service.annotations }}
   annotations:
+    {{- include "mozg.checkov.resource" . | trim | nindent 4 }}
+    {{- with .Values.service.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -26,6 +27,8 @@ metadata:
   name: {{ include "mozg.peersName" . }}
   labels:
     {{- include "mozg.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" . | trim | nindent 4 }}
 spec:
   clusterIP: None
   publishNotReadyAddresses: false

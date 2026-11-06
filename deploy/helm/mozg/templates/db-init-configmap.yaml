@@ -12,6 +12,8 @@ metadata:
   name: {{ include "mozg.db.fullname" $ctx }}-init
   labels:
     {{- include "mozg.db.labels" $ctx | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" $ | trim | nindent 4 }}
 data:
   10-mozg-restore.sh: |
     #!/bin/sh

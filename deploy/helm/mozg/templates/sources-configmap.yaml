@@ -11,6 +11,8 @@ metadata:
   name: {{ include "mozg.fullname" . }}-sources
   labels:
     {{- include "mozg.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" . | trim | nindent 4 }}
 data:
   {{- range $name, $db := $dbs }}
   {{- $ctx := dict "root" $ "name" $name "db" $db }}
