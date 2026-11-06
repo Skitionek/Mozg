@@ -1,0 +1,54 @@
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- range $name, $db := $dbs }}
+{{- $ctx := dict "root" $ "name" $name "db" $db }}
+{{- if eq $db.engine "postgres" }}
+---
+# Run by the postgres image on first start only (empty data directory), in
+# name order.  A first start that dies part-way leaves no .mozg-ready marker,
+# and the `prepare` init container then clears it so the next start retries.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mozg.db.fullname" $ctx }}-init
+  labels:
+    {{- include "mozg.db.labels" $ctx | nindent 4 }}
+data:
+  10-mozg-restore.sh: |
+    #!/bin/sh
+    set -eu
+    dump=/var/lib/postgresql/data/mozg-dump
+    [ -d "$dump" ] || exit 0
+    run_psql() { psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" "$@"; }
+    file=$(find "$dump" -type f \( -name '*.dmp' -o -name '*.dump' -o -name '*.backup' \) | head -n 1)
+    if [ -n "$file" ]; then
+      echo "mozg: restoring $file - this can take a long time"
+      if ! pg_restore --no-owner --no-privileges --jobs="${MOZG_RESTORE_JOBS:-2}" \
+          --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" "$file"; then
+        # pg_restore counts harmless errors (ownership, comments on schemas it
+        # did not create) as failure; accept the restore if the data is there.
+        if [ -n "${MOZG_VERIFY_SQL:-}" ] && run_psql -c "$MOZG_VERIFY_SQL" >/dev/null; then
+          echo "mozg: pg_restore reported errors, but the verification query succeeds"
+        else
+          echo "mozg: restore failed"; exit 1
+        fi
+      fi
+    fi
+    find "$dump" -type f \( -name '*.sql' -o -name '*.sql.gz' \) | sort | while read -r f; do
+      echo "mozg: running $f"
+      case "$f" in
+        *.gz) gunzip -c "$f" | run_psql ;;
+        *) run_psql -f "$f" ;;
+      esac
+    done
+  {{- if $db.initSQL }}
+  20-mozg-init.sql: |
+    {{- $db.initSQL | nindent 4 }}
+  {{- end }}
+  99-mozg-ready.sh: |
+    #!/bin/sh
+    set -eu
+    touch "$PGDATA/.mozg-ready"
+    rm -rf /var/lib/postgresql/data/mozg-dump
+    echo "mozg: {{ $db.catalog.name }} is ready"
+{{- end }}
+{{- end }}

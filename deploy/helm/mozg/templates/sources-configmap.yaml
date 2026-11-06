@@ -1,0 +1,48 @@
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- if gt (len $dbs) 0 }}
+# Catalog entries for the self-hosted databases, registered by Mozg at startup
+# (MOZG_SOURCES_DIR).  Every connection field names an environment variable
+# set from the database's Service and Secret, so the server holds the
+# credentials: callers can query these sources but never see or redirect
+# their connections.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mozg.fullname" . }}-sources
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+data:
+  {{- range $name, $db := $dbs }}
+  {{- $ctx := dict "root" $ "name" $name "db" $db }}
+  {{- $prefix := include "mozg.db.envPrefix" $ctx }}
+  {{- $entry := dict }}
+  {{- if $db.catalog.preset }}
+  {{- $raw := $.Files.Get (printf "files/catalog/%s.json" $db.catalog.preset) }}
+  {{- if not $raw }}
+  {{- fail (printf "databases.%s.catalog.preset: no files/catalog/%s.json in the chart" $name $db.catalog.preset) }}
+  {{- end }}
+  {{- $entry = $raw | fromJson }}
+  {{- end }}
+  {{- range $key := list "label" "description" "category" "homepage" "docs" "license" "entities" }}
+  {{- if hasKey $db.catalog $key }}
+  {{- $_ := set $entry $key (get $db.catalog $key) }}
+  {{- end }}
+  {{- end }}
+  {{- if not $entry.entities }}
+  {{- fail (printf "databases.%s.catalog needs entities (or a preset)" $name) }}
+  {{- end }}
+  {{- $_ := set $entry "name" $db.catalog.name }}
+  {{- $_ := set $entry "driver" $db.engine }}
+  {{- if not $entry.label }}{{ $_ := set $entry "label" $db.catalog.name }}{{ end }}
+  {{- $conn := dict
+      "host" (dict "env" (printf "%s_HOST" $prefix))
+      "port" (dict "env" (printf "%s_PORT" $prefix))
+      "database" (dict "env" (printf "%s_DATABASE" $prefix))
+      "user" (dict "env" (printf "%s_USER" $prefix))
+      "password" (dict "env" (printf "%s_PASSWORD" $prefix)) }}
+  {{- if eq $db.engine "neo4j" }}{{ $_ := set $conn "scheme" "bolt" }}{{ end }}
+  {{- $_ := set $entry "connection" $conn }}
+  {{ $db.catalog.name }}.json: |
+    {{- toPrettyJson $entry | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,24 @@
+apiVersion: v2
+name: mozg
+description: >-
+  Mozg — a "slow by design" GraphQL layer over 47 public life-science APIs,
+  plus any databases you choose to host yourself (restored from their
+  published dumps, scaled to zero when idle).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/Skitionek/Mozg
+sources:
+  - https://github.com/Skitionek/Mozg
+keywords:
+  - graphql
+  - bioinformatics
+  - life-science
+  - federation
+  - keda
+maintainers:
+  - name: Skitionek
+    url: https://github.com/Skitionek
+annotations:
+  artifacthub.io/license: MIT

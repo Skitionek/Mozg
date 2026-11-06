@@ -7,6 +7,7 @@ const { typeDefs, resolvers } = require('./schema')
 const { handleStreamRequest } = require('./stream')
 const { serveStatic } = require('./static')
 const { maskError } = require('./errors')
+const { handleDemandRequest } = require('./database/self-hosted')
 
 const PORT = process.env.PORT || 4000
 
@@ -66,6 +67,10 @@ const server = createServer((req, res) => {
     return handleStreamRequest(req, res)
   }
 
+  // Demand for self-hosted databases, polled by KEDA to scale them to and
+  // from zero (see deploy/helm/mozg and src/database/self-hosted.js).
+  if (url.pathname.startsWith('/demand') && handleDemandRequest(url.pathname, res, url.searchParams)) return
+
   // Liveness for load balancers and container orchestrators.  Deliberately
   // touches no upstream: a slow third-party API must not get Mozg restarted.
   if (url.pathname === '/healthz') {
@@ -82,6 +87,7 @@ server.listen(PORT, () => {
   console.log(`  GraphQL API    →  http://localhost:${PORT}/graphql`)
   console.log(`  Streaming API  →  http://localhost:${PORT}/stream`)
   console.log(`  Health check   →  http://localhost:${PORT}/healthz`)
+  console.log(`  Demand         →  http://localhost:${PORT}/demand`)
 })
 
 // Finish in-flight queries before exiting when the platform asks us to stop;

@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mozg.fullname" . }}
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mozg.selectorLabels" . | nindent 4 }}
+---
+# Resolves to every Mozg pod, so a pod asked for a database's demand can ask
+# its peers: KEDA polls one pod at a time, and each knows only its own queries.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mozg.peersName" . }}
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: false
+  ports:
+    - port: 4000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mozg.selectorLabels" . | nindent 4 }}
