@@ -18,6 +18,8 @@ And because not every user wants to think in GraphQL, Mozg includes a browser-ba
 
 > In essence, Mozg is less like a database and more like a brain-shaped abstraction layer: it doesn't store memories — it connects them.
 
+▶ **[Watch the 80-second demo](docs/media/mozg-demo.mp4)**: one query across UniProt, PDBe, AlphaFold and Reactome, an OBO-key join to Open Targets, and GraphiQL.
+
 ```graphql
 # One protein → its structures, its predicted model, the pathways it acts in,
 # and the drug-target record of the gene that encodes it — five databases, one query.

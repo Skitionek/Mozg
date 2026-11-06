@@ -158,6 +158,11 @@ verified against the live APIs, and joined up across sources.
   all six engines into one cluster, with every image, Kubernetes, kind, Helm
   and KEDA taken from the preset. A weekly workflow checks the presets
   against endoflife.date (`scripts/ci-presets.js`).
+- **A recorded demo** (`docs/media/mozg-demo.mp4`, 80 s) of the query
+  builder: UniProt with structures, AlphaFold and pathways in one query, an
+  OBO-key join to Open Targets, a REST source, and GraphiQL.
+  `scripts/record-demo.js` re-records it against the live APIs with
+  Playwright, and fails rather than record an error.
 - **GitHub Pages is the documentation site** (`scripts/build-site.js`). It
   publishes the overview, the source reference, the runnable examples, the
   connector and deployment guides, the changelog, the demo recording and the
@@ -231,6 +236,23 @@ verified against the live APIs, and joined up across sources.
   glibc 2.38, and the image was based on Debian 12 (glibc 2.36).  It is now
   based on Debian 13 (`node:26-trixie-slim`), and CI opens a SQLite database
   inside the image.
+- A self-hosted PostgreSQL waking from zero could fail the query with
+  "Knex: Timeout acquiring a connection" where the network drops connections
+  to a Service with no pods (kind 0.33) instead of refusing them. The pg
+  client had no connect timeout, so knex's pool gave up after a minute with
+  an error that does not say the database is down. PostgreSQL connections now
+  time out after 10 s with "timeout expired", which counts as a cold start.
+- `examples/seed.js` appended another copy of the sample rows on every run
+  (its `INSERT OR IGNORE`s had nothing unique to ignore on), and every test
+  run seeds. Comments grew quadratically, to 105,000 after 68 runs, and the
+  3-level benchmark slowed from 1 ms to 176 ms. It now seeds in one
+  transaction: it leaves the sample rows alone if they are already there,
+  and otherwise rebuilds them, which also repairs a database the old script
+  grew.
+- npm 12, which ships with Node 28, blocks dependency install scripts unless
+  `allowScripts` in `package.json` covers them. sqlite3's binding was never
+  built under it, so every SQLite query failed. `allowScripts` now names
+  sqlite3.
 - Neo4j 2025 and later: numeric properties were typed as strings, so
   filtering on a number failed. These releases name property types in
   Cypher's terms (`INTEGER NOT NULL`), which the Neo4j handler's schema
