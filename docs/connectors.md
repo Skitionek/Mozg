@@ -235,6 +235,16 @@ reaches its end of life on 2026-11-12.
       maps them, so both generations produce the same schema.
     - Found by the `newest` CI preset. Neo4j 5.26 and 2026.10.1 both pass
       the connector suite.
+17. **A PostgreSQL waking from zero could time out in the pool.** kind 0.33
+    drops connections to a Service with no pods instead of refusing them.
+    - The other drivers' connect timeouts turned that into a recognised
+      cold start.
+    - The pg client has none, so knex's pool gave up after a minute with
+      "Timeout acquiring a connection", which `withWake` does not retry.
+    - PostgreSQL connections now give up after 10 s with "timeout expired",
+      which it does.
+    - Found by the kind test once it ran every engine at once on the
+      presets' kind release.
 
 ## Known limitations
 
