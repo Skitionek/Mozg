@@ -1,0 +1,77 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+# Mozg: reachable by its clients (and by KEDA, which polls /demand), free to
+# call out — it queries public APIs and its own databases.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mozg.fullname" . }}
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" . | trim | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mozg.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: http
+          protocol: TCP
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    # Peer pods ask each other for demand.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "mozg.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: http
+          protocol: TCP
+{{- range $name, $db := $dbs }}
+{{- $ctx := dict "root" $ "name" $name "db" $db }}
+---
+# {{ $db.catalog.name }}: only Mozg may connect.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mozg.db.fullname" $ctx }}
+  labels:
+    {{- include "mozg.db.labels" $ctx | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" $ | trim | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mozg.db.selectorLabels" $ctx | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "mozg.selectorLabels" $ | nindent 14 }}
+      ports:
+        - port: db
+          protocol: TCP
+{{- end }}
+---
+# The helm test pod only makes one outbound request; nothing may reach it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mozg.fullname" . }}-test
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.resource" . | trim | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: test
+  policyTypes: [Ingress]
+  ingress: []
+{{- end }}

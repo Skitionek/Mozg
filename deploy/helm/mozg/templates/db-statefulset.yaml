@@ -18,6 +18,8 @@ metadata:
   name: {{ $full }}
   labels:
     {{- include "mozg.db.labels" $ctx | nindent 4 }}
+  annotations:
+    {{- include "mozg.checkov.db" $ctx | trim | nindent 4 }}
 spec:
   serviceName: {{ $full }}
   {{- if not (and $db.scaleToZero.enabled $keda) }}
@@ -34,6 +36,7 @@ spec:
         mozg.io/engine: {{ $db.engine }}
       annotations:
         checksum/config: {{ toJson $db | sha256sum }}
+        {{- include "mozg.checkov.db" $ctx | trim | nindent 8 }}
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
@@ -61,8 +64,11 @@ spec:
                 echo "mozg: a previous first start did not finish; clearing the data directory to retry"
                 rm -rf "$pgdata"
               fi
+          resources:
+            {{- toYaml $db.initResources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           volumeMounts:
@@ -91,8 +97,11 @@ spec:
               value: {{ $db.dump.format | default "dump" | quote }}
             - name: DUMP_FILENAME
               value: {{ include "mozg.db.dumpFilename" $ctx | quote }}
+          resources:
+            {{- toYaml $db.initResources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           volumeMounts:
@@ -100,6 +109,25 @@ spec:
               mountPath: {{ $dataDir }}
         {{- end }}
         {{- if not $pg }}
+        # Neo4j reads NEO4J_AUTH_FILE ("neo4j/<password>"); compose it from the
+        # Secret's password so the password never travels in an env variable.
+        - name: auth
+          image: {{ $db.downloaderImage }}
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, 'printf "neo4j/%s" "$(cat /run/secrets/mozg/password)" > /run/auth/neo4j-auth']
+          resources:
+            {{- toYaml $db.initResources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: credentials
+              mountPath: /run/secrets/mozg
+              readOnly: true
+            - name: auth
+              mountPath: /run/auth
         - name: load
           image: {{ include "mozg.db.image" $ctx }}
           imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
@@ -127,6 +155,9 @@ spec:
               value: {{ $db.database | quote }}
             - name: MIGRATE
               value: {{ (and $db.dump $db.dump.migrate) | default false | toString | quote }}
+          # Loading and migrating a dump is database-sized work.
+          resources:
+            {{- toYaml $db.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -143,6 +174,7 @@ spec:
           imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: {{ $pg }}
             capabilities:
               drop: [ALL]
           env:
@@ -151,11 +183,8 @@ spec:
               value: {{ $db.database | quote }}
             - name: POSTGRES_USER
               value: {{ $db.username | quote }}
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "mozg.db.secretName" $ctx }}
-                  key: password
+            - name: POSTGRES_PASSWORD_FILE
+              value: /run/secrets/mozg/password
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
             - name: MOZG_RESTORE_JOBS
@@ -163,13 +192,8 @@ spec:
             - name: MOZG_VERIFY_SQL
               value: {{ (and $db.dump $db.dump.verifySQL) | default "" | quote }}
             {{- else }}
-            - name: NEO4J_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "mozg.db.secretName" $ctx }}
-                  key: password
-            - name: NEO4J_AUTH
-              value: neo4j/$(NEO4J_PASSWORD)
+            - name: NEO4J_AUTH_FILE
+              value: /run/auth/neo4j-auth
             - name: NEO4J_initial_dbms_default__database
               value: {{ $db.database | quote }}
             - name: NEO4J_server_memory_heap_initial__size
@@ -232,14 +256,34 @@ spec:
               mountPath: /docker-entrypoint-initdb.d
             - name: dshm
               mountPath: /dev/shm
+            - name: credentials
+              mountPath: /run/secrets/mozg
+              readOnly: true
+            # Writable paths under a read-only root filesystem.
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
             {{- else }}
             - name: logs
               mountPath: /logs
+            - name: auth
+              mountPath: /run/auth
+              readOnly: true
             {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: credentials
+          secret:
+            secretName: {{ include "mozg.db.secretName" $ctx }}
+            items:
+              - key: password
+                path: password
+            defaultMode: 0440
         {{- if $pg }}
+        - name: run
+          emptyDir: {}
         - name: init
           configMap:
             name: {{ $full }}-init
@@ -251,6 +295,10 @@ spec:
         {{- else }}
         - name: logs
           emptyDir: {}
+        - name: auth
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
         {{- end }}
       {{- with $db.nodeSelector }}
       nodeSelector:

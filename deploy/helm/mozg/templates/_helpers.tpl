@@ -149,6 +149,19 @@ CKV_K8S_43=Images are referenced by tag from values; pin a digest in image.tag i
     "CKV_K8S_35=Mozg reads self-hosted database credentials from environment variables named in its catalog; they are never returned by the API") }}
 {{- end }}
 
+{{/* Annotations for a database StatefulSet (on the resource and its pod template) */}}
+{{- define "mozg.checkov.db" -}}
+{{- $skips := list
+    (include "mozg.checkov.ns" .root)
+    (include "mozg.checkov.pull" .root)
+    (include "mozg.checkov.digest" .root)
+    "CKV_K8S_40=Runs as the database image's own unprivileged user (postgres 70/999, neo4j 7474), which owns the data volume" }}
+{{- if eq .db.engine "neo4j" }}
+{{- $skips = append $skips "CKV_K8S_22=The Neo4j image's entrypoint writes its configuration under /var/lib/neo4j at startup; the init containers do run read-only" }}
+{{- end }}
+{{- include "mozg.checkov.render" $skips }}
+{{- end }}
+
 {{/* Annotations for a resource that is not a workload */}}
 {{- define "mozg.checkov.resource" -}}
 {{- include "mozg.checkov.render" (list (include "mozg.checkov.ns" .)) }}
