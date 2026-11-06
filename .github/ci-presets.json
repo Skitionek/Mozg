@@ -3,13 +3,13 @@
   "pins": {
     "mysql": "Mozg's mysql connector reaches MySQL 8.4 at most: 9.x removed mysql_native_password, the only login its client speaks (docs/connectors.md, finding 2).",
     "arangodb": "3.12 is ArangoDB's only supported line, and it publishes no current pre-release images.",
-    "nodeImage": "Node nightlies are not published as container images, so the newest image is the newest released line."
+    "nodeImageTag": "Node nightlies are not published as container images, so the newest image is the newest released line."
   },
   "presets": {
     "oldest": {
       "experimental": false,
       "node": "22",
-      "nodeImage": "node:22-trixie-slim",
+      "nodeImageTag": "22-trixie-slim",
       "postgres": "14-alpine",
       "mysql": "8.4",
       "mariadb": "10.11",
@@ -24,7 +24,7 @@
     "lts": {
       "experimental": false,
       "node": "26",
-      "nodeImage": "node:26-trixie-slim",
+      "nodeImageTag": "26-trixie-slim",
       "postgres": "18-alpine",
       "mysql": "8.4",
       "mariadb": "12.3",
@@ -39,7 +39,7 @@
     "newest": {
       "experimental": true,
       "node": "28-nightly",
-      "nodeImage": "node:26-trixie-slim",
+      "nodeImageTag": "26-trixie-slim",
       "postgres": "19rc1-alpine",
       "mysql": "8.4",
       "mariadb": "13.1-rc",

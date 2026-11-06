@@ -63,7 +63,7 @@ jobs:
                --test tests/*.test.js
 
   docker:
-    name: Docker image (${{ matrix.preset.name }}, ${{ matrix.preset.nodeImage }})
+    name: Docker image (${{ matrix.preset.name }}, node:${{ matrix.preset.nodeImageTag }})
     runs-on: ubuntu-latest
     needs: presets
     continue-on-error: ${{ matrix.preset.experimental }}
@@ -81,8 +81,8 @@ jobs:
 
       - name: Build image
         env:
-          NODE_IMAGE: ${{ matrix.preset.nodeImage }}
-        run: docker build --build-arg NODE_IMAGE="$NODE_IMAGE" -t mozg:ci .
+          NODE_TAG: ${{ matrix.preset.nodeImageTag }}
+        run: docker build --build-arg NODE_TAG="$NODE_TAG" -t mozg:ci .
 
       # Native modules load only against a compatible C library; /healthz
       # never touches them.

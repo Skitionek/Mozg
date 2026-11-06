@@ -158,7 +158,7 @@ verified against the live APIs, and joined up across sources.
     snapshot). This preset is allowed to fail.
 
   Each preset runs the unit tests, the Docker image (now built
-  with `--build-arg NODE_IMAGE`), and the connector suite, which now covers
+  with `--build-arg NODE_TAG`), and the connector suite, which now covers
   MariaDB too. It also runs the Helm chart's kind test, which now installs
   all six engines into one cluster, with every image, Kubernetes, kind, Helm
   and KEDA taken from the preset. A weekly workflow checks the presets
