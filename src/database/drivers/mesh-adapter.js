@@ -113,11 +113,42 @@ function cacheKeyFor (connection) {
   return JSON.stringify({ ...connectionIdentity(connection), password: connection.password || '' })
 }
 
+/**
+ * The Neo4j transport opens its driver with `useBigInt`, so integer
+ * properties arrive as native BigInts — which the BigInt scalar of the
+ * @neo4j/graphql it executes with cannot serialize ("BigInt cannot represent
+ * value: 1"): no node with an integer property could be read.  Teach that
+ * scalar BigInts: a number while it is a safe integer, else a string (as it
+ * returns driver Integers).  Done before the first Neo4j schema is built,
+ * which copies the scalar's functions.
+ */
+let neo4jBigIntPatched = false
+function patchNeo4jBigInt () {
+  if (neo4jBigIntPatched) return
+  neo4jBigIntPatched = true
+  try {
+    const path = require('node:path')
+    const transport = path.dirname(require.resolve('@graphql-mesh/transport-neo4j'))
+    const neo4jGraphql = require.resolve('@neo4j/graphql', { paths: [transport] })
+    const { GraphQLBigInt } = require(path.join(path.dirname(neo4jGraphql), 'graphql', 'scalars', 'BigInt.js'))
+    const serialize = GraphQLBigInt.serialize
+    GraphQLBigInt.serialize = (value) => typeof value === 'bigint' ? bigIntOutput(value) : serialize.call(GraphQLBigInt, value)
+  } catch {
+    // A different layout of the Neo4j transport: leave its scalar alone.
+  }
+}
+
+/** A BigInt as a JSON value: a number while it is a safe integer, else a string. */
+function bigIntOutput (value) {
+  return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString()
+}
+
 async function getOrCreateMeshSource (connection) {
   const { driver } = connection
   const cacheKey = cacheKeyFor(connection)
 
   if (meshSourceCache.has(cacheKey)) return meshSourceCache.get(cacheKey)
+  if (driver === 'neo4j') patchNeo4jBigInt()
 
   const { pkg, config } = buildHandlerDescriptor(driver, connection)
   const HandlerClass = require(pkg).default
@@ -295,6 +326,12 @@ function coerceLeaf (named, value) {
     }
     case 'Boolean':
       return value === true || value === 'true' || value === 1 || value === '1'
+    case 'BigInt': {
+      // @neo4j/graphql takes BigInt variables only as strings.
+      const text = String(value)
+      if (!/^-?\d+$/.test(text)) throw new Error(`"${value}" is not an integer`)
+      return text
+    }
     default:
       // Custom scalars (BigInt, DateTime, …) parse their own input.
       return value
@@ -780,4 +817,4 @@ async function introspect (connection) {
   return { tables }
 }
 
-module.exports = { executeQuery, introspect, destroyAll, registerMeshSource, isValidGraphQLName, buildHandlerDescriptor, buildWhere, buildOrderBy }
+module.exports = { bigIntOutput, patchNeo4jBigInt, executeQuery, introspect, destroyAll, registerMeshSource, isValidGraphQLName, buildHandlerDescriptor, buildWhere, buildOrderBy }
