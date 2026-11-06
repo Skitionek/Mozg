@@ -8,8 +8,8 @@
  *
  * Relationship map:
  *  - /carts     → /users     (userId FK, belongsTo)
- *  - /users     → /carts     (userId FK on carts, hasMany)
- *  - /products  → /products/categories (category string, belongsTo by name)
+ *  - /users     → /carts     (/carts/user/{id}, hasMany: the API ignores
+ *                              a userId filter on /carts)
  */
 module.exports = {
   name: 'fakestore',
@@ -41,7 +41,7 @@ module.exports = {
       name: '/users',
       columns: ['id', 'email', 'username', 'phone', 'name', 'address'],
       relations: [
-        { entity: '/carts', foreignKey: 'id', type: 'hasMany', alias: 'carts' }
+        { entity: '/carts/user/{id}', foreignKey: 'userId', type: 'hasMany', alias: 'carts' }
       ]
     }
   ]

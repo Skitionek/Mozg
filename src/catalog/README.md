@@ -213,3 +213,41 @@ node scripts/verify-sources.js                   # every api source
 It runs each entity's example, checks the declared fields came back, then
 follows every relation from the first row.  The weekly integration workflow
 runs the same check.
+
+## `rest` entries
+
+The demo sources (`jsonplaceholder`, `pokeapi`, `swapi`, …) use the plain
+`rest` driver: `from` is a path under `connection.database`, `where` keys
+become query parameters, and rows are the response array or the array under
+an envelope key (`data`, `results`, `items`, …).  An entry can tell the driver
+how its API differs:
+
+```js
+connection: {
+  database: 'https://musicbrainz.org/ws/2',
+  headers: { 'User-Agent': '…' },                         // defaults; a caller's headers win
+  paging: { limit: 'limit', offset: 'offset', sort: null, order: null },
+  unwrap: ['artists', 'recordings']                       // extra envelope keys
+},
+rateLimit: { requestsPerSecond: 1, maxConcurrent: 1 },
+```
+
+`paging` names the API's limit / offset / sort / order parameters; the
+default is json-server's `_limit` / `_start` / `_sort` / `_order`, and a name
+set to `null` is done by the driver instead.  These settings apply whether a
+query names the `source` or spells out the same base URL.
+
+Relations name what the API can actually serve:
+
+| Join | Relation |
+|------|----------|
+| Related rows filter by the parent's id: `/posts?userId=1` | `{ entity: '/posts', foreignKey: 'userId', type: 'hasMany' }` |
+| The parent holds the related id or URL | `{ entity: '/users', foreignKey: 'userId', type: 'belongsTo' }` |
+| …nested in the parent, or in a list | `foreignKey: 'owner.login'`, `'types[].type.url'` |
+| The API has a path for it: `/carts/user/1` | `{ entity: '/carts/user/{id}', foreignKey: 'userId', type: 'hasMany' }` |
+
+A placeholder path is fetched as is; `foreignKey` then only documents the
+related field (every relation names one).  URLs found in data are followed
+only on the connection's own origin, and a URL of a whole collection
+(`/people/`) names no record.  If the API can serve a join only by fetching a
+whole collection and filtering it locally, leave the relation out.

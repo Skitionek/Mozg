@@ -19,7 +19,7 @@ module.exports = {
       name: '/posts',
       columns: ['id', 'userId', 'title', 'body'],
       relations: [
-        { entity: '/comments', foreignKey: 'id', type: 'hasMany', alias: 'comments' },
+        { entity: '/comments', foreignKey: 'postId', type: 'hasMany', alias: 'comments' },
         { entity: '/users', foreignKey: 'userId', localKey: 'userId', type: 'belongsTo', alias: 'user' }
       ]
     },
@@ -27,9 +27,9 @@ module.exports = {
       name: '/users',
       columns: ['id', 'name', 'username', 'email', 'phone', 'website'],
       relations: [
-        { entity: '/posts', foreignKey: 'id', type: 'hasMany', alias: 'posts' },
-        { entity: '/todos', foreignKey: 'id', type: 'hasMany', alias: 'todos' },
-        { entity: '/albums', foreignKey: 'id', type: 'hasMany', alias: 'albums' }
+        { entity: '/posts', foreignKey: 'userId', type: 'hasMany', alias: 'posts' },
+        { entity: '/todos', foreignKey: 'userId', type: 'hasMany', alias: 'todos' },
+        { entity: '/albums', foreignKey: 'userId', type: 'hasMany', alias: 'albums' }
       ]
     },
     {

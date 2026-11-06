@@ -12,10 +12,9 @@
  *    (returns {total, objectIDs: [...]})
  *  - /objects/{objectID} – full record for one object
  *
- * Relationship map:
- *  - /objects  → /departments  (departmentId FK, belongsTo)
- *  - /departments have many /objects (departmentId, hasMany; use
- *    /objects?departmentIds={departmentId} to filter)
+ * No relations: an object names its department in words, not by id, and
+ * /objects?departmentIds={departmentId} returns only object ids (often
+ * hundreds of thousands), each needing its own /objects/{objectID} request.
  */
 module.exports = {
   name: 'metmuseum',
@@ -23,22 +22,19 @@ module.exports = {
   description: 'Open access collection API for the Metropolitan Museum of Art with objects, departments and search.',
   driver: 'rest',
   connection: {
-    database: 'https://collectionapi.metmuseum.org/public/collection/v1'
+    database: 'https://collectionapi.metmuseum.org/public/collection/v1',
+    unwrap: ['departments']
   },
   entities: [
     {
       name: '/departments',
       columns: ['departmentId', 'displayName'],
-      relations: [
-        { entity: '/objects', foreignKey: 'departmentId', type: 'hasMany', alias: 'objects' }
-      ]
+      relations: []
     },
     {
       name: '/objects',
       columns: ['objectID', 'isHighlight', 'accessionNumber', 'accessionYear', 'isPublicDomain', 'primaryImage', 'department', 'objectType', 'title', 'artistDisplayName', 'artistNationality', 'objectDate', 'medium', 'dimensions', 'country', 'period', 'culture', 'departmentId'],
-      relations: [
-        { entity: '/departments', foreignKey: 'departmentId', type: 'belongsTo', alias: 'department' }
-      ]
+      relations: []
     }
   ]
 }

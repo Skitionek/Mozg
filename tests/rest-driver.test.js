@@ -182,3 +182,151 @@ describe('rest driver: auth, envelopes, limits and cross-catalog relations', () 
     assert.ok(tables.some((t) => t.name === '/posts'))
   })
 })
+
+describe('rest driver: per-source paging, envelopes and relation paths', () => {
+  const { registerCatalog } = require('../src/catalog')
+  const PAGED = {
+    name: 'rest-paged-test',
+    label: 'Paged test API',
+    driver: 'rest',
+    connection: {
+      database: 'https://paged.test/api',
+      paging: { limit: 'limit', offset: null, sort: null, order: null },
+      unwrap: ['people'],
+      headers: { 'X-Source': 'catalog' }
+    },
+    entities: [{ name: '/people', columns: ['id', 'name'], relations: [] }]
+  }
+  const PEOPLE = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, name: `p${i + 1}` }))
+  let unregister
+  let seenHeaders
+
+  beforeEach(() => {
+    unregister = registerCatalog(PAGED)
+    seenHeaders = []
+    globalThis.fetch = async (url, init) => {
+      const u = new URL(url)
+      requests.push(u)
+      seenHeaders.push(init.headers)
+      const n = u.searchParams.has('limit') ? Number(u.searchParams.get('limit')) : 4 // a server-side default page
+      return reply({ count: PEOPLE.length, people: PEOPLE.slice(0, n) })
+    }
+  })
+  afterEach(() => unregister())
+
+  const paged = { driver: 'rest', database: 'https://paged.test/api' }
+
+  test('a source names its own paging parameters, found by base URL', async () => {
+    const { data } = await rest.executeQuery({ connection: paged, from: '/people', limit: 2 })
+    assert.deepEqual(data.map((p) => p.id), [1, 2])
+    assert.deepEqual([...requests[0].searchParams], [['limit', '2']])
+    assert.equal(seenHeaders[0]['X-Source'], 'catalog')
+  })
+
+  test('without an offset parameter the page is asked for up to its end and cut here', async () => {
+    const { data } = await rest.executeQuery({ connection: paged, from: '/people', limit: 2, offset: 3 })
+    assert.deepEqual(data.map((p) => p.id), [4, 5])
+    assert.equal(requests[0].searchParams.get('limit'), '5')
+  })
+
+  test('without a sort parameter nothing is paged server-side, and rows are sorted here', async () => {
+    const { data } = await rest.executeQuery({ connection: paged, from: '/people', limit: 2, orderBy: 'id', orderDirection: 'desc' })
+    assert.deepEqual(data.map((p) => p.id), [4, 3])
+    assert.deepEqual([...requests[0].searchParams], [])
+  })
+
+  test('a connection naming the source gets the same settings, and the caller may override them', async () => {
+    await rest.executeQuery({ connection: { ...paged, source: 'rest-paged-test' }, from: '/people', limit: 1 })
+    await rest.executeQuery({ connection: { ...paged, paging: { limit: 'size' }, headers: { 'X-Source': 'caller' } }, from: '/people', limit: 1 })
+    assert.equal(requests[0].searchParams.get('limit'), '1')
+    assert.equal(requests[1].searchParams.get('size'), '1')
+    assert.equal(seenHeaders[1]['X-Source'], 'caller')
+  })
+
+  test('a single record in an envelope is unwrapped; a record with such a field is not', async () => {
+    globalThis.fetch = async (url) => reply(String(url).endsWith('/one') ? { data: { id: 5, name: 'x' }, info: {} } : { id: 6, data: { a: 1 } })
+    assert.deepEqual((await rest.executeQuery({ connection, from: '/one' })).data, [{ id: 5, name: 'x' }])
+    assert.deepEqual((await rest.executeQuery({ connection, from: '/own' })).data, [{ id: 6, data: { a: 1 } }])
+  })
+})
+
+describe('rest driver: relations through paths, templates and lists', () => {
+  const REPOS = [
+    { id: 1, owner: { login: 'ada' }, contributors: [{ user: { url: 'https://api.test/api/users/2' } }, { user: { url: 'https://api.test/api/users/3' } }] },
+    { id: 2, owner: null, contributors: [] }
+  ]
+
+  beforeEach(() => {
+    globalThis.fetch = async (url) => {
+      const u = new URL(url)
+      requests.push(u)
+      if (u.pathname === '/api/repos') return reply(REPOS)
+      if (u.pathname === '/api/users/ada') return reply({ id: 1, login: 'ada' })
+      const user = u.pathname.match(/^\/api\/users\/(\d+)$/)
+      if (user) return reply(USERS.find((x) => String(x.id) === user[1]))
+      const byUser = u.pathname.match(/^\/api\/posts\/by-user\/(\d+)$/)
+      if (byUser) return reply(POSTS.filter((p) => String(p.userId) === byUser[1]))
+      if (u.pathname === '/api/users/') return reply(USERS)
+      return reply({}, 404)
+    }
+  })
+
+  test('a foreign key may be a path into the parent', async () => {
+    const { data } = await rest.executeQuery({
+      connection,
+      from: '/repos',
+      relations: [
+        { entity: '/users', foreignKey: 'owner.login', type: 'belongsTo', alias: 'owner' },
+        { entity: '/users', foreignKey: 'contributors[].user.url', type: 'hasMany', alias: 'contributors' }
+      ]
+    })
+    assert.deepEqual(data.map((r) => r.owner && r.owner.login), ['ada', null])
+    assert.deepEqual(data[0].contributors.map((u) => u.name), ['Barbara', 'Carl'])
+    assert.deepEqual(data[1].contributors, [])
+    assert.ok(!requests.some((u) => u.pathname === '/api/users' && u.search), 'a path is never used as a filter')
+  })
+
+  test('an entity path with placeholders is filled from the parent', async () => {
+    const { data } = await rest.executeQuery({
+      connection,
+      from: '/repos',
+      relations: [{ entity: '/posts/by-user/{owner.login}', foreignKey: 'userId', type: 'hasMany', alias: 'byLogin' },
+        { entity: '/posts/by-user/{id}', foreignKey: 'userId', type: 'hasMany', alias: 'posts', where: { full: true } }]
+    })
+    assert.deepEqual(data.map((r) => r.posts.map((p) => p.id)), [[10, 11], []])
+    assert.deepEqual(data[1].byLogin, [])
+    assert.ok(requests.some((u) => u.pathname === '/api/posts/by-user/1' && u.searchParams.get('full') === 'true'))
+    assert.equal(requests.filter((u) => u.pathname.startsWith('/api/posts/by-user/ada')).length, 1)
+  })
+
+  test('belongsTo over a list follows the first; a collection URL names no record', async () => {
+    globalThis.fetch = (inner => async (url) => {
+      if (String(url).endsWith('/films/9')) return reply({ id: 9, people: ['https://api.test/api/users/', 'https://api.test/api/users/2'], lead: 'https://api.test/api/users/' })
+      return inner(url)
+    })(globalThis.fetch)
+    const { data } = await rest.executeQuery({
+      connection,
+      from: '/films/9',
+      relations: [
+        { entity: '/users', foreignKey: 'people', type: 'hasMany', alias: 'cast' },
+        { entity: '/users', foreignKey: 'people', type: 'belongsTo', alias: 'first' },
+        { entity: '/users', foreignKey: 'lead', type: 'belongsTo', alias: 'lead' }
+      ]
+    })
+    assert.deepEqual(data[0].cast.map((u) => u.name), ['Barbara'])
+    assert.equal(data[0].lead, null)
+    assert.ok(!requests.some((u) => u.pathname === '/api/users/'), 'the collection itself is never fetched')
+    // The first entry is the collection URL, so the first record is the next one.
+    assert.equal(data[0].first.name, 'Barbara')
+  })
+
+  test('a relation limit caps a list of references before they are fetched', async () => {
+    await rest.executeQuery({
+      connection,
+      from: '/repos',
+      where: { id: 1 },
+      relations: [{ entity: '/users', foreignKey: 'contributors[].user.url', type: 'hasMany', alias: 'contributors', limit: 1 }]
+    })
+    assert.equal(requests.filter((u) => /^\/api\/users\/\d+$/.test(u.pathname)).length, 1)
+  })
+})

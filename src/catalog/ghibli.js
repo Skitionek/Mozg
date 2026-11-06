@@ -8,7 +8,10 @@
  * All endpoints return arrays directly (no envelope wrapper).
  *
  * Relationship notes:
- *  - Films contain arrays of people/location/species/vehicle URLs.
+ *  - Films contain arrays of people/location/species/vehicle URLs.  Where
+ *    the API has no list it puts the collection URL (`/locations/`), which
+ *    names no record and is skipped; that is nearly always the case for
+ *    locations and vehicles, so films link only to people and species.
  *  - `/people` has a `species` field (single URL) and a `films` array (URLs).
  *  - `/locations` has a `residents` array of /people URLs and a `films` array.
  *  - `/species` has a `people` array of /people URLs and a `films` array.
@@ -28,10 +31,8 @@ module.exports = {
       name: '/films',
       columns: ['id', 'title', 'original_title', 'original_title_romanised', 'description', 'director', 'producer', 'release_date', 'running_time', 'rt_score', 'people', 'species', 'locations', 'vehicles', 'url'],
       relations: [
-        { entity: '/people', foreignKey: 'url', type: 'hasMany', alias: 'people' },
-        { entity: '/locations', foreignKey: 'url', type: 'hasMany', alias: 'locations' },
-        { entity: '/species', foreignKey: 'url', type: 'hasMany', alias: 'species' },
-        { entity: '/vehicles', foreignKey: 'url', type: 'hasMany', alias: 'vehicles' }
+        { entity: '/people', foreignKey: 'people', type: 'hasMany', alias: 'people' },
+        { entity: '/species', foreignKey: 'species', type: 'hasMany', alias: 'species' }
       ]
     },
     {

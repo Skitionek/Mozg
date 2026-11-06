@@ -11,8 +11,8 @@
  * Rate limits: 3 req/sec, 60 req/min.
  *
  * Relationship notes:
- *  - Each anime/manga record embeds an array of genres with {mal_id, name}.
- *    The `mal_id` value can be used to look up /genres/anime or /genres/manga.
+ *  - Each anime/manga record embeds its genres as {mal_id, name, url}, so no
+ *    relation is needed to get them; /genres/anime has no per-id lookup.
  *  - /top/anime and /seasons/now are filtered views of /anime (same entity shape).
  *  - /top/manga is a filtered view of /manga.
  */
@@ -28,16 +28,12 @@ module.exports = {
     {
       name: '/anime',
       columns: ['mal_id', 'title', 'title_english', 'type', 'source', 'episodes', 'status', 'airing', 'score', 'rank', 'popularity', 'season', 'year'],
-      relations: [
-        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
-      ]
+      relations: []
     },
     {
       name: '/manga',
       columns: ['mal_id', 'title', 'title_english', 'type', 'chapters', 'volumes', 'status', 'score', 'rank', 'popularity'],
-      relations: [
-        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
-      ]
+      relations: []
     },
     {
       name: '/characters',
@@ -62,23 +58,17 @@ module.exports = {
     {
       name: '/top/anime',
       columns: ['mal_id', 'title', 'type', 'episodes', 'score', 'rank', 'popularity', 'members'],
-      relations: [
-        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
-      ]
+      relations: []
     },
     {
       name: '/top/manga',
       columns: ['mal_id', 'title', 'type', 'chapters', 'score', 'rank', 'popularity', 'members'],
-      relations: [
-        { entity: '/genres/manga', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
-      ]
+      relations: []
     },
     {
       name: '/seasons/now',
       columns: ['mal_id', 'title', 'type', 'episodes', 'score', 'season', 'year'],
-      relations: [
-        { entity: '/genres/anime', foreignKey: 'mal_id', type: 'hasMany', alias: 'genres' }
-      ]
+      relations: []
     }
   ]
 }
