@@ -2,13 +2,14 @@
 
 /**
  * Elasticsearch / OpenSearch connector against a real cluster.  Runs when
- * MOZG_IT_ELASTICSEARCH_URL is set, e.g. http://elastic:secret@localhost:9200
- * (credentials optional).  Each fixture table becomes an index, with dynamic
+ * MOZG_IT_ELASTICSEARCH_URL is set, e.g. http://localhost:9200 — with
+ * security on, add the user to the URL (http://elastic@localhost:9200) and
+ * the password in MOZG_IT_ELASTICSEARCH_PASSWORD.  Each fixture table becomes an index, with dynamic
  * mappings — strings as text with a keyword subfield, as clusters do by default.
  */
 
 const { TABLES } = require('./fixture')
-const { runConnectorSuite } = require('./suite')
+const { runConnectorSuite, badCredentialsFor } = require('./suite')
 
 const URL_ = process.env.MOZG_IT_ELASTICSEARCH_URL
 let connection = null
@@ -16,7 +17,7 @@ if (URL_) {
   const u = new URL(URL_)
   connection = { driver: 'elasticsearch', database: `${u.protocol}//${u.host}` }
   if (u.username) connection.user = decodeURIComponent(u.username)
-  if (u.password) connection.password = decodeURIComponent(u.password)
+  if (process.env.MOZG_IT_ELASTICSEARCH_PASSWORD) connection.password = process.env.MOZG_IT_ELASTICSEARCH_PASSWORD
 }
 
 async function es (method, path, body, ndjson) {
@@ -30,8 +31,7 @@ runConnectorSuite({
   name: 'elasticsearch',
   skipAll: !URL_ && 'set MOZG_IT_ELASTICSEARCH_URL to run',
   connection,
-  badCredentials: connection && { ...connection, user: connection.user || 'elastic', password: 'definitely-wrong-pw-123' },
-  skip: connection && !connection.user ? { credentials: 'cluster runs without security' } : {},
+  badCredentials: badCredentialsFor(connection),
   async seed () {
     for (const [table, rows] of Object.entries(TABLES)) {
       await es('DELETE', `/${table}`)

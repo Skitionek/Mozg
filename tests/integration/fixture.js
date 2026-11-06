@@ -50,13 +50,18 @@ const COLUMNS = {
   proteins: { id: 'int', name: 'text', uniprot_accession: 'text' }
 }
 
-/** Parse a `scheme://user:password@host:port/database` URL into a connection. */
+/**
+ * A connection from a `scheme://user@host:port/database` URL.  A password,
+ * when the server needs one, comes from its own variable —
+ * MOZG_IT_<DRIVER>_PASSWORD — never from inside a URL.
+ */
 function connectionFromUrl (driver, url) {
   const u = new URL(url)
   const connection = { driver, host: u.hostname }
   if (u.port) connection.port = Number(u.port)
   if (u.username) connection.user = decodeURIComponent(u.username)
-  if (u.password) connection.password = decodeURIComponent(u.password)
+  const password = process.env[`MOZG_IT_${driver.toUpperCase()}_PASSWORD`]
+  if (password) connection.password = password
   const db = u.pathname.replace(/^\//, '')
   if (db) connection.database = db
   return connection

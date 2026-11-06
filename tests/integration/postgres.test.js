@@ -3,11 +3,12 @@
 /**
  * PostgreSQL connector against a real server.
  * Runs when MOZG_IT_POSTGRES_URL is set, e.g.
- *   postgres://postgres:secret@localhost:5432/mozg_it
+ *   postgres://postgres@localhost:5432/mozg_it
+ * (password, if the server needs one, in MOZG_IT_POSTGRES_PASSWORD)
  */
 
 const { TABLES, COLUMNS, connectionFromUrl } = require('./fixture')
-const { runConnectorSuite } = require('./suite')
+const { runConnectorSuite, badCredentialsFor } = require('./suite')
 
 const URL_ = process.env.MOZG_IT_POSTGRES_URL
 const connection = URL_ ? connectionFromUrl('postgres', URL_) : null
@@ -18,9 +19,9 @@ runConnectorSuite({
   name: 'postgres',
   skipAll: !URL_ && 'set MOZG_IT_POSTGRES_URL to run',
   connection,
-  badCredentials: connection && { ...connection, password: 'definitely-wrong-pw-123' },
+  badCredentials: badCredentialsFor(connection, { refusesUnknownUsers: true }),
   async seed () {
-    const knex = require('knex')({ client: 'pg', connection: { ...connection, user: connection.user, password: connection.password } })
+    const knex = require('knex')({ client: 'pg', connection: { ...connection } })
     try {
       for (const table of Object.keys(TABLES).reverse()) await knex.schema.dropTableIfExists(table)
       for (const [table, rows] of Object.entries(TABLES)) {

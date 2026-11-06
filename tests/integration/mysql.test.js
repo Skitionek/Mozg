@@ -3,11 +3,12 @@
 /**
  * MySQL connector (graphql-mesh MySQL handler) against a real server.
  * Runs when MOZG_IT_MYSQL_URL is set, e.g.
- *   mysql://mozg:secret@127.0.0.1:3306/mozg_it
+ *   mysql://root@127.0.0.1:3306/mozg_it
+ * (password, if the server needs one, in MOZG_IT_MYSQL_PASSWORD)
  */
 
 const { TABLES, COLUMNS, connectionFromUrl } = require('./fixture')
-const { runConnectorSuite } = require('./suite')
+const { runConnectorSuite, badCredentialsFor } = require('./suite')
 
 const URL_ = process.env.MOZG_IT_MYSQL_URL
 const connection = URL_ ? connectionFromUrl('mysql', URL_) : null
@@ -22,7 +23,7 @@ runConnectorSuite({
   name: 'mysql',
   skipAll: !URL_ && 'set MOZG_IT_MYSQL_URL to run',
   connection,
-  badCredentials: connection && { ...connection, password: 'definitely-wrong-pw-123' },
+  badCredentials: badCredentialsFor(connection, { refusesUnknownUsers: true }),
   async seed () {
     const mysql = require('mysql')
     const conn = mysql.createConnection({

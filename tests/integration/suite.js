@@ -13,7 +13,8 @@
  *   entity: (table) => name the driver expects in `from` (default: same),
  *   field:  (column) => name the driver returns (default: same),
  *   skip:   { <capability>: 'reason' } for what a backend genuinely cannot do,
- *   badCredentials: connection that must fail to authenticate (optional).
+ *   badCredentials: connection that must fail to authenticate (optional) —
+ *           see badCredentialsFor().
  */
 
 const { describe, test, before, after } = require('node:test')
@@ -37,6 +38,19 @@ const FAKE_UNIPROT = {
 
 const UNIPROT_NAMES = { P04637: 'Cellular tumor antigen p53', P38398: 'Breast cancer type 1 susceptibility protein', P00533: 'Epidermal growth factor receptor' }
 
+/**
+ * Credentials that must be refused: a user that does not exist, with a
+ * password made up for this run — no credential ever lives in test code.
+ * A server running without authentication accepts anything, so the check is
+ * skipped (returns null) when the configured connection carries no password
+ * and `refusesUnknownUsers` is false.
+ */
+function badCredentialsFor (connection, { refusesUnknownUsers = false } = {}) {
+  if (!connection) return null
+  if (!connection.password && !refusesUnknownUsers) return null
+  return { ...connection, user: 'mozg_it_nobody', password: `wrong-${require('node:crypto').randomUUID()}` }
+}
+
 function runConnectorSuite (adapter) {
   const skip = adapter.skip || {}
   const entity = adapter.entity || ((t) => t)
@@ -56,7 +70,8 @@ function runConnectorSuite (adapter) {
       unregister = require('../../src/catalog').registerCatalog(FAKE_UNIPROT)
       originalFetch = globalThis.fetch
       globalThis.fetch = async (url, init) => {
-        const u = new URL(String(url))
+        // Clients such as arangojs pass a Request object, not a string.
+        const u = new URL(globalThis.Request && url instanceof globalThis.Request ? url.url : String(url))
         if (u.host !== 'it-uniprot.test') return originalFetch(url, init)
         const acc = u.pathname.split('/').pop()
         const body = UNIPROT_NAMES[acc] ? { acc, name: UNIPROT_NAMES[acc] } : null
@@ -164,7 +179,7 @@ function runConnectorSuite (adapter) {
       }
     })
 
-    it('reports bad credentials readably without leaking them', 'credentials', async () => {
+    test('reports bad credentials readably without leaking them', { skip: skip.credentials || (!adapter.badCredentials && 'the server runs without authentication') || false }, async () => {
       const bad = adapter.badCredentials
       await assert.rejects(
         executeQuery({ connection: bad, from: entity('users'), limit: 1 }),
@@ -178,4 +193,4 @@ function runConnectorSuite (adapter) {
   })
 }
 
-module.exports = { runConnectorSuite }
+module.exports = { runConnectorSuite, badCredentialsFor }
