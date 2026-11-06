@@ -274,7 +274,7 @@ Base URL: `https://www.ebi.ac.uk/intact/ws` · [Home](https://www.ebi.ac.uk/inta
 
 **Reactome** — Open-source, manually curated pathway knowledgebase covering metabolism, signalling, gene expression and disease for human and 15+ model organisms. Stable ids look like R-HSA-69620.
 
-Base URL: `https://reactome.org/ContentService` · [Home](https://reactome.org) · [API docs](https://reactome.org/ContentService/) · Licence: CC BY 4.0 · Throttled to 10 req/s
+Base URL: `https://reactome.org/ContentService` · [Home](https://reactome.org) · [API docs](https://reactome.org/ContentService/) · Licence: CC0 1.0 · Throttled to 10 req/s
 
 | Entity | Where | Fields | Include | Linked by key |
 |---|---|---|---|---|

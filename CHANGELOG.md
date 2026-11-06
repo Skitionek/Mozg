@@ -110,6 +110,11 @@ verified against the live APIs, and joined up across sources.
   non-`api` driver was tested against a real server or service and given a
   status. A shared behavioural suite runs against PostgreSQL, MySQL, Neo4j,
   ArangoDB and Elasticsearch in the new Connectors workflow.
+- **Public database dumps** ([docs/dumps.md](docs/dumps.md)): public
+  life-science and demo databases whose dumps the chart can host, each URL
+  checked and, for several, restored with the chart's own first-start
+  commands. Each loadable one has a `databases:` snippet; those that need
+  converting, or cannot be loaded, say why.
 - REST driver: per-source `paging` parameter names, extra `unwrap` envelope
   keys, default `headers` and `rateLimit`, applied whether a query names the
   source or its base URL. Relations take a path as `foreignKey`
@@ -258,5 +263,12 @@ verified against the live APIs, and joined up across sources.
   Cypher's terms (`INTEGER NOT NULL`), which the Neo4j handler's schema
   introspector does not know. The adapter now translates them to the older
   names first.
+- An entity named after its Neo4j node label (`Pathway`) was not found,
+  because the Neo4j handler names its query fields after pluralised labels
+  (`pathways`). The `reactome` preset names all its entities that way, so
+  none of them could be queried. An entity name now also matches the list
+  field returning the type of that name.
+- The Reactome entries gave its licence as CC BY 4.0. Reactome's data is
+  CC0 1.0; only its illustrations are CC BY 4.0.
 
 [Unreleased]: https://github.com/Skitionek/Mozg/commits/main

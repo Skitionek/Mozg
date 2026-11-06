@@ -87,8 +87,8 @@ under the rule that two fields with the same key and the same value
 denote the same thing.  A Helm chart hosts copies of large databases on
 any of six engines next to Mozg, scales each to zero when idle, and
 wakes it on the next query.  The evaluation covers an automated suite of
-745 tests, a connector evaluation against real servers that found and
-fixed fifteen defects, static and live verification of the catalog,
+767 tests, a connector evaluation against real servers that found and
+fixed seventeen defects, static and live verification of the catalog,
 ontology ingestion up to 256\,680 triples, and server-side overhead
 below one millisecond per query.
 \end{abstract}
@@ -902,7 +902,11 @@ such databases next to it, on any of the six engines Mozg can query:
 PostgreSQL~18, MariaDB~12.3 (for the \texttt{mysql} driver),
 Neo4j~5.26, ArangoDB~3.12, Elasticsearch~9.5, and SQLite.  Presets
 restore ChEMBL from its PostgreSQL dump and Reactome from its Neo4j
-graph dump.
+graph dump.  The repository lists further public dumps the chart can
+load as published (\path{docs/dumps.md}), among them ChEBI, STRING,
+Reactome's relational database, the OBO ontologies as SQLite files, and
+the Monarch knowledge graph, together with those that must be converted
+first and why.
 
 \paragraph{First start.}
 Each server engine runs as a StatefulSet with a persistent volume.  On
@@ -988,7 +992,7 @@ line; CI tests three version presets (Section~\ref{sec:eval-versions}).
 
 \subsection{Automated Tests}
 
-The unit-test suite (\texttt{node --test tests/*.test.js}) has 745 tests
+The unit-test suite (\texttt{node --test tests/*.test.js}) has 767 tests
 in 120 suites, all of which pass.  It covers every driver against
 in-memory stand-ins or recorded response shapes, the HTTP client, OBO
 key normalisation, the catalog lint, the schema, the streaming endpoint,
@@ -1051,7 +1055,7 @@ Driver & Backend & Tested against & Relations & Status \\
 \end{tabularx}
 \end{table*}
 
-The evaluation found sixteen defects, all fixed:
+The evaluation found seventeen defects, all fixed:
 \begin{enumerate}
   \item \textbf{Every Mesh connector was broken.}  A global npm override
         of \texttt{@graphql-tools/utils}, added for a security advisory
@@ -1113,11 +1117,23 @@ The evaluation found sixteen defects, all fixed:
         failed against Neo4j~2026.10.  The adapter now translates the
         new names back first.  The \texttt{newest} version preset
         (Section~\ref{sec:eval-versions}) found it.
+  \item \textbf{Neo4j entities named after labels.}  The Mesh Neo4j
+        handler names its query fields after pluralised labels
+        (\texttt{Pathway} becomes \texttt{pathways}), and the adapter
+        matched entity names only to field names, so the Reactome
+        preset, which names its entities after labels, could not be
+        queried.  The end-to-end catalog used the field name and missed
+        it.  An entity name now also matches the list field returning
+        the type of that name.
 \end{enumerate}
-Two further cold-start defects surfaced in the Helm end-to-end tests
+Three further cold-start defects surfaced in the Helm end-to-end tests
 and were fixed: a PostgreSQL connection terminated by the server's
-shutdown (\texttt{57P01}) was not treated as a cold start, and the
-ArangoDB entrypoint defect described in Section~\ref{sec:selfhost}.
+shutdown (\texttt{57P01}) was not treated as a cold start; the
+PostgreSQL client had no connect timeout, so where the network drops
+connections to a Service with no pods rather than refusing them, the
+connection pool gave up with an error not recognised as a cold start;
+and the ArangoDB entrypoint defect described in
+Section~\ref{sec:selfhost}.
 
 \subsection{Version Presets}
 \label{sec:eval-versions}

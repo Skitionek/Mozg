@@ -4,7 +4,7 @@ const { stripTags } = require('../database/text')
 
 /**
  * Reactome — open, manually curated knowledgebase of biological pathways and
- * reactions (CC BY 4.0).
+ * reactions (data CC0 1.0; illustrations CC BY 4.0).
  * API docs: https://reactome.org/ContentService/
  *
  * Stable ids look like R-HSA-69620 (human), R-MMU-… (mouse).  Pathway
@@ -38,7 +38,7 @@ module.exports = {
   category: 'Interactions & pathways',
   homepage: 'https://reactome.org',
   docs: 'https://reactome.org/ContentService/',
-  license: 'CC BY 4.0',
+  license: 'CC0 1.0',
   driver: 'api',
   connection: {
     database: 'https://reactome.org/ContentService',

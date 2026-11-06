@@ -56,7 +56,7 @@ reaches its end of life on 2026-11-12.
 | `postgres` | PostgreSQL (knex + pg) | Integration suite on PostgreSQL 14, 18 and 19 RC1 (the three presets); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
 | `sqlite3` | SQLite file (knex) | Integration suite on a temp file, locally and in CI; unit tests; inside the Docker image; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ | **Stable** |
 | `mysql` | MySQL via graphql-mesh | Integration suite: MySQL 8.4 LTS, and MariaDB 10.11, 12.3 and 13.1 RC, in CI; Helm chart end to end on kind (MariaDB) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
-| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS and 2026.10.1); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see findings 1, 13 and 16) |
+| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS and 2026.10.1); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see findings 1, 13, 16 and 18) |
 | `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12.13); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
 | `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.19, 9.5 and a 9.7 snapshot); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
 | `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12) | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
@@ -245,6 +245,15 @@ reaches its end of life on 2026-11-12.
       which it does.
     - Found by the kind test once it ran every engine at once on the
       presets' kind release.
+18. **A Neo4j entity named after its node label was not found.** The Neo4j
+    handler names query fields after pluralised labels (`Pathway` becomes
+    `pathways`), and the adapter matched entity names only to field names.
+    - The `reactome` preset names its entities after the labels, so none of
+      them could be queried. The e2e catalog names its entity `proteins`, so
+      the kind test passed.
+    - An entity name now also matches the list field returning the type of
+      that name. Checked against Neo4j 5.26.
+    - Found while writing [the list of public dumps](dumps.md).
 
 ## Known limitations
 

@@ -4,7 +4,7 @@
   "category": "Interactions & pathways",
   "homepage": "https://reactome.org",
   "docs": "https://reactome.org/dev/graph-database",
-  "license": "CC BY 4.0",
+  "license": "CC0 1.0",
   "entities": [
     {
       "name": "Pathway",

@@ -29,7 +29,7 @@ const PAGES = [
   { examples: 'examples/queries.json', out: 'examples.html', nav: 'Examples', title: 'Examples' },
   { src: 'docs/connectors.md', out: 'connectors.html', nav: 'Connectors' },
   { src: 'docs/deploy.md', out: 'deploy.html', nav: 'Deploy' },
-  { src: 'docs/dumps.md', out: 'dumps.html', nav: 'Database dumps', optional: true },
+  { src: 'docs/dumps.md', out: 'dumps.html', nav: 'Database dumps' },
   { src: 'CHANGELOG.md', out: 'changelog.html', nav: 'Changelog' }
 ]
 
@@ -210,8 +210,7 @@ function withoutTitle (markdown) {
 }
 
 async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROOT, commit = process.env.GITHUB_SHA || '' } = {}) {
-  const pages = PAGES.filter((p) => !p.optional || fs.existsSync(path.join(root, p.src)))
-  const pageBySrc = new Map(pages.filter((p) => p.src).map((p) => [p.src, p.out]))
+  const pageBySrc = new Map(PAGES.filter((p) => p.src).map((p) => [p.src, p.out]))
   fs.rmSync(out, { recursive: true, force: true })
   fs.mkdirSync(out, { recursive: true })
 
@@ -229,7 +228,7 @@ async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROO
   fs.writeFileSync(path.join(out, '.nojekyll'), '')
 
   const written = []
-  for (const page of pages) {
+  for (const page of PAGES) {
     let markdown
     if (page.examples) markdown = examplesMarkdown(JSON.parse(fs.readFileSync(path.join(root, page.examples), 'utf8')))
     else markdown = fs.readFileSync(path.join(root, page.src), 'utf8')
@@ -237,7 +236,7 @@ async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROO
     const rendered = await renderMarkdown(isIndex ? withoutTitle(markdown) : markdown, page.src || 'docs/examples.md', pageBySrc)
     const html = layout({
       page,
-      nav: pages,
+      nav: PAGES,
       title: page.title || rendered.title,
       body: rendered.html,
       toc: tableOfContents(rendered.headings),

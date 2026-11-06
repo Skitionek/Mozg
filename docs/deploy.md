@@ -156,7 +156,9 @@ query ──▶ Mozg ──(connection refused: nothing running)──▶ retrie
 ## Adding your own database
 
 Any dump of a supported engine (see [Engines](#engines)) can be hosted the
-same way.  Describe its tables (node labels, collections, indices) and,
+same way.  [Public database dumps](dumps.md) lists public life-science and
+demo databases whose dumps load as published, with a ready `databases:`
+snippet for each, and the ones that need converting first.  Describe its tables (node labels, collections, indices) and,
 crucially, the **OBO key** of every identifier column:
 
 ```yaml
