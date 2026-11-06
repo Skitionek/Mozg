@@ -22,7 +22,8 @@ const { CATEGORIES } = require('../src/database/catalog-lint')
 
 const OUT = path.join(__dirname, '..', 'docs', 'sources.md')
 
-const cell = (s) => String(s == null ? '' : s).replace(/\|/g, '\\|').replace(/\n/g, ' ')
+// Escape backslashes first, so an escaped pipe cannot be un-escaped by one already in the text.
+const cell = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ')
 const anchor = (name) => name.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 function render () {

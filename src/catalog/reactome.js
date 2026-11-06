@@ -1,5 +1,7 @@
 'use strict'
 
+const { stripTags } = require('../database/text')
+
 /**
  * Reactome — open, manually curated knowledgebase of biological pathways and
  * reactions (CC BY 4.0).
@@ -10,7 +12,6 @@
  * the UniProt proteins and ChEBI small molecules it involves.
  */
 
-const stripTags = (s) => (s == null ? null : String(s).replace(/<[^>]*>/g, '').trim())
 
 // Fields shared by every entity that returns Reactome events (pathways and reactions).
 const EVENT_FIELDS = {
