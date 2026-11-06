@@ -167,7 +167,6 @@ The following free, public endpoints can be used directly — no sign-up require
 | RFAM | `mysql` | `mysql-rfam-public.ebi.ac.uk` | `Rfam` | `rfamro` | *(empty)* | RNA families |
 | Neo4j Movies | `neo4j` | `demo.neo4jlabs.com` | `movies` | `movies` | *(public demo — see [Neo4j Labs](https://demo.neo4jlabs.com))* | Movie graph (scheme: `neo4j+s`) |
 | JSONPlaceholder | `rest` | – | `https://jsonplaceholder.typicode.com` | – | – | Fake REST data |
-| RestCountries | `rest` | – | `https://restcountries.com/v3.1` | – | – | Country data |
 | Open-Meteo | `rest` | – | `https://api.open-meteo.com/v1` | – | – | Weather (no key) |
 | PokéAPI | `rest` | – | `https://pokeapi.co/api/v2` | – | – | Pokémon |
 | Jikan | `rest` | – | `https://api.jikan.moe/v4` | – | – | Anime (MyAnimeList) |

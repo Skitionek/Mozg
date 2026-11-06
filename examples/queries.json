@@ -132,12 +132,6 @@
     "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://api.openbrewerydb.org/v1\" }\n    from: \"/breweries\"\n    where: { by_type: \"micro\", by_country: \"united_states\", per_page: \"10\" }\n    select: [\"id\", \"name\", \"brewery_type\", \"city\", \"state_province\", \"website_url\"]\n  }) { count data }\n}"
   },
   {
-    "name": "REST – RestCountries: European countries",
-    "description": "List the first 10 European countries with name, capital, population and flags.",
-    "category": "REST",
-    "query": "{\n  query(input: {\n    connection: { driver: rest, database: \"https://restcountries.com/v3.1\" }\n    from: \"/region/europe\"\n    select: [\"name\",\"capital\",\"population\",\"flags\"]\n    limit: 10\n  }) { count data }\n}"
-  },
-  {
     "name": "REST – Open-Meteo: current weather in Berlin",
     "description": "Get the current weather forecast for Berlin from the Open-Meteo free API.",
     "category": "REST",
