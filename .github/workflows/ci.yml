@@ -65,6 +65,17 @@ jobs:
       - name: Build image
         run: docker build -t mozg:ci .
 
+      # Native modules load only against a compatible C library; /healthz
+      # never touches them.
+      - name: SQLite works inside the image
+        run: |
+          docker run --rm --user 10001:10001 --read-only mozg:ci node -e "
+            const sqlite3 = require('sqlite3')
+            new sqlite3.Database(':memory:').get('select sqlite_version() as v', (err, row) => {
+              if (err) throw err
+              console.log('sqlite', row.v)
+            })"
+
       - name: Start container and wait for /healthz
         run: |
           docker run -d --name mozg -p 4000:4000 mozg:ci
