@@ -104,6 +104,19 @@ describe('http.request', () => {
     assert.equal(body, null)
   })
 
+  test('a network failure keeps its cause, so callers can tell "not up yet" apart', async () => {
+    // Given an upstream that refuses connections
+    globalThis.fetch = async () => { throw new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:9200'), { code: 'ECONNREFUSED' }) }) }
+
+    // When it is requested
+    // Then the error says so in its message and carries the refusal as its cause
+    await assert.rejects(
+      http.request('http://db.internal:9200/x', { retries: 0 }),
+      (err) => /failed: fetch failed/.test(err.message) && err.transient && err.cause.cause.code === 'ECONNREFUSED' &&
+        require('../src/database/self-hosted').isWakeError(err)
+    )
+  })
+
   test('times out a hung request and reports it as transient', async () => {
     // Given an upstream that never answers until aborted
     globalThis.fetch = (url, init) => new Promise((resolve, reject) => {
