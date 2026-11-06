@@ -12,7 +12,6 @@ const { stripTags } = require('../database/text')
  * the UniProt proteins and ChEBI small molecules it involves.
  */
 
-
 // Fields shared by every entity that returns Reactome events (pathways and reactions).
 const EVENT_FIELDS = {
   reactomeId: 'stId',

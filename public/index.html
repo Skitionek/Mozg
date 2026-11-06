@@ -496,7 +496,6 @@
   to execute queries, or copy the generated GraphQL and paste it into your local instance.
 </div>
 
-
 <header>
   <h1><span>Mozg</span> – Cross-Database Query Interface</h1>
   <nav>
@@ -521,14 +520,14 @@
         <option value="">— select entity —</option>
       </select>
       <div class="row2" style="margin-top:.4rem">
-        <button class="btn btn-secondary btn-sm" onclick="openSchemaModal()" title="Visualize the whole schema">📊 Schema</button>
-        <button class="btn btn-secondary btn-sm" onclick="applyCatalog()">⚡ Apply to Form</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openSchemaModal()" title="Visualize the whole schema">📊 Schema</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="applyCatalog()">⚡ Apply to Form</button>
       </div>
     </div>
     <div id="source-mode" class="hidden" style="margin-top:.5rem">
       <div class="relation-chip">
         <span>Source <strong id="source-mode-name"></strong> — no connection needed</span>
-        <button class="remove-btn" onclick="clearSource(); generateQuery()" title="Back to a manual connection">×</button>
+        <button type="button" class="remove-btn" onclick="clearSource(); generateQuery()" title="Back to a manual connection">×</button>
       </div>
       <div id="source-params-hint" style="font-size:.72rem;color:var(--muted);margin:.35rem 0 .2rem"></div>
       <label>Include related data</label>
@@ -597,7 +596,7 @@
     <label id="conn-db-label">Database / File</label>
     <input id="conn-database" type="text" placeholder=":memory:" />
 
-    <button class="btn btn-secondary btn-full" id="introspect-btn" onclick="introspect()">🔍 Introspect Schema</button>
+    <button type="button" class="btn btn-secondary btn-full" id="introspect-btn" onclick="introspect()">🔍 Introspect Schema</button>
 
     <!-- ── Query ── -->
     <div class="section-title">Query</div>
@@ -668,23 +667,23 @@
           <input id="rel-foreign-key" type="text" placeholder="user_id" />
         </div>
       </div>
-      <button class="btn btn-secondary btn-full btn-sm" style="margin-top:.4rem" onclick="addRelation()">+ Add Relation</button>
+      <button type="button" class="btn btn-secondary btn-full btn-sm" style="margin-top:.4rem" onclick="addRelation()">+ Add Relation</button>
     </div>
 
-    <button class="btn btn-secondary btn-full" style="margin-top:.6rem" onclick="generateQuery()">⚙ Generate GraphQL</button>
+    <button type="button" class="btn btn-secondary btn-full" style="margin-top:.6rem" onclick="generateQuery()">⚙ Generate GraphQL</button>
 
   </aside>
 
   <!-- ── Main ────────────────────────────────────────────────── -->
   <main>
     <div class="main-toolbar">
-      <button class="btn btn-primary" id="run-query-btn" onclick="runQuery()" title="Run query (Ctrl+Enter / ⌘+Enter)">
+      <button type="button" class="btn btn-primary" id="run-query-btn" onclick="runQuery()" title="Run query (Ctrl+Enter / ⌘+Enter)">
         <span class="spinner hidden" id="run-spinner"></span>
         ▶ Run Query
       </button>
-      <button class="btn btn-secondary" onclick="clearResults()">✕ Clear</button>
-      <button class="btn btn-secondary" onclick="shareQuery()" title="Copy permalink to clipboard">🔗 Share</button>
-      <button class="btn btn-secondary" id="stream-btn" onclick="runStream()"
+      <button type="button" class="btn btn-secondary" onclick="clearResults()">✕ Clear</button>
+      <button type="button" class="btn btn-secondary" onclick="shareQuery()" title="Copy permalink to clipboard">🔗 Share</button>
+      <button type="button" class="btn btn-secondary" id="stream-btn" onclick="runStream()"
         title="Stream results progressively via /stream (progressive JSON inlining)"
         aria-label="Stream results progressively">⚡ Stream</button>
       <div class="spacer"></div>
@@ -697,7 +696,7 @@
         <div class="panel-header">
           GraphQL Query
           <span class="spacer" style="flex:1"></span>
-          <button class="btn btn-secondary btn-sm" onclick="copyQuery()" style="font-size:.7rem;padding:.2rem .6rem;">Copy</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyQuery()" style="font-size:.7rem;padding:.2rem .6rem;">Copy</button>
         </div>
         <textarea id="query-editor" spellcheck="false">{
   query(input: {
@@ -718,9 +717,9 @@
           <span id="result-badge" class="badge hidden">0</span>
           <span class="spacer" style="flex:1"></span>
           <div class="view-toggle">
-            <button id="view-json-btn" class="btn btn-secondary btn-sm active" onclick="setResultView('json')">JSON</button>
-            <button id="view-table-btn" class="btn btn-secondary btn-sm" onclick="setResultView('table')">Table</button>
-            <button id="view-graph-btn" class="btn btn-secondary btn-sm" onclick="setResultView('graph')">Graph</button>
+            <button type="button" id="view-json-btn" class="btn btn-secondary btn-sm active" onclick="setResultView('json')">JSON</button>
+            <button type="button" id="view-table-btn" class="btn btn-secondary btn-sm" onclick="setResultView('table')">Table</button>
+            <button type="button" id="view-graph-btn" class="btn btn-secondary btn-sm" onclick="setResultView('graph')">Graph</button>
           </div>
         </div>
         <div id="result-welcome" class="welcome-wrap">
@@ -785,7 +784,7 @@
   <div id="schema-modal-inner">
     <div id="schema-modal-header">
       <span id="schema-modal-title">Schema — <span id="schema-modal-db-label"></span></span>
-      <button class="btn btn-secondary btn-sm" onclick="closeSchemaModal()">✕ Close</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeSchemaModal()">✕ Close</button>
     </div>
     <div id="schema-modal-body">
       <svg id="schema-graph-svg" style="overflow:visible;"></svg>
@@ -975,7 +974,7 @@
     list.innerHTML = relations.map((r, i) => `
       <div class="relation-chip">
         <span><strong>${r.type}</strong> → ${r.entity} (${r.foreignKey})</span>
-        <button class="remove-btn" onclick="removeRelation(${i})">×</button>
+        <button type="button" class="remove-btn" onclick="removeRelation(${i})">×</button>
       </div>
     `).join('');
   }

@@ -195,3 +195,8 @@ describe('stripTags', () => {
     assert.equal(stripTags(null), null)
   })
 })
+
+test('stripTags drops an unterminated comment with the rest of the text', () => {
+  const { stripTags } = require('../src/database/text')
+  assert.equal(stripTags('kept <!-- never closed <script>x</script>'), 'kept')
+})
