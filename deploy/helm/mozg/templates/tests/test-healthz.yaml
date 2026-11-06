@@ -3,26 +3,42 @@ kind: Pod
 metadata:
   name: "{{ include "mozg.fullname" . }}-test-healthz"
   labels:
-    {{- include "mozg.labels" . | nindent 4 }}
+    # Not the server's labels: the Mozg Service must never route to this pod.
+    helm.sh/chart: {{ include "mozg.chart" . }}
+    app.kubernetes.io/name: {{ include "mozg.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: test
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    {{- include "mozg.checkov.render" (list
+        (include "mozg.checkov.ns" .)
+        (include "mozg.checkov.pull" .)
+        (include "mozg.checkov.digest" .)
+        "CKV_K8S_8=A one-shot helm test pod that exits after one request; a liveness probe has nothing to watch"
+        "CKV_K8S_9=A one-shot helm test pod that nothing routes traffic to; a readiness probe has nothing to gate") | trim | nindent 4 }}
 spec:
   restartPolicy: Never
   automountServiceAccountToken: false
   securityContext:
     runAsNonRoot: true
-    runAsUser: 100
+    runAsUser: 10001
+    runAsGroup: 10001
     seccompProfile:
       type: RuntimeDefault
   containers:
     - name: healthz
       image: curlimages/curl:8.11.1
+      imagePullPolicy: IfNotPresent
       command:
         - sh
         - -c
         - curl -fsS --retry 5 --retry-delay 2 --retry-all-errors http://{{ include "mozg.fullname" . }}:{{ .Values.service.port }}/healthz
+      resources:
+        {{- toYaml .Values.testResources | nindent 8 }}
       securityContext:
         allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
         capabilities:
           drop: [ALL]

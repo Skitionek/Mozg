@@ -124,3 +124,61 @@ describe('rest driver', () => {
     assert.match(data[0].nope.error, /relation fetch failed: REST fetch failed: .*404/)
   })
 })
+
+describe('rest driver: auth, envelopes, limits and cross-catalog relations', () => {
+  test('a user alone is a Bearer token, user and password are Basic auth', async () => {
+    const seen = []
+    const inner = globalThis.fetch
+    globalThis.fetch = async (url, init) => { seen.push(init.headers.Authorization); return inner(url, init) }
+    await rest.executeQuery({ connection: { ...connection, user: 'tok' }, from: '/users' })
+    http.reset()
+    await rest.executeQuery({ connection: { ...connection, user: 'u', password: 'p' }, from: '/users' })
+    assert.deepEqual(seen, ['Bearer tok', `Basic ${Buffer.from('u:p').toString('base64')}`])
+  })
+
+  test('envelopes are unwrapped and scalars wrapped', async () => {
+    globalThis.fetch = async (url) => reply(String(url).includes('wrapped') ? { results: [{ id: 1 }, { id: 2 }] } : String(url).includes('scalar') ? 42 : { id: 7 })
+    assert.deepEqual((await rest.executeQuery({ connection, from: '/wrapped' })).data, [{ id: 1 }, { id: 2 }])
+    assert.deepEqual((await rest.executeQuery({ connection, from: '/scalar' })).data, [42])
+    assert.deepEqual((await rest.executeQuery({ connection, from: '/single' })).data, [{ id: 7 }])
+  })
+
+  test('a relation limit caps related rows per parent', async () => {
+    const { data } = await rest.executeQuery({
+      connection,
+      from: '/users',
+      where: { id: 1 },
+      relations: [{ entity: '/posts', foreignKey: 'userId', type: 'hasMany', alias: 'posts', limit: 1 }]
+    })
+    assert.equal(data[0].posts.length, 1)
+  })
+
+  test('a parent without the join value gets an empty result without a request', async () => {
+    const { data } = await rest.executeQuery({
+      connection,
+      from: '/users',
+      where: { id: 1 },
+      relations: [
+        { entity: '/posts', localKey: 'missing', foreignKey: 'userId', type: 'hasMany', alias: 'posts' },
+        { entity: '/users', foreignKey: 'missing', type: 'belongsTo', alias: 'owner' }
+      ]
+    })
+    assert.deepEqual(data[0].posts, [])
+    assert.equal(data[0].owner, null)
+  })
+
+  test('a relation naming another catalog is resolved there, reporting failure in place', async () => {
+    const { data } = await rest.executeQuery({
+      connection,
+      from: '/users',
+      where: { id: 1 },
+      relations: [{ catalog: 'no-such-catalog', entity: 'x', localKey: 'id', foreignKey: 'id', alias: 'elsewhere' }]
+    })
+    assert.match(data[0].elsewhere.error, /no-such-catalog/)
+  })
+
+  test('introspection describes the source from its catalog entry', async () => {
+    const { tables } = await rest.introspect({ driver: 'rest', database: 'https://jsonplaceholder.typicode.com' })
+    assert.ok(tables.some((t) => t.name === '/posts'))
+  })
+})

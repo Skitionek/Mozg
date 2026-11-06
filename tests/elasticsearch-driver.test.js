@@ -170,3 +170,55 @@ describe('elasticsearch driver', () => {
     })
   })
 })
+
+describe('elasticsearch driver: limits, documents by id, failures', () => {
+  test('a relation limit caps related documents per parent', async () => {
+    const { data } = await es.executeQuery({
+      connection,
+      from: 'users',
+      where: { id: 1 },
+      relations: [{ entity: 'posts', localKey: 'id', foreignKey: 'user_id', type: 'hasMany', alias: 'posts', limit: 1 }]
+    })
+    assert.equal(data[0].posts.length, 1)
+  })
+
+  test('belongsTo by document id fetches with _mget', async () => {
+    INDICES.posts.docs[0].author_doc = 'u2'
+    try {
+      const { data } = await es.executeQuery({
+        connection,
+        from: 'posts',
+        where: { id: 1 },
+        relations: [{ entity: 'users', foreignKey: 'author_doc', type: 'belongsTo', alias: 'author' }]
+      })
+      assert.equal(data[0].author.name, 'Barbara')
+      assert.ok(requests.some((r) => r.path === '/users/_mget'))
+    } finally {
+      delete INDICES.posts.docs[0].author_doc
+    }
+  })
+
+  test('an endpoint path honours select', async () => {
+    const { data } = await es.executeQuery({ connection, from: '_cat/indices', select: ['index'] })
+    assert.deepEqual(data, [{ index: 'users' }, { index: 'posts' }, { index: '.kibana' }])
+  })
+
+  test('a failing relation is reported in place; another catalog is resolved there', async () => {
+    const { data } = await es.executeQuery({
+      connection,
+      from: 'users',
+      where: { id: 1 },
+      relations: [
+        { entity: 'nope', localKey: 'id', foreignKey: 'user_id', alias: 'nope' },
+        { catalog: 'no-such-catalog', entity: 'x', localKey: 'id', foreignKey: 'id', alias: 'elsewhere' }
+      ]
+    })
+    assert.match(data[0].nope.error, /relation fetch failed for nope/)
+    assert.match(data[0].elsewhere.error, /no-such-catalog/)
+  })
+
+  test('a user alone is sent as a Bearer token', async () => {
+    await es.executeQuery({ connection: { ...connection, user: 'api-key', password: undefined }, from: 'users', limit: 1 })
+    assert.ok(requests.some((r) => r.headers.Authorization === 'Bearer api-key'))
+  })
+})

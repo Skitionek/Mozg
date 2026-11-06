@@ -116,3 +116,50 @@ describe('arango driver: connection cache', () => {
     assert.notEqual(calls[0].db, calls[1].db)
   })
 })
+
+describe('arango driver: limits, empty parents, cross-catalog, introspection', () => {
+  test('a relation limit becomes a LIMITed subquery per parent', async () => {
+    answer = () => (calls.length === 1 ? [{ _key: 'u1' }, { _key: 'u2' }] : [{ user_id: 'u1', title: 'A' }])
+    await arango.executeQuery({ connection, from: 'users', relations: [{ entity: 'posts', foreignKey: 'user_id', type: 'hasMany', limit: 2 }] })
+    assert.match(calls[1].aql, /^FOR id IN @val\d+ FOR doc IN \(FOR doc IN @@coll\d+ FILTER doc\[@attr\d+\] == id LIMIT @val\d+ RETURN doc\) RETURN doc$/)
+    assert.ok(Object.values(calls[1].bindVars).includes(2))
+  })
+
+  test('hasOne is a cap of one', async () => {
+    answer = () => (calls.length === 1 ? [{ _key: 'u1' }] : [{ user_id: 'u1', title: 'A' }])
+    const { data } = await arango.executeQuery({ connection, from: 'users', relations: [{ entity: 'posts', foreignKey: 'user_id', type: 'hasOne', alias: 'post' }] })
+    assert.equal(data[0].post.title, 'A')
+    assert.ok(Object.values(calls[1].bindVars).includes(1))
+  })
+
+  test('parents without the join value get empty results without a query', async () => {
+    answer = () => [{ _key: 'u1' }]
+    const { data } = await arango.executeQuery({ connection, from: 'users', relations: [{ entity: 'posts', localKey: 'missing', foreignKey: 'user_id', alias: 'posts' }] })
+    assert.deepEqual(data[0].posts, [])
+    assert.equal(calls.length, 1)
+  })
+
+  test('a relation naming another catalog is resolved there, reporting failure in place', async () => {
+    answer = () => [{ _key: 'u1' }]
+    const { data } = await arango.executeQuery({ connection, from: 'users', relations: [{ catalog: 'no-such-catalog', entity: 'x', localKey: '_key', foreignKey: 'id', alias: 'elsewhere' }] })
+    assert.match(data[0].elsewhere.error, /no-such-catalog/)
+  })
+
+  test('introspection samples one document per document collection', async () => {
+    const originalList = Database.prototype.listCollections
+    Database.prototype.listCollections = async () => [{ name: 'users', type: 2 }, { name: 'follows', type: 3 }]
+    answer = () => [{ _key: 'u1', name: 'Ada', tags: ['x'] }]
+    try {
+      const { tables } = await arango.introspect(connection)
+      assert.deepEqual(tables.map((t) => t.name), ['users'])
+      assert.deepEqual(tables[0].columns.map((c) => [c.name, c.type, c.isPrimaryKey]), [['_key', 'string', true], ['name', 'string', false], ['tags', 'Array', false]])
+      assert.deepEqual(calls[0].bindVars, { '@coll': 'users' })
+    } finally {
+      Database.prototype.listCollections = originalList
+    }
+  })
+
+  test('an empty collection name is refused', async () => {
+    await assert.rejects(arango.executeQuery({ connection, from: '' }), /collection name is required/)
+  })
+})

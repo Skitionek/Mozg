@@ -154,6 +154,23 @@ databaseDefaults:
     initialCooldownSeconds: 3600
   # -- Image used to download dumps (needs sh, curl, tar, gzip, sha256sum)
   downloaderImage: curlimages/curl:8.11.1
+  # -- Database container resources (presets set their own)
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # -- Resources of the small init containers (preparing the data directory,
+  # downloading and unpacking a dump).  Loading a Neo4j dump uses `resources`.
+  initResources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: "1"
+      memory: 256Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -205,6 +222,7 @@ databases:
         cpu: 500m
         memory: 2Gi
       limits:
+        cpu: "2"
         memory: 4Gi
     # -- Startup budget, in seconds.  The first start restores the dump,
     # which for ChEMBL takes one to several hours.
@@ -246,6 +264,7 @@ databases:
         cpu: 500m
         memory: 4Gi
       limits:
+        cpu: "2"
         memory: 6Gi
     neo4j:
       heapSize: 2G
@@ -283,6 +302,7 @@ databases:
         cpu: 50m
         memory: 128Mi
       limits:
+        cpu: 500m
         memory: 512Mi
     startupTimeoutSeconds: 600
     scaleToZero:

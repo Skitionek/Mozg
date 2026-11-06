@@ -111,3 +111,74 @@ describe('biocyc driver', () => {
     assert.equal(requests.length, 0)
   })
 })
+
+describe('biocyc driver: accounts, local servers, limits and failures', () => {
+  test('signs in once with the account and sends the session cookie', async () => {
+    const inner = globalThis.fetch
+    const cookies = []
+    let logins = 0
+    globalThis.fetch = async (url, init = {}) => {
+      if (String(url).endsWith('/credentials/login/')) {
+        logins++
+        assert.equal(init.method, 'POST')
+        return { status: 302, headers: { get: (h) => (h === 'set-cookie' ? 'BioCycSession=abc; Path=/; HttpOnly' : null) } }
+      }
+      cookies.push(init.headers && init.headers.Cookie)
+      return inner(url, init)
+    }
+    const conn = { ...connection(), user: 'me@example.org', password: 'pw' }
+    await biocyc.executeQuery({ connection: conn, from: 'pathways' })
+    await biocyc.executeQuery({ connection: conn, from: 'reactions' })
+    assert.equal(logins, 1, 'the session is reused')
+    assert.deepEqual(cookies, ['BioCycSession=abc', 'BioCycSession=abc'])
+  })
+
+  test('a login that returns no session is reported', async () => {
+    globalThis.fetch = async () => ({ status: 200, headers: { get: () => null } })
+    await assert.rejects(biocyc.executeQuery({ connection: { ...connection(), user: 'nobody@example.org', password: 'x' }, from: 'genes' }), /BioCyc login failed for nobody@example.org/)
+  })
+
+  test('a local Pathway Tools server is addressed by host, scheme and port', async () => {
+    await biocyc.executeQuery({ connection: { ...connection(), host: 'ptools.local', port: 1555 }, from: 'pathways' })
+    assert.match(requests[0], /^http:\/\/ptools\.local:1555\/apixml/)
+  })
+
+  test('other HTTP failures pass through unchanged', async () => {
+    globalThis.fetch = async () => ({ ok: false, status: 400, statusText: 'Bad Request', headers: { get: () => 'text/plain' }, text: async () => 'bad id' })
+    await assert.rejects(biocyc.executeQuery({ connection: connection(), from: 'genes' }), /400/)
+  })
+
+  test('a relation limit caps related frames per parent', async () => {
+    const { data } = await biocyc.executeQuery({
+      connection: connection(),
+      from: 'pathways',
+      where: { _id: 'PWY0-301' },
+      relations: [{ entity: 'reactions', foreignKey: 'reaction_list', type: 'hasMany', alias: 'reactions', limit: 1 }]
+    })
+    assert.equal(data[0].reactions.length, 1)
+  })
+
+  test('hasOne takes the first related frame; a failing relation is reported in place', async () => {
+    const { data } = await biocyc.executeQuery({
+      connection: connection(),
+      from: 'pathways',
+      where: { _id: 'PWY0-301' },
+      relations: [
+        { entity: 'reactions', foreignKey: 'reaction_list', type: 'hasOne', alias: 'firstReaction' },
+        { catalog: 'no-such-catalog', entity: 'x', localKey: '_id', foreignKey: 'id', alias: 'elsewhere' }
+      ]
+    })
+    assert.equal(data[0].firstReaction._id, 'RXN0-2461')
+    assert.match(data[0].elsewhere.error, /no-such-catalog/)
+
+    globalThis.fetch = async (url) => (String(url).includes('Pathways')
+      ? { ok: true, status: 200, headers: { get: () => 'text/xml' }, text: async () => PATHWAYS }
+      : { ok: false, status: 400, statusText: 'Bad Request', headers: { get: () => 'text/plain' }, text: async () => 'no' })
+    const { data: failed } = await biocyc.executeQuery({
+      connection: connection(),
+      from: 'pathways',
+      relations: [{ entity: 'reactions', foreignKey: 'reaction_list', type: 'hasMany', alias: 'reactions' }]
+    })
+    assert.match(failed[0].reactions.error, /relation fetch failed for reactions/)
+  })
+})
