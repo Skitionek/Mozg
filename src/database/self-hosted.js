@@ -85,10 +85,11 @@ function allDemand (now = Date.now()) {
 const WAKE_CODES = new Set([
   'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
   'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_SEQUENCE_TIMEOUT',
+  '57P01', '57P02', // Postgres: terminating connection (shut down, or crashed)
   '57P03', // Postgres: the database system is starting up
   'ServiceUnavailable', 'SessionExpired', 'Neo.TransientError.General.DatabaseUnavailable'
 ])
-const WAKE_MESSAGE = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ServiceUnavailable|starting up|Connection terminated unexpectedly|Could not perform discovery|Failed to connect to server|getaddrinfo|socket hang up|DatabaseUnavailable|other side closed|Connection lost|Handshake inactivity timeout/i
+const WAKE_MESSAGE = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ServiceUnavailable|starting up|Connection terminated unexpectedly|Could not perform discovery|Failed to connect to server|getaddrinfo|socket hang up|DatabaseUnavailable|other side closed|Connection lost|Handshake inactivity timeout|terminating connection due to administrator command|Connection ended unexpectedly/i
 
 /** Whether an error means the database is not up yet (as opposed to the query being wrong). */
 function isWakeError (err) {

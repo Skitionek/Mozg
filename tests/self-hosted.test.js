@@ -145,6 +145,9 @@ describe('isWakeError', () => {
     // mesh handler only the message survives.
     assert.ok(selfHosted.isWakeError(Object.assign(new Error('Handshake inactivity timeout'), { code: 'PROTOCOL_SEQUENCE_TIMEOUT' })))
     assert.ok(selfHosted.isWakeError(new Error('Handshake inactivity timeout')))
+    // Postgres shutting down under an idle pooled connection, as knex reports it
+    assert.ok(selfHosted.isWakeError(Object.assign(new Error('select * from "proteins" - terminating connection due to administrator command'), { code: '57P01' })))
+    assert.ok(selfHosted.isWakeError(new Error('Connection ended unexpectedly')))
   })
 
   test('does not mistake real errors for a cold start', () => {
