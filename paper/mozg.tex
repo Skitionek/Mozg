@@ -952,15 +952,19 @@ as bad credentials or an unknown table, fail at once.  Introspection
 waits in the same way.  ``Slow by design'' includes a cold start.
 
 \paragraph{End-to-end tests.}
-For each engine, CI deploys the chart on a kind~\cite{kind} cluster
-with KEDA and a small database holding two UniProt accessions, and
-asserts that the database (1)~scales to zero when idle, (2)~is woken by
+CI deploys the chart on a kind~\cite{kind} cluster with KEDA and a
+small database of every engine, each holding two UniProt accessions,
+and asserts, for each engine in parallel, that its database
+(1)~scales to zero when idle, (2)~is woken by
 a query that is then answered, (3)~joins to the public UniProt API by
 OBO key, (4)~keeps its connection hidden from callers, (5)~scales back
 to zero once the demand window and cooldown have passed, and (6)~is
 woken again, when the query after a second cold start finds the pooled
 connections of the first one dead and must still be answered.  Steps
-1, 5, and 6 do not apply to SQLite, which has no server.
+1, 5, and 6 do not apply to SQLite, which has no server.  The test
+runs once per version preset (Section~\ref{sec:eval-versions}), with
+Kubernetes, kind, Helm, KEDA, Node.js and every database image taken
+from the preset.
 
 \paragraph{An upstream entrypoint defect.}
 The ArangoDB image's entrypoint, from version 3.12.5 on, starts its
@@ -980,7 +984,7 @@ with a fixed entrypoint the extra mount is simply unused.
 Unless stated otherwise, measurements were taken on a virtual machine
 with four vCPUs (Intel Xeon, 2.1\,GHz) and 15\,GB of RAM, running
 Node.js 22.23.4.  The production image runs Node.js~26, the active LTS
-line, and CI runs the unit tests on Node.js 22, 24, and 26.
+line; CI tests three version presets (Section~\ref{sec:eval-versions}).
 
 \subsection{Automated Tests}
 
@@ -1009,8 +1013,9 @@ designed to be repeated.
 
 The database connectors share one behavioural suite
 (\path{tests/integration/suite.js}), which CI runs against a real
-server of each kind: PostgreSQL~18, MySQL~8.4 (LTS), Neo4j~5.26 (LTS),
-ArangoDB~3.12, and Elasticsearch~9.5.6, plus a SQLite file.  It covers
+server of each kind---PostgreSQL, MySQL, MariaDB, Neo4j, ArangoDB and
+Elasticsearch, plus a SQLite file---once per version preset
+(Section~\ref{sec:eval-versions}).  It covers
 select, where, ordering, limit and offset; \texttt{hasMany},
 \texttt{hasOne}, and \texttt{belongsTo}, including a per-parent relation
 limit; relations nested three deep; introspection; a relation from a
@@ -1029,12 +1034,12 @@ Table~\ref{tab:connectors} summarises the result.
 \toprule
 Driver & Backend & Tested against & Relations & Status \\
 \midrule
-\texttt{postgres} & PostgreSQL (Knex) & Integration suite (PostgreSQL 18); Helm end-to-end on kind & batched & Stable \\
+\texttt{postgres} & PostgreSQL (Knex) & Integration suite (PostgreSQL 14, 18, 19 RC1); Helm end-to-end on kind & batched & Stable \\
 \texttt{sqlite3} & SQLite file (Knex) & Integration suite; inside the Docker image; Helm end-to-end & batched & Stable \\
-\texttt{mysql} & MySQL via Mesh & Integration suite (MySQL 8.4); Helm end-to-end (MariaDB 12.3) & per row & Beta \\
-\texttt{neo4j} & Neo4j via Mesh & Shape tests; integration suite (Neo4j 5.26); Helm end-to-end & per row & Beta \\
-\texttt{arango} & ArangoDB (arangojs) & Unit tests on generated AQL; integration suite (3.12); Helm end-to-end & batched & Beta \\
-\texttt{elasticsearch} & Elasticsearch REST & In-memory stand-in; integration suite (9.5.6); Helm end-to-end & batched & Beta \\
+\texttt{mysql} & MySQL via Mesh & Integration suite (MySQL 8.4; MariaDB 10.11, 12.3, 13.1 RC); Helm end-to-end (MariaDB) & per row & Beta \\
+\texttt{neo4j} & Neo4j via Mesh & Shape tests; integration suite (Neo4j 5.26, 2026.10); Helm end-to-end & per row & Beta \\
+\texttt{arango} & ArangoDB (arangojs) & Unit tests on generated AQL; integration suite (3.12.13); Helm end-to-end & batched & Beta \\
+\texttt{elasticsearch} & Elasticsearch REST & In-memory stand-in; integration suite (8.19, 9.5, 9.7 snapshot); Helm end-to-end & batched & Beta \\
 \texttt{rest} & JSON HTTP APIs & Unit tests; every demo-source relation followed live & per row & Stable \\
 \texttt{kegg} & rest.kegg.jp & Unit tests; live \texttt{/list}, \texttt{/get}, \texttt{/link} & via path suffix & Stable \\
 \texttt{openapi} & OpenAPI via Mesh & Live Petstore v3; shape tests & per row & Beta \\
@@ -1046,7 +1051,7 @@ Driver & Backend & Tested against & Relations & Status \\
 \end{tabularx}
 \end{table*}
 
-The evaluation found fifteen defects, all fixed:
+The evaluation found sixteen defects, all fixed:
 \begin{enumerate}
   \item \textbf{Every Mesh connector was broken.}  A global npm override
         of \texttt{@graphql-tools/utils}, added for a security advisory
@@ -1100,11 +1105,63 @@ The evaluation found fifteen defects, all fixed:
         binding needs glibc 2.38, and the image was based on Debian~12
         (glibc 2.36).  It is now based on Debian~13, and CI opens a
         SQLite database inside the image.
+  \item \textbf{Neo4j 2025 and later lost numeric filters.}  Neo4j's
+        calendar releases name property types in Cypher's terms
+        (\texttt{INTEGER NOT NULL}) rather than the driver's
+        (\texttt{Long}); the Mesh handler's schema introspector typed
+        every name it did not know as a string, so filtering on a number
+        failed against Neo4j~2026.10.  The adapter now translates the
+        new names back first.  The \texttt{newest} version preset
+        (Section~\ref{sec:eval-versions}) found it.
 \end{enumerate}
 Two further cold-start defects surfaced in the Helm end-to-end tests
 and were fixed: a PostgreSQL connection terminated by the server's
 shutdown (\texttt{57P01}) was not treated as a cold start, and the
 ArangoDB entrypoint defect described in Section~\ref{sec:selfhost}.
+
+\subsection{Version Presets}
+\label{sec:eval-versions}
+
+Testing every combination of runtime, database, and cluster version is
+neither affordable nor informative.  CI instead tests three presets,
+kept in one file (\path{.github/ci-presets.json}).  The \texttt{oldest}
+preset takes each project's oldest release line that is still
+supported; \texttt{lts} its current long-term-support line, or its
+newest stable release where it has none; and \texttt{newest} its newest
+release, pre-releases included (Table~\ref{tab:presets}).  Each preset
+runs the unit tests, builds the Docker image, runs the connector suite,
+and runs the Helm end-to-end test.  The \texttt{newest} preset is
+allowed to fail: it is an early warning, not a gate.  A weekly job
+checks the presets against endoflife.date and fails when one is on the
+wrong release line.
+
+\begin{table}[tb]
+\caption{Version presets tested by CI (November 2026).}
+\label{tab:presets}
+\small
+\begin{tabular}{llll}
+\toprule
+Component & \texttt{oldest} & \texttt{lts} & \texttt{newest} \\
+\midrule
+Node.js & 22 & 26 & 28 nightly \\
+PostgreSQL & 14 & 18 & 19 RC1 \\
+MariaDB & 10.11 & 12.3 & 13.1 RC \\
+MySQL & 8.4 & 8.4 & 8.4 \\
+Neo4j & 5.26 & 5.26 & 2026.10 \\
+ArangoDB & 3.12 & 3.12 & 3.12 \\
+Elasticsearch & 8.19 & 9.5 & 9.7 snapshot \\
+Kubernetes & 1.35 & 1.37 & 1.37 \\
+Helm & 3.22 & 4.3 & 4.3 \\
+KEDA & 2.20 & 2.21 & 2.21 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+MySQL stays at 8.4 in every preset, because the connector cannot reach
+MySQL~9 (defect~2); ArangoDB has one supported line.  Locally, the
+connector suite passed on every database version in
+Table~\ref{tab:presets}.  It passed against Neo4j~2026.10 only after
+defect~16 was fixed.
 
 \subsection{Functional Evaluation}
 
@@ -1253,8 +1310,8 @@ mitigation.  Results are reproducible via \texttt{tests/bench.test.js}.
 
 \subsection{Self-Hosting End to End}
 
-The per-engine kind tests (Section~\ref{sec:selfhost}) passed for all
-six engines: each database scaled to zero, was woken by a query,
+The kind tests (Section~\ref{sec:selfhost}), run per engine with the
+\texttt{lts} images, passed for all six engines: each database scaled to zero, was woken by a query,
 answered it, joined to UniProt by OBO key, kept its connection hidden,
 returned to zero, and was woken a second time.  One wake of the MariaDB
 database was observed to take 18\,s from query to answer, of which up to
