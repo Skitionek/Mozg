@@ -1,0 +1,281 @@
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- $keda := .Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
+{{- range $name, $db := $dbs }}
+{{- $ctx := dict "root" $ "name" $name "db" $db }}
+{{- $full := include "mozg.db.fullname" $ctx }}
+{{- $uid := include "mozg.db.uid" $ctx | int }}
+{{- $pg := eq $db.engine "postgres" }}
+{{- $dataDir := ternary "/var/lib/postgresql/data" "/data" $pg }}
+{{- $marker := ternary "/var/lib/postgresql/data/pgdata/.mozg-ready" "/data/.mozg-ready" $pg }}
+{{- $startup := div (int ($db.startupTimeoutSeconds | default 600)) 10 }}
+{{- if and (eq $db.engine "neo4j") (ne (toString $db.username) "neo4j") }}
+{{- fail (printf "databases.%s.username must be neo4j for the neo4j engine" $name) }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $full }}
+  labels:
+    {{- include "mozg.db.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: {{ $full }}
+  {{- if not (and $db.scaleToZero.enabled $keda) }}
+  replicas: 1
+  {{- end }}
+  {{- /* Under KEDA the replica count is left to the ScaledObject; the first start runs one replica. */}}
+  selector:
+    matchLabels:
+      {{- include "mozg.db.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mozg.db.selectorLabels" $ctx | nindent 8 }}
+        mozg.io/engine: {{ $db.engine }}
+      annotations:
+        checksum/config: {{ toJson $db | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ $uid }}
+        runAsGroup: {{ $uid }}
+        fsGroup: {{ $uid }}
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        {{- if $pg }}
+        - name: prepare
+          image: {{ include "mozg.db.image" $ctx }}
+          imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              pgdata=/var/lib/postgresql/data/pgdata
+              if [ -f "$pgdata/PG_VERSION" ] && [ ! -f "$pgdata/.mozg-ready" ]; then
+                echo "mozg: a previous first start did not finish; clearing the data directory to retry"
+                rm -rf "$pgdata"
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+        {{- end }}
+        {{- if and $db.dump $db.dump.url }}
+        - name: fetch-dump
+          image: {{ $db.downloaderImage }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              {{- include "mozg.db.fetchScript" $ctx | nindent 14 }}
+          env:
+            - name: DATA_DIR
+              value: {{ $dataDir }}
+            - name: READY_MARKER
+              value: {{ $marker }}
+            - name: DUMP_URL
+              value: {{ $db.dump.url | quote }}
+            - name: DUMP_SHA256
+              value: {{ $db.dump.sha256 | default "" | quote }}
+            - name: DUMP_FORMAT
+              value: {{ $db.dump.format | default "dump" | quote }}
+            - name: DUMP_FILENAME
+              value: {{ include "mozg.db.dumpFilename" $ctx | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: {{ $dataDir }}
+        {{- end }}
+        {{- if not $pg }}
+        - name: load
+          image: {{ include "mozg.db.image" $ctx }}
+          imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              if [ -f /data/.mozg-ready ]; then exit 0; fi
+              mkdir -p /tmp/conf
+              printf 'server.directories.data=/data\nserver.directories.logs=/tmp/logs\n' > /tmp/conf/neo4j.conf
+              export NEO4J_CONF=/tmp/conf
+              if [ -f "/data/mozg-dump/$DB.dump" ]; then
+                echo "mozg: loading $DB from its dump"
+                neo4j-admin database load --from-path=/data/mozg-dump --overwrite-destination=true "$DB"
+                if [ "$MIGRATE" = "true" ]; then
+                  echo "mozg: migrating $DB to the Neo4j 5 store format"
+                  neo4j-admin database migrate --force-btree-indexes-to-range "$DB"
+                fi
+              fi
+              touch /data/.mozg-ready
+              rm -rf /data/mozg-dump
+          env:
+            - name: DB
+              value: {{ $db.database | quote }}
+            - name: MIGRATE
+              value: {{ (and $db.dump $db.dump.migrate) | default false | toString | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+        {{- end }}
+      containers:
+        - name: {{ $db.engine }}
+          image: {{ include "mozg.db.image" $ctx }}
+          imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            {{- if $pg }}
+            - name: POSTGRES_DB
+              value: {{ $db.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ $db.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mozg.db.secretName" $ctx }}
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: MOZG_RESTORE_JOBS
+              value: {{ (and $db.dump $db.dump.restoreJobs) | default 2 | quote }}
+            - name: MOZG_VERIFY_SQL
+              value: {{ (and $db.dump $db.dump.verifySQL) | default "" | quote }}
+            {{- else }}
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mozg.db.secretName" $ctx }}
+                  key: password
+            - name: NEO4J_AUTH
+              value: neo4j/$(NEO4J_PASSWORD)
+            - name: NEO4J_initial_dbms_default__database
+              value: {{ $db.database | quote }}
+            - name: NEO4J_server_memory_heap_initial__size
+              value: {{ $db.neo4j.heapSize | default "1G" | quote }}
+            - name: NEO4J_server_memory_heap_max__size
+              value: {{ $db.neo4j.heapSize | default "1G" | quote }}
+            - name: NEO4J_server_memory_pagecache_size
+              value: {{ $db.neo4j.pageCacheSize | default "1G" | quote }}
+            - name: NEO4J_server_default__listen__address
+              value: 0.0.0.0
+            {{- range $k, $v := ($db.neo4j.config | default dict) }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: db
+              containerPort: {{ include "mozg.db.port" $ctx }}
+              protocol: TCP
+          {{- if $pg }}
+          # During the first start the server listens on its socket only (the
+          # restore runs then), so TCP readiness doubles as "restore finished".
+          startupProbe:
+            exec:
+              command: [sh, -c, 'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 10
+            failureThreshold: {{ $startup }}
+          readinessProbe:
+            exec:
+              command: [sh, -c, 'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: [sh, -c, 'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 30
+            failureThreshold: 6
+          {{- else }}
+          startupProbe:
+            tcpSocket:
+              port: db
+            periodSeconds: 10
+            failureThreshold: {{ $startup }}
+          readinessProbe:
+            tcpSocket:
+              port: db
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: db
+            periodSeconds: 30
+            failureThreshold: 6
+          {{- end }}
+          resources:
+            {{- toYaml $db.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ $dataDir }}
+            {{- if $pg }}
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+            - name: dshm
+              mountPath: /dev/shm
+            {{- else }}
+            - name: logs
+              mountPath: /logs
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if $pg }}
+        - name: init
+          configMap:
+            name: {{ $full }}-init
+            defaultMode: 0755
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        {{- else }}
+        - name: logs
+          emptyDir: {}
+        {{- end }}
+      {{- with $db.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $db.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $db.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "mozg.db.selectorLabels" $ctx | nindent 10 }}
+      spec:
+        accessModes:
+          {{- toYaml $db.storage.accessModes | nindent 10 }}
+        {{- if $db.storage.storageClass }}
+        storageClassName: {{ $db.storage.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $db.storage.size | quote }}
+{{- end }}

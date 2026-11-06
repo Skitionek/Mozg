@@ -1,0 +1,286 @@
+# Mozg Helm chart.
+#
+# Mozg itself is stateless: it answers GraphQL by querying sources live.  The
+# 47 public life-science APIs need nothing deployed.  Large databases you
+# would rather query locally — ChEMBL, Reactome, your own — can be hosted by
+# this chart under `databases`: each is restored once from its published
+# dump, sits behind its own Service, and (with KEDA installed) scales to zero
+# replicas when nobody has queried it for a while.  See docs/deploy.md.
+
+# -- Mozg replicas (ignored when autoscaling.enabled)
+replicaCount: 2
+
+image:
+  # -- Mozg image.  Build it from the repository's Dockerfile and push it
+  # wherever your cluster pulls from.
+  repository: ghcr.io/skitionek/mozg
+  # -- Defaults to the chart's appVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # -- Defaults to the release's full name
+  name: ""
+  annotations: {}
+  # Mozg needs no Kubernetes API access.
+  automount: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mozg.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+# Mozg's own settings (environment variables; see README "Running Mozg in production").
+mozg:
+  # -- Timeout per outbound HTTP request
+  httpTimeoutMs: 30000
+  # -- Retries for 408/429/502/503/504 and network errors
+  httpRetries: 2
+  # -- Cache identical outbound GETs for this long (0 = off; trades freshness for speed)
+  httpCacheTtlMs: 0
+  # -- Allow callers to point a public catalog source at a private-network mirror
+  allowPrivateMirrors: false
+  # -- How long SIGTERM waits for in-flight queries
+  shutdownGraceMs: 30000
+  # -- How long a query waits for a self-hosted database that is scaled to
+  # zero to come up (see databases.*.scaleToZero)
+  wakeTimeoutMs: 180000
+  # -- A self-hosted database counts as in demand for this long after its last
+  # query; KEDA keeps it up while demand is 1
+  demandWindowMs: 60000
+  # -- Names of extra ConfigMaps whose *.json keys are catalog entries to
+  # register (your own sources, alongside those of `databases`)
+  extraSourcesConfigMaps: []
+  extraEnv: []
+
+# Settings every entry under `databases` starts from; anything set on a
+# database overrides these.
+databaseDefaults:
+  service:
+    # -- The database's Service: the stable address Mozg (and anything else
+    # you allow) reaches it through, whether or not it is currently running
+    type: ClusterIP
+    annotations: {}
+  storage:
+    # -- StorageClass for the data volume ("" = cluster default)
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+  scaleToZero:
+    # -- Scale the database between 0 and 1 replicas on demand.  Requires
+    # KEDA (https://keda.sh) in the cluster.  Off = always one replica.
+    enabled: true
+    # -- Seconds without demand before the database is scaled to zero
+    cooldownSeconds: 900
+    # -- How often KEDA asks Mozg for demand.  Bounds the extra cold-start
+    # latency of the first query after a scale-down.
+    pollingIntervalSeconds: 15
+    # -- After installation, never scale to zero for this long: the first
+    # restore of a large dump must finish before the database may sleep.
+    initialCooldownSeconds: 3600
+  # -- Image used to download dumps (needs sh, curl, tar, gzip, sha256sum)
+  downloaderImage: curlimages/curl:8.11.1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Databases to host alongside Mozg.  Each key is a database; enable the ones
+# you want.  Two presets are provided; add your own with the same shape (see
+# `example` at the bottom and docs/deploy.md).
+databases:
+
+  # ChEMBL — bioactive molecules, targets, mechanisms and assays, restored
+  # from EMBL-EBI's official PostgreSQL dump.  Registered in Mozg as the
+  # catalog source "chembl-postgres"; its identifier columns carry OBO keys,
+  # so its rows join to UniProt, PubChem, PubMed and the rest without
+  # declaring anything.
+  chembl:
+    enabled: false
+    engine: postgres
+    image:
+      repository: postgres
+      tag: "16-alpine"
+      pullPolicy: IfNotPresent
+    # -- Database, user and (generated, stored in a Secret) password
+    database: chembl
+    username: mozg
+    # -- Use an existing Secret (key: password) instead of generating one
+    existingSecret: ""
+    dump:
+      # -- ChEMBL 37 (released May 2026), pinned.  Check
+      # https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/latest/ for newer.
+      url: https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_37/chembl_37_postgresql.tar.gz
+      # -- From checksums.txt next to the dump
+      sha256: d5fb08a6c9bf6cf7319dbdf74bdb5a7d4ce767aace670250ba1435cab4d58c58
+      # -- tar.gz (archive holding a pg_dump file), dump (pg_dump custom
+      # format), sql or sql.gz
+      format: tar.gz
+      # -- Parallel pg_restore jobs
+      restoreJobs: 4
+      # -- Restore is accepted when this query succeeds afterwards (pg_restore
+      # reports harmless errors, e.g. about ownership, as failures)
+      verifySQL: SELECT 1 FROM molecule_dictionary LIMIT 1
+    # -- Inline SQL run once, after any dump (postgres only)
+    initSQL: ""
+    storage:
+      # -- The restored database is ~30 GB with indexes; the dump needs ~4 GB
+      # more while it is restored
+      size: 80Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        memory: 4Gi
+    # -- Startup budget, in seconds.  The first start restores the dump,
+    # which for ChEMBL takes one to several hours.
+    startupTimeoutSeconds: 28800
+    scaleToZero:
+      initialCooldownSeconds: 28800
+    catalog:
+      # -- Catalog source name (QueryInput.source)
+      name: chembl-postgres
+      # -- Entity definitions shipped with the chart (files/catalog/*.json)
+      preset: chembl-postgres
+
+  # Reactome — the pathway knowledgebase as a Neo4j graph, loaded from
+  # Reactome's graph database dump.  Registered as "reactome-neo4j".
+  reactome:
+    enabled: false
+    engine: neo4j
+    image:
+      repository: neo4j
+      # -- Neo4j 5 LTS.  Reactome publishes Neo4j 4 dumps; they are loaded
+      # and then migrated to the 5 format (dump.migrate).
+      tag: "5.26-community"
+      pullPolicy: IfNotPresent
+    database: reactome
+    username: neo4j
+    existingSecret: ""
+    dump:
+      # -- Reactome release 98, pinned.  Check https://reactome.org/download-data
+      url: https://download.reactome.org/98/reactome.graphdb.dump
+      sha256: ""
+      format: dump
+      # -- Run `neo4j-admin database migrate` after loading (needed for the
+      # Neo4j 4 format Reactome publishes)
+      migrate: true
+    storage:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        memory: 6Gi
+    neo4j:
+      heapSize: 2G
+      pageCacheSize: 2G
+      # -- Extra neo4j.conf settings, as NEO4J_* environment variables (Reactome's recommendations)
+      config:
+        NEO4J_db_recovery_fail__on__missing__files: "false"
+    startupTimeoutSeconds: 7200
+    scaleToZero:
+      initialCooldownSeconds: 7200
+    catalog:
+      name: reactome-neo4j
+      preset: reactome-neo4j
+
+  # Your own database: a small example kept disabled.  Copy it under a new key.
+  example:
+    enabled: false
+    engine: postgres
+    image:
+      repository: postgres
+      tag: "16-alpine"
+    database: example
+    username: mozg
+    # -- Either a dump to restore ...
+    dump:
+      url: ""
+    # -- ... or inline SQL run once on first start
+    initSQL: |
+      CREATE TABLE proteins (id integer PRIMARY KEY, accession text NOT NULL, note text);
+      INSERT INTO proteins VALUES (1, 'P04637', 'tumour suppressor'), (2, 'P00533', 'EGFR');
+    storage:
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+    startupTimeoutSeconds: 600
+    scaleToZero:
+      cooldownSeconds: 300
+      initialCooldownSeconds: 300
+    catalog:
+      name: example-proteins
+      label: Example proteins
+      description: A table of proteins hosted with Mozg
+      # -- Entities as in any catalog entry: tables (or node labels), their
+      # columns, the OBO key of every identifier column, and relations.
+      # Annotating `accession` with `uniprot` is all it takes to join these
+      # rows to UniProt, AlphaFold, PDBe, Reactome, … via
+      # include: ["uniprot/protein(accession)"].
+      entities:
+        - name: proteins
+          description: One protein of interest
+          columns: [id, accession, note]
+          obo:
+            accession: uniprot
+          relations: []

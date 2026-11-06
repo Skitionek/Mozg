@@ -1,0 +1,38 @@
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
+{{- range $name, $db := $dbs }}
+{{- $ctx := dict "root" $ "name" $name "db" $db }}
+{{- if $db.scaleToZero.enabled }}
+---
+# Scales {{ $db.catalog.name }} between 0 and 1 replicas on the demand Mozg
+# reports for it: 1 while a query is in flight or ran within
+# mozg.demandWindowMs (combined across Mozg pods), else 0.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "mozg.db.fullname" $ctx }}
+  labels:
+    {{- include "mozg.db.labels" $ctx | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: {{ include "mozg.db.fullname" $ctx }}
+  minReplicaCount: 0
+  maxReplicaCount: 1
+  pollingInterval: {{ $db.scaleToZero.pollingIntervalSeconds }}
+  cooldownPeriod: {{ $db.scaleToZero.cooldownSeconds }}
+  # The first restore must finish before the database may sleep.
+  initialCooldownPeriod: {{ $db.scaleToZero.initialCooldownSeconds }}
+  triggers:
+    - type: metrics-api
+      metricType: Value
+      metadata:
+        url: "http://{{ include "mozg.fullname" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.service.port }}/demand/{{ $db.catalog.name }}"
+        format: json
+        valueLocation: demand
+        targetValue: "1"
+        activationTargetValue: "0"
+{{- end }}
+{{- end }}
+{{- end }}

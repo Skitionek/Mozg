@@ -1,0 +1,32 @@
+Mozg is installed as {{ include "mozg.fullname" . }}.
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "mozg.fullname" . }} 4000:{{ .Values.service.port }}
+  open http://localhost:4000/          # query builder
+       http://localhost:4000/graphql   # GraphiQL
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- $keda := .Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
+{{- if gt (len $dbs) 0 }}
+
+Self-hosted databases (query them with `source:`):
+{{- range $name, $db := $dbs }}
+  - {{ $db.catalog.name }} ({{ $db.engine }}){{ if and $db.dump $db.dump.url }} — restoring from {{ $db.dump.url }} on first start{{ end }}
+{{- end }}
+
+The first start restores each dump, which can take hours for ChEMBL:
+  kubectl -n {{ .Release.Namespace }} logs -f statefulset/<name> -c fetch-dump
+  kubectl -n {{ .Release.Namespace }} logs -f statefulset/<name>
+{{- range $name, $db := $dbs }}
+{{- if and $db.scaleToZero.enabled (not $keda) }}
+
+WARNING: databases.{{ $name }}.scaleToZero is enabled but KEDA is not
+installed, so {{ $db.catalog.name }} runs one replica permanently.  Install
+KEDA (https://keda.sh) and upgrade this release to scale it to zero.
+{{- end }}
+{{- end }}
+{{- if $keda }}
+
+With KEDA, idle databases scale to zero; the first query after that waits
+for a cold start (up to mozg.wakeTimeoutMs = {{ .Values.mozg.wakeTimeoutMs }} ms).
+Current demand:  curl http://localhost:4000/demand
+{{- end }}
+{{- end }}

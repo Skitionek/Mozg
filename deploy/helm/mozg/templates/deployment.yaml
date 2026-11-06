@@ -1,0 +1,156 @@
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- $sources := or (gt (len $dbs) 0) (gt (len .Values.mozg.extraSourcesConfigMaps) 0) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mozg.fullname" . }}
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mozg.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Restart when the catalog of self-hosted databases changes.
+        checksum/sources: {{ include (print $.Template.BasePath "/sources-configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "mozg.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "mozg.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ add (div .Values.mozg.shutdownGraceMs 1000) 5 }}
+      containers:
+        - name: mozg
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "4000"
+            - name: NODE_ENV
+              value: production
+            - name: MOZG_HTTP_TIMEOUT_MS
+              value: {{ .Values.mozg.httpTimeoutMs | quote }}
+            - name: MOZG_HTTP_RETRIES
+              value: {{ .Values.mozg.httpRetries | quote }}
+            - name: MOZG_HTTP_CACHE_TTL_MS
+              value: {{ .Values.mozg.httpCacheTtlMs | quote }}
+            {{- if .Values.mozg.allowPrivateMirrors }}
+            - name: MOZG_ALLOW_PRIVATE_MIRRORS
+              value: "1"
+            {{- end }}
+            - name: MOZG_SHUTDOWN_GRACE_MS
+              value: {{ .Values.mozg.shutdownGraceMs | quote }}
+            - name: MOZG_WAKE_TIMEOUT_MS
+              value: {{ .Values.mozg.wakeTimeoutMs | quote }}
+            - name: MOZG_DEMAND_WINDOW_MS
+              value: {{ .Values.mozg.demandWindowMs | quote }}
+            # Every pod, so demand for a database is combined across replicas.
+            - name: MOZG_PEERS
+              value: "{{ include "mozg.peersName" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+            {{- if $sources }}
+            - name: MOZG_SOURCES_DIR
+              value: /etc/mozg/sources
+            {{- end }}
+            {{- range $name, $db := $dbs }}
+            {{- $ctx := dict "root" $ "name" $name "db" $db }}
+            {{- $prefix := include "mozg.db.envPrefix" $ctx }}
+            # {{ $db.catalog.name }}: connection held by the server, never sent to callers
+            - name: {{ $prefix }}_HOST
+              value: "{{ include "mozg.db.fullname" $ctx }}.{{ $.Release.Namespace }}.svc.cluster.local"
+            - name: {{ $prefix }}_PORT
+              value: {{ include "mozg.db.port" $ctx | quote }}
+            - name: {{ $prefix }}_DATABASE
+              value: {{ $db.database | quote }}
+            - name: {{ $prefix }}_USER
+              value: {{ $db.username | quote }}
+            - name: {{ $prefix }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mozg.db.secretName" $ctx }}
+                  key: password
+            {{- end }}
+            {{- with .Values.mozg.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if $sources }}
+            - name: sources
+              mountPath: /etc/mozg/sources
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if $sources }}
+        - name: sources
+          projected:
+            sources:
+              {{- if gt (len $dbs) 0 }}
+              - configMap:
+                  name: {{ include "mozg.fullname" . }}-sources
+              {{- end }}
+              {{- range .Values.mozg.extraSourcesConfigMaps }}
+              - configMap:
+                  name: {{ . }}
+              {{- end }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

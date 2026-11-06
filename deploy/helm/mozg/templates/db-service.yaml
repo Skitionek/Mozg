@@ -1,0 +1,27 @@
+{{- $dbs := include "mozg.databases" . | fromYaml }}
+{{- range $name, $db := $dbs }}
+{{- $ctx := dict "root" $ "name" $name "db" $db }}
+---
+# The stable address of {{ $db.catalog.name }}, whether or not it is running.
+# While it is scaled to zero the Service has no endpoints: connections are
+# refused, Mozg counts the attempt as demand, and KEDA brings the database up.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mozg.db.fullname" $ctx }}
+  labels:
+    {{- include "mozg.db.labels" $ctx | nindent 4 }}
+  {{- with $db.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $db.service.type }}
+  ports:
+    - name: db
+      port: {{ include "mozg.db.port" $ctx }}
+      targetPort: db
+      protocol: TCP
+  selector:
+    {{- include "mozg.db.selectorLabels" $ctx | nindent 4 }}
+{{- end }}
