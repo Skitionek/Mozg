@@ -114,6 +114,16 @@ function runConnectorSuite (adapter) {
       assert.equal(posts[0].author[f('name')], 'Carl')
     })
 
+    it('caps related rows per parent with a relation limit', 'relations', async () => {
+      const { data } = await q({
+        from: entity('users'),
+        orderBy: f('id'),
+        relations: [{ entity: entity('posts'), localKey: f('id'), foreignKey: f('user_id'), type: 'hasMany', alias: 'posts', limit: 1 }]
+      })
+      // Users 1 and 3 have several posts each; nobody may get more than one
+      assert.deepEqual(data.map((u) => u.posts.length), USERS.map((u) => Math.min(1, POSTS.filter((p) => p.user_id === u.id).length)))
+    })
+
     it('nests relations three levels deep', 'relations', async () => {
       const { data } = await q({
         from: entity('users'),

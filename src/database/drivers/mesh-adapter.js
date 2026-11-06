@@ -623,7 +623,8 @@ async function executeQuery (input) {
   const selSet = selectedFields.join(' ')
   const selection = returnsScalar ? '' : (isConn ? `{ nodes { ${selSet} } totalCount }` : `{ ${selSet} }`)
 
-  const queryStr = `${operation} ${defsStr} { ${fieldName}${argsStr} ${selection} }`
+  // Named: some executors (Thrift) index operations by name and fail on anonymous ones.
+  const queryStr = `${operation} Mozg${defsStr} { ${fieldName}${argsStr} ${selection} }`
 
   const result = await runQuery(source, queryStr, variables)
 
@@ -690,6 +691,7 @@ async function loadRelations (connection, rows, relations) {
       type = 'hasMany',
       select: relSelect,
       where: relWhere,
+      limit: relLimit,
       relations: nested
     } = rel
     const resultKey = alias || entity
@@ -707,7 +709,7 @@ async function loadRelations (connection, rows, relations) {
           from: entity,
           select: relSelect,
           where: { ...relWhere, [isBelongsTo ? ownerKey : foreignKey]: value },
-          limit: type === 'hasMany' ? undefined : 1,
+          limit: type === 'hasMany' ? relLimit : 1,
           relations: nested
         })
         row[resultKey] = type === 'hasMany' ? relData : (relData[0] ?? null)

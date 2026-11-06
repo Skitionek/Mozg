@@ -74,12 +74,23 @@ async function biocycGet (path, config) {
   const cookie = await authenticate(config)
   const headers = { Accept: 'application/xml' }
   if (cookie) headers.Cookie = cookie
-  const { body, status } = await http.request(`${baseUrl(config)}${path}`, {
-    headers,
-    format: 'xml',
-    rateLimit: { requestsPerSecond: 1, maxConcurrent: 1 },
-    allowStatus: [307]
-  })
+  let response
+  try {
+    response = await http.request(`${baseUrl(config)}${path}`, {
+      headers,
+      format: 'xml',
+      rateLimit: { requestsPerSecond: 1, maxConcurrent: 1 },
+      allowStatus: [307]
+    })
+  } catch (err) {
+    // BioCyc fronts its services with a browser check when it sees too many
+    // anonymous requests; the page means nothing to a caller, so say what it is.
+    if (err.status === 403 && /Checking your browser|pow-challenge/i.test(err.body || err.message)) {
+      throw new Error('BioCyc refused the request with an anti-bot browser check — sign in with a BioCyc account (connection.user / connection.password) or retry later', { cause: err })
+    }
+    throw err
+  }
+  const { body, status } = response
   if (status === 307) {
     throw new Error('BioCyc requires an account for this request — pass your BioCyc login as connection.user / connection.password (https://biocyc.org/account.shtml)')
   }
@@ -176,7 +187,8 @@ async function executeQuery (input) {
       // One listing of the related class serves every parent row.
       const byId = new Map((await listClass(connection, classFor(rel.entity))).map((r) => [r._id, r]))
       for (const row of rows) {
-        const related = [].concat(row[rel.foreignKey] || []).map((id) => byId.get(id)).filter(Boolean)
+        let related = [].concat(row[rel.foreignKey] || []).map((id) => byId.get(id)).filter(Boolean)
+        if (rel.limit != null) related = related.slice(0, rel.limit)
         row[resultKey] = rel.type === 'hasMany' || rel.type == null ? project(related, rel.select) : (project(related, rel.select)[0] ?? null)
       }
     } catch (err) {

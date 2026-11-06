@@ -1,6 +1,7 @@
 'use strict'
 
 const { introspectFromCatalog } = require('../catalog-schema')
+const http = require('../http')
 
 const UNWRAP_KEYS = ['data', 'results', 'items', 'records', 'list', 'entries']
 
@@ -65,15 +66,28 @@ function applySelect (rows, select) {
 }
 
 /**
- * Fetch a URL and return a normalised array of rows.
+ * Fetch a URL and return a normalised array of rows, through the shared HTTP
+ * client (timeouts, retries on transient failures, per-host throttling).
  */
 async function fetchAndNormalise (url, headers) {
-  const res = await globalThis.fetch(url, { headers })
-  if (!res.ok) {
-    throw new Error(`REST fetch failed: ${res.status} ${res.statusText} — ${url}`)
+  try {
+    const { body } = await http.request(url, { headers })
+    return normalise(body)
+  } catch (err) {
+    throw new Error(`REST fetch failed: ${err.message}`, { cause: err })
   }
-  const json = await res.json()
-  return normalise(json)
+}
+
+function sortRows (rows, field, direction) {
+  const sign = String(direction || 'asc').toLowerCase() === 'desc' ? -1 : 1
+  return [...rows].sort((a, b) => {
+    const x = a[field]
+    const y = b[field]
+    if (x == null && y == null) return 0
+    if (x == null) return 1
+    if (y == null) return -1
+    return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * sign
+  })
 }
 
 async function executeQuery (input) {
@@ -121,20 +135,76 @@ async function executeQuery (input) {
 
   let rows = await fetchAndNormalise(authedUrl, headers)
 
+  // Most APIs ignore JSONPlaceholder's paging and sorting parameters.  Sorting
+  // here is harmless when the server already did it; more rows than `limit`
+  // means the server ignored paging, so page here too.
+  if (orderBy) rows = sortRows(rows, orderBy, orderDirection)
+  if (limit != null && rows.length > limit) rows = rows.slice(offset || 0, (offset || 0) + limit)
+
   rows = applySelect(rows, select)
 
   // Load relations
   if (relations && relations.length > 0) {
-    await loadRelations(base, headers, rows, relations)
+    await loadRelations({ connection, base, headers }, rows, relations)
   }
 
   return { data: rows, count: rows.length }
 }
 
-async function loadRelations (base, headers, rows, relations) {
+/**
+ * The URL of a related record named by a value on the parent row: an
+ * absolute URL as-is (SWAPI, Ghibli and Rick and Morty link records that
+ * way), otherwise `{base}/{entity}/{value}`.  URLs found in data are only
+ * followed on the connection's own origin, so an API response cannot steer
+ * the server at another host.
+ */
+function recordUrl (base, entityPath, value) {
+  const text = String(value)
+  if (/^https?:\/\//i.test(text)) {
+    if (new URL(text).origin !== new URL(base).origin) {
+      throw new Error(`refusing to follow ${new URL(text).origin}: not this connection's origin`)
+    }
+    return text
+  }
+  return `${base}${entityPath}/${encodeURIComponent(text)}`
+}
+
+/** Run `fn` over `items` with at most `limit` in flight. */
+async function mapLimited (items, limit, fn) {
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+}
+
+/**
+ * Relations, as RelationInput documents them:
+ *   belongsTo         the parent's `foreignKey` value identifies the record
+ *                     (an id → /entity/{id}, or a URL to fetch)
+ *   hasMany / hasOne  related records whose `foreignKey` equals the parent's
+ *                     `localKey` → /entity?{foreignKey}={value}; or, when the
+ *                     parent's `foreignKey` field holds a list of ids or URLs
+ *                     (SpaceX `launches`), those records
+ * Lookups for different rows run a few at a time.
+ */
+async function loadRelations (ctx, rows, relations) {
   if (!rows.length) return
+  const { connection, base, headers } = ctx
 
   for (const rel of relations) {
+    // A relation naming another catalog entry is resolved against that
+    // entry's own connection, by the connector.
+    if (rel.catalog) {
+      const { resolveCrossCatalogRelation } = require('../relations')
+      const connector = require('../connector')
+      await resolveCrossCatalogRelation(connector.executeQuery, rows, rel)
+      continue
+    }
+
     const {
       entity,
       localKey = 'id',
@@ -142,38 +212,43 @@ async function loadRelations (base, headers, rows, relations) {
       alias,
       type = 'hasMany',
       select,
+      where,
+      limit,
       relations: nested
     } = rel
 
     const resultKey = alias || entity
     const entityPath = entity.startsWith('/') ? entity : `/${entity}`
 
-    for (const row of rows) {
-      // Use foreignKey field on the parent row as the path segment per the spec:
-      // sub-fetch to {base}/{entity}/{parentRow[foreignKey]}
-      const pathVal = row[foreignKey] ?? row[localKey]
-      if (pathVal == null) {
-        row[resultKey] = type === 'hasMany' ? [] : null
-        continue
-      }
-
+    await mapLimited(rows, 4, async (row) => {
       try {
-        const subUrl = `${base}${entityPath}/${pathVal}`
-        const subRows = await fetchAndNormalise(subUrl, headers)
-        const filtered = applySelect(subRows, select)
-
-        if (nested && nested.length > 0) {
-          await loadRelations(base, headers, filtered, nested)
+        let related
+        const refs = row[foreignKey]
+        if (type === 'belongsTo') {
+          if (refs == null) { row[resultKey] = null; return }
+          related = await fetchAndNormalise(buildAuth(connection, recordUrl(base, entityPath, refs)).url, headers)
+        } else if (Array.isArray(refs)) {
+          related = (await Promise.all(refs.filter((r) => r != null).map((r) => fetchAndNormalise(buildAuth(connection, recordUrl(base, entityPath, r)).url, headers)))).flat()
+        } else {
+          const parentValue = row[localKey]
+          if (parentValue == null) { row[resultKey] = type === 'hasMany' ? [] : null; return }
+          const url = new URL(`${base}${entityPath}`)
+          for (const [k, v] of Object.entries(where || {})) url.searchParams.set(k, String(v))
+          url.searchParams.set(foreignKey, String(parentValue))
+          related = await fetchAndNormalise(buildAuth(connection, url.toString()).url, headers)
         }
 
-        row[resultKey] = type === 'hasMany' ? filtered : (filtered[0] ?? null)
+        if (type === 'hasMany' && limit != null) related = related.slice(0, limit)
+        related = applySelect(related, select)
+        if (nested && nested.length > 0) await loadRelations(ctx, related, nested)
+        row[resultKey] = type === 'hasMany' ? related : (related[0] ?? null)
       } catch (err) {
         // Return a partial result: primary row is preserved; the failed relation
         // is represented as an error object so the client can see what went wrong
         // without losing the rest of the query result.
         row[resultKey] = { error: `relation fetch failed: ${err.message}` }
       }
-    }
+    })
   }
 }
 

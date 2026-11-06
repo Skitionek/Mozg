@@ -192,6 +192,62 @@ describe('demand across pods', () => {
   })
 })
 
+describe('edge cases', () => {
+  test('a connection naming an unknown source is passed straight through', async () => {
+    assert.equal(await selfHosted.withWake({ driver: 'postgres', source: 'no-such-source' }, async () => 'ok'), 'ok')
+  })
+
+  test('an entry that cannot be inspected is left out of the demand list', () => {
+    const broken = { name: 'sh-broken', label: 'Broken', driver: 'sqlite3', entities: [] }
+    Object.defineProperty(broken, 'connection', { get () { throw new Error('unreadable') }, enumerable: true })
+    const unregisterBroken = registerCatalog(broken)
+    try {
+      assert.ok(!selfHosted.allDemand().some((d) => d.source === 'sh-broken'))
+    } finally {
+      unregisterBroken()
+    }
+  })
+
+  test('an error without a message is not a cold start unless its code says so', () => {
+    assert.equal(selfHosted.isWakeError({ code: 'E_SOMETHING' }), false)
+    assert.equal(selfHosted.isWakeError({ code: 'ECONNREFUSED' }), true)
+  })
+
+  test('combining idle pods reports no demand and no last use', () => {
+    assert.deepEqual(selfHosted.combine('sh-test', [{ demand: 0, inFlight: 0, lastUsed: null }, { demand: 0 }]), {
+      source: 'sh-test', demand: 0, inFlight: 0, lastUsed: null
+    })
+  })
+
+  test('IPv6 peers are addressed in brackets, and a peer answering an error counts as no demand', async () => {
+    process.env.MOZG_PEERS = 'mozg-peers.test.svc'
+    try {
+      const urls = []
+      const fetch = async (url) => { urls.push(url); return { ok: false, json: async () => ({ demand: 1 }) } }
+      const out = await selfHosted.clusterDemand('sh-test', { lookup: async () => [{ address: 'fd00::1' }], fetch })
+      assert.match(urls[0], /^http:\/\/\[fd00::1\]:/)
+      assert.equal(out.demand, 0)
+    } finally {
+      delete process.env.MOZG_PEERS
+    }
+  })
+
+  test('peers are found through DNS by default; an unreachable peer counts as no demand', async () => {
+    process.env.MOZG_PEERS = 'localhost'
+    const port = process.env.PORT
+    process.env.PORT = '9'
+    try {
+      const out = await selfHosted.clusterDemand('sh-test')
+      assert.equal(out.source, 'sh-test')
+      assert.equal(out.demand, 0)
+    } finally {
+      delete process.env.MOZG_PEERS
+      if (port === undefined) delete process.env.PORT
+      else process.env.PORT = port
+    }
+  })
+})
+
 describe('GET /demand', () => {
   function fakeRes () {
     return {

@@ -173,7 +173,7 @@ async function loadRelations (connection, rows, relations) {
       continue
     }
 
-    const { entity, localKey = '_id', foreignKey, ownerKey = '_id', alias, type = 'hasMany', select, where, relations: nested } = rel
+    const { entity, localKey = '_id', foreignKey, ownerKey = '_id', alias, type = 'hasMany', select, where, limit, relations: nested } = rel
     const resultKey = alias || entity
 
     try {
@@ -204,7 +204,7 @@ async function loadRelations (connection, rows, relations) {
       }
       for (const row of rows) {
         const matches = grouped.get(String(row[sourceKey])) || []
-        row[resultKey] = type === 'hasMany' ? matches : (matches[0] ?? null)
+        row[resultKey] = type === 'hasMany' ? (limit != null ? matches.slice(0, limit) : matches) : (matches[0] ?? null)
       }
     } catch (err) {
       const errObj = { error: `relation fetch failed for ${entity}: ${err.message}` }

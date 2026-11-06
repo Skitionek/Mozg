@@ -263,3 +263,41 @@ describe('createConnectionCache', () => {
     assert.equal(rebuilt, true)
   })
 })
+
+describe('knex relation limit', () => {
+  test('caps related rows per parent inside the database', async () => {
+    // Given an author with two books and another with one
+    // When at most one book per author is asked for
+    const { data } = await executeKnexQuery(getKnexInstance, {
+      connection: {},
+      from: 'authors',
+      orderBy: 'id',
+      relations: [{ entity: 'books', foreignKey: 'author_id', type: 'hasMany', limit: 1, alias: 'books', select: ['title'] }]
+    })
+
+    // Then each parent gets at most one, without the row-number column
+    assert.deepEqual(data.map((a) => a.books.length), [1, 1, 0])
+    assert.deepEqual(Object.keys(data[0].books[0]).sort(), ['author_id', 'title'])
+  })
+
+  test('without a limit every related row comes back', async () => {
+    const { data } = await executeKnexQuery(getKnexInstance, {
+      connection: {},
+      from: 'authors',
+      where: { id: 1 },
+      relations: [{ entity: 'books', foreignKey: 'author_id', type: 'hasMany', alias: 'books' }]
+    })
+    assert.equal(data[0].books.length, 2)
+  })
+
+  test('hasOne fetches one row per parent', async () => {
+    const { data } = await executeKnexQuery(getKnexInstance, {
+      connection: {},
+      from: 'authors',
+      orderBy: 'id',
+      relations: [{ entity: 'books', foreignKey: 'author_id', type: 'hasOne', alias: 'aBook' }]
+    })
+    assert.ok(data[0].aBook && data[0].aBook.author_id === 1)
+    assert.equal(data[2].aBook, null)
+  })
+})
