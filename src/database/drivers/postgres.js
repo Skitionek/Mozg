@@ -25,6 +25,9 @@ const { executeKnexQuery, createConnectionCache } = require('./knex-query')
 
 const pool = createConnectionCache()
 
+/** How long to wait for a PostgreSQL server to accept a connection (the MySQL client's default). */
+const CONNECT_TIMEOUT_MS = 10_000
+
 function getKnexInstance (connection) {
   const { host, port, database, user, password } = connection
   // password is part of the key, unlike the mesh-adapter's connection cache:
@@ -40,7 +43,12 @@ function getKnexInstance (connection) {
       port: port || 5432,
       database,
       user,
-      password: password || ''
+      password: password || '',
+      // A connection to an address that never answers (a scaled-to-zero
+      // database's Service, on some networks) fails after this long with
+      // "timeout expired", a recognised cold start, instead of hanging until
+      // knex's pool gives up with an error that says nothing about why.
+      connectionTimeoutMillis: CONNECT_TIMEOUT_MS
     },
     pool: { min: 0, max: 5 }
   }))

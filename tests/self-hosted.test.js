@@ -148,6 +148,9 @@ describe('isWakeError', () => {
     // Postgres shutting down under an idle pooled connection, as knex reports it
     assert.ok(selfHosted.isWakeError(Object.assign(new Error('select * from "proteins" - terminating connection due to administrator command'), { code: '57P01' })))
     assert.ok(selfHosted.isWakeError(new Error('Connection ended unexpectedly')))
+    // Postgres connect timeout, where the network drops connections to a
+    // Service with no pods (kind 0.33) instead of refusing them
+    assert.ok(selfHosted.isWakeError(new Error('timeout expired')))
   })
 
   test('does not mistake real errors for a cold start', () => {
