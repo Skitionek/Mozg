@@ -171,8 +171,13 @@ verified against the live APIs, and joined up across sources.
   `dbId`) could not be read: the mesh transport's driver returns native
   BigInts, which `@neo4j/graphql`'s BigInt scalar rejected.  They are
   returned as numbers (strings beyond 2^53), and BigInt filters work.
-- A query to a self-hosted database waking from zero now also waits through a
-  refused Elasticsearch connection (the HTTP client kept no cause) and through
-  pooled connections the database closed when it scaled down.
+- A query to a self-hosted database waking from zero now also waits through:
+  - a refused Elasticsearch connection (the HTTP client kept no cause);
+  - pooled connections the database closed when it scaled down;
+  - a MySQL server that accepted the connection but has not greeted yet.
+- The Docker image could not load SQLite: `sqlite3`'s prebuilt binding needs
+  glibc 2.38, and the image was based on Debian 12 (glibc 2.36).  It is now
+  based on `node:22-trixie-slim`, and CI opens a SQLite database inside the
+  image.
 
 [Unreleased]: https://github.com/Skitionek/Mozg/commits/main
