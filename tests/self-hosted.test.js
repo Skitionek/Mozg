@@ -141,6 +141,10 @@ describe('isWakeError', () => {
     const arango = new Error('Fetch failed: other side closed', { cause: new TypeError('fetch failed', { cause: socket }) })
     assert.ok(selfHosted.isWakeError(arango))
     assert.ok(selfHosted.isWakeError(Object.assign(new Error('Connection lost: The server closed the connection.'), { code: 'PROTOCOL_CONNECTION_LOST' })))
+    // MySQL, connected while the pod comes up: no greeting yet.  Through the
+    // mesh handler only the message survives.
+    assert.ok(selfHosted.isWakeError(Object.assign(new Error('Handshake inactivity timeout'), { code: 'PROTOCOL_SEQUENCE_TIMEOUT' })))
+    assert.ok(selfHosted.isWakeError(new Error('Handshake inactivity timeout')))
   })
 
   test('does not mistake real errors for a cold start', () => {
