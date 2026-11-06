@@ -1,11 +1,13 @@
 {{- $dbs := include "mozg.databases" . | fromYaml }}
 {{- range $name, $db := $dbs }}
 {{- $ctx := dict "root" $ "name" $name "db" $db }}
-{{- if eq $db.engine "postgres" }}
+{{- $layout := include "mozg.db.layout" $ctx | fromYaml }}
+{{- $sctx := dict "root" $ "name" $name "db" $db "layout" $layout }}
+{{- if or (include "mozg.db.isServer" $ctx) $db.initSQL }}
 ---
-# Run by the postgres image on first start only (empty data directory), in
-# name order.  A first start that dies part-way leaves no .mozg-ready marker,
-# and the `prepare` init container then clears it so the next start retries.
+# First-start files for {{ $db.catalog.name }} ({{ $db.engine }}).  A first start
+# that dies part-way leaves no ready marker, and the `prepare` init container
+# then clears the data directory so the next start begins again.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,10 +17,13 @@ metadata:
   annotations:
     {{- include "mozg.checkov.resource" $ | trim | nindent 4 }}
 data:
+  {{- if eq $db.engine "postgres" }}
+  # Run by the postgres image on first start only (empty data directory), in
+  # name order.
   10-mozg-restore.sh: |
     #!/bin/sh
     set -eu
-    dump=/var/lib/postgresql/data/mozg-dump
+    dump={{ $layout.dump }}
     [ -d "$dump" ] || exit 0
     run_psql() { psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" "$@"; }
     file=$(find "$dump" -type f \( -name '*.dmp' -o -name '*.dump' -o -name '*.backup' \) | head -n 1)
@@ -49,8 +54,53 @@ data:
   99-mozg-ready.sh: |
     #!/bin/sh
     set -eu
-    touch "$PGDATA/.mozg-ready"
-    rm -rf /var/lib/postgresql/data/mozg-dump
-    echo "mozg: {{ $db.catalog.name }} is ready"
+    {{- include "mozg.db.readyScript" $sctx | nindent 4 }}
+  {{- else if eq $db.engine "mysql" }}
+  10-mozg-restore.sh: |
+    {{- include "mozg.db.mysqlRestore" $sctx | nindent 4 }}
+  {{- if $db.initSQL }}
+  20-mozg-init.sql: |
+    {{- $db.initSQL | nindent 4 }}
+  {{- end }}
+  99-mozg-ready.sh: |
+    {{- include "mozg.db.readyScript" $sctx | nindent 4 }}
+  {{- else if eq $db.engine "arango" }}
+  05-mozg-database.js: |
+    {{- include "mozg.db.arangoDatabase" $sctx | nindent 4 }}
+  10-mozg-restore.sh: |
+    {{- include "mozg.db.arangoRestore" $sctx | nindent 4 }}
+  {{- if $db.initJS }}
+  # Runs in arangosh; `db` is the {{ $db.database }} database.
+  20-mozg-init.js: |
+    db._useDatabase({{ $db.database | toJson }})
+    {{- $db.initJS | nindent 4 }}
+  {{- end }}
+  99-mozg-ready.sh: |
+    {{- include "mozg.db.readyScript" $sctx | nindent 4 }}
+  {{- else if eq $db.engine "neo4j" }}
+  start.sh: |
+    {{- include "mozg.db.neo4jStart" $sctx | nindent 4 }}
+  {{- if $db.initCypher }}
+  {{- $statements := list }}
+  {{- range (kindIs "string" $db.initCypher | ternary (list $db.initCypher) $db.initCypher) }}
+  {{- $statements = append $statements (dict "statement" .) }}
+  {{- end }}
+  # Neo4j's HTTP API runs one statement per entry, in one transaction.
+  init.json: |
+    {{- dict "statements" $statements | toJson | nindent 4 }}
+  {{- end }}
+  {{- else if eq $db.engine "elasticsearch" }}
+  start.sh: |
+    {{- include "mozg.db.elasticsearchStart" $sctx | nindent 4 }}
+  {{- if $db.initBulk }}
+  # Elasticsearch _bulk format: an action line, then a document line.
+  init.ndjson: |
+    {{- $db.initBulk | trim | nindent 4 }}
+  {{- end }}
+  {{- else if eq $db.engine "sqlite3" }}
+  # Applied to the SQLite file in each Mozg pod, after any download.
+  init.sql: |
+    {{- $db.initSQL | nindent 4 }}
+  {{- end }}
 {{- end }}
 {{- end }}

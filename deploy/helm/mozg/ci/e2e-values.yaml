@@ -1,6 +1,7 @@
-# Values for the kind end-to-end test (.github/workflows/helm.yml).
-# Two Mozg replicas exercise demand combined across pods; the example
-# database scales to zero quickly so the test can watch a full cycle.
+# Base values for the kind end-to-end test (.github/workflows/helm.yml), used
+# with one ci/e2e-<engine>.yaml per job.  Two Mozg replicas exercise demand
+# combined across pods; the database scales to zero quickly so the test can
+# watch full cycles.
 replicaCount: 2
 image:
   repository: mozg
@@ -15,12 +16,12 @@ resources:
 mozg:
   wakeTimeoutMs: 240000
   demandWindowMs: 15000
-databases:
-  example:
+databaseDefaults:
+  startupTimeoutSeconds: 600
+  storage:
+    size: 1Gi
+  scaleToZero:
     enabled: true
-    startupTimeoutSeconds: 300
-    scaleToZero:
-      enabled: true
-      cooldownSeconds: 30
-      pollingIntervalSeconds: 5
-      initialCooldownSeconds: 0
+    cooldownSeconds: 30
+    pollingIntervalSeconds: 5
+    initialCooldownSeconds: 0

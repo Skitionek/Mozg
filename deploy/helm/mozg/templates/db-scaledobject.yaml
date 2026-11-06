@@ -2,7 +2,7 @@
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
 {{- range $name, $db := $dbs }}
 {{- $ctx := dict "root" $ "name" $name "db" $db }}
-{{- if $db.scaleToZero.enabled }}
+{{- if and (include "mozg.db.isServer" $ctx) $db.scaleToZero.enabled }}
 ---
 # Scales {{ $db.catalog.name }} between 0 and 1 replicas on the demand Mozg
 # reports for it: 1 while a query is in flight or ran within

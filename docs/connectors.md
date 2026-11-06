@@ -158,6 +158,31 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
       test environment, so their remaining relations were checked against
       the API documentation only.
 
+13. **Neo4j nodes with integer properties could not be read.** The mesh
+    Neo4j transport opens its driver with `useBigInt`, so integers arrive as
+    native BigInts. The `@neo4j/graphql` 7 BigInt scalar it executes with
+    rejects those ("BigInt cannot represent value: 1"), and so did any query
+    over such a node.
+    - The connector suite missed it: its fixture is seeded from JavaScript
+      numbers, which Neo4j stores as floats.
+    - Cypher-created data, Reactome's `dbId` among it, has integers.
+    - The adapter now serialises BigInts as numbers while they are safe
+      integers, else as strings.
+    - BigInt filter values are sent as the strings that scalar requires.
+    - Found by the Helm chart's Neo4j end-to-end test, which creates its
+      nodes in Cypher.
+14. **Waking from zero, for every engine.** A query to a database that is
+    scaled to zero retries until it comes up, but only for errors it
+    recognises as "not up yet". Two cases were missing:
+    - the HTTP client dropped the network error, so a refused Elasticsearch
+      connection read as a bare "fetch failed";
+    - a pooled connection closed by the database when it scaled down
+      (undici's `UND_ERR_SOCKET` "other side closed", MySQL's
+      `PROTOCOL_CONNECTION_LOST`) failed the query.
+
+    The error now keeps its cause, and both cases count as a cold start.
+    Each engine's kind test wakes its database a second time to cover them.
+
 ## Known limitations
 
 - MySQL users must use `mysql_native_password` (finding 2).

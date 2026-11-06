@@ -1,0 +1,28 @@
+databases:
+  e2e:
+    enabled: true
+    engine: arango
+    database: e2e
+    initJS: |
+      db._create('proteins')
+      db.proteins.save([
+        { _key: '1', id: 1, accession: 'P04637', note: 'tumour suppressor' },
+        { _key: '2', id: 2, accession: 'P00533', note: 'EGFR' }
+      ])
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "2"
+        memory: 1536Mi
+    catalog:
+      name: e2e-proteins
+      label: E2E proteins
+      entities:
+        - name: proteins
+          description: Two proteins of interest
+          columns: [id, accession, note]
+          obo:
+            accession: uniprot
+          relations: []

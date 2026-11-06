@@ -1,6 +1,7 @@
 {{- $dbs := include "mozg.databases" . | fromYaml }}
 {{- range $name, $db := $dbs }}
 {{- $ctx := dict "root" $ "name" $name "db" $db }}
+{{- if include "mozg.db.isServer" $ctx }}
 ---
 # The stable address of {{ $db.catalog.name }}, whether or not it is running.
 # While it is scaled to zero the Service has no endpoints: connections are
@@ -25,4 +26,5 @@ spec:
       protocol: TCP
   selector:
     {{- include "mozg.db.selectorLabels" $ctx | nindent 4 }}
+{{- end }}
 {{- end }}

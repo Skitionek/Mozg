@@ -33,6 +33,7 @@ spec:
           protocol: TCP
 {{- range $name, $db := $dbs }}
 {{- $ctx := dict "root" $ "name" $name "db" $db }}
+{{- if include "mozg.db.isServer" $ctx }}
 ---
 # {{ $db.catalog.name }}: only Mozg may connect.
 apiVersion: networking.k8s.io/v1
@@ -56,6 +57,7 @@ spec:
       ports:
         - port: db
           protocol: TCP
+{{- end }}
 {{- end }}
 ---
 # The helm test pod only makes one outbound request; nothing may reach it.

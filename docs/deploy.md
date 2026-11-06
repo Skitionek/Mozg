@@ -60,6 +60,50 @@ kubectl -n bio logs -f statefulset/mozg-db-chembl -c fetch-dump
 kubectl -n bio logs -f statefulset/mozg-db-chembl
 ```
 
+## Engines
+
+Every database Mozg can query can be hosted.  `engine` picks the server and
+how its first start loads data; the image can be overridden with `image`.
+
+| `engine` | Default image | Dump (`dump.format`) | Inline data | Mozg connects as |
+|----------|---------------|----------------------|-------------|------------------|
+| `postgres` | `postgres:16-alpine` | pg_dump custom format (`dump`), `sql`, `sql.gz`, or a `tar.gz` around one | `initSQL` | `username` |
+| `mysql` | `mariadb:11.4` | `sql`, `sql.gz`, or a `tar.gz` of SQL files | `initSQL` | `username` (not root) |
+| `neo4j` | `neo4j:5.26-community` | `neo4j-admin database dump` file (`dump`), migrated from Neo4j 4 with `dump.migrate` | `initCypher` (a list of statements) | `neo4j` |
+| `arango` | `arangodb:3.12.4` | `tar.gz` of an `arangodump` directory | `initJS` (arangosh, `db` is the database) | `root` |
+| `elasticsearch` | `elasticsearch:8.15.5` | `tar.gz` of a snapshot repository (its latest snapshot is restored) or of `_bulk` NDJSON files; `ndjson`, `ndjson.gz` | `initBulk` (`_bulk` NDJSON) | `elastic` |
+| `sqlite3` | none — a file Mozg opens | the file (`sqlite`), `sqlite.gz`, or a `tar.gz` holding one | `initSQL` | — |
+
+Every server engine follows the same first start:
+1. an init container downloads the dump (resuming, checksum-verified);
+2. the engine loads it, then the inline data;
+3. a ready marker is written, and only then does the database become ready.
+
+A first start that dies part-way is cleared and retried from the dump.
+Until the database is ready, Mozg's queries treat it as a cold start and
+wait.
+
+- **MySQL** runs MariaDB by default, which speaks the MySQL protocol and
+  authenticates with `mysql_native_password`, as Mozg's mysql connector
+  needs.  Oracle's `mysql` image works where that plugin is enabled; pass
+  server flags with `mysql.args`.  `root` shares the Secret's password but
+  may only log in from inside the pod.
+- **Neo4j, ArangoDB and Elasticsearch** create only their built-in
+  superuser on first start, so Mozg connects as that user.  Mozg's
+  connectors only read.
+- **Elasticsearch** runs as one node with password authentication over
+  plain HTTP inside the cluster, where the NetworkPolicy admits only Mozg.
+  Memory-mapped stores are off (`node.store.allow_mmap=false`), so nodes
+  need no `vm.max_map_count` tuning.  `elasticsearch.heapSize` sets the
+  JVM heap (`512m`), and `elasticsearch.config` adds settings.
+- **SQLite** has no server.  The file is fetched (and given its `initSQL`)
+  by init containers of each Mozg pod, into a volume of `storage.size`.
+  It neither scales nor needs a password.  It suits files that download in
+  seconds; host larger data in one of the server engines.
+
+`ci/e2e-<engine>.yaml` in the chart has the same small table for every
+engine; CI deploys each on kind and runs the whole cycle below.
+
 ## Scaling to zero
 
 With [KEDA](https://keda.sh) installed in the cluster, each database scales
@@ -83,14 +127,18 @@ query ──▶ Mozg ──(connection refused: nothing running)──▶ retrie
   its peers (through the `mozg-peers` headless Service) and reports demand if
   any of them has it.  Scaling Mozg out does not hide demand from KEDA.
 - While the database is at zero its Service has no endpoints and connections
-  are refused.  Mozg treats that — and DNS failures, timeouts, Postgres
-  "starting up", Neo4j "service unavailable" — as a **cold start**, not an
-  error, and keeps retrying (backing off to 5 s) for up to
-  `mozg.wakeTimeoutMs` (3 minutes by default).  Errors that mean the query is
-  wrong (bad credentials, unknown table) fail at once.
+  are refused.  Mozg treats all of these as a **cold start**, not an error:
+  - refused connections, DNS failures and timeouts;
+  - Postgres "starting up" and Neo4j "service unavailable";
+  - pooled connections the database closed when it scaled down.
+
+  It keeps retrying, backing off to 5 s, for up to `mozg.wakeTimeoutMs`
+  (3 minutes by default).  Errors that mean the query is wrong (bad
+  credentials, unknown table) fail at once.
 - **Cold-start latency** is the KEDA polling interval (15 s by default) plus
-  the database's start time: a few seconds for PostgreSQL, 30–60 s for Neo4j
-  with Reactome.  Mozg is "slow by design"; this is where that shows most.
+  the database's start time: a few seconds for PostgreSQL and MariaDB, 10–20 s
+  for ArangoDB, 30–60 s for Neo4j (with Reactome) and Elasticsearch.  Mozg is
+  "slow by design"; this is where that shows most.
 - `cooldownSeconds` (15 minutes by default) is how long a database stays up
   after the last demand.  `initialCooldownSeconds` keeps it up after
   installation until the first restore can finish — set it above your
@@ -98,18 +146,16 @@ query ──▶ Mozg ──(connection refused: nothing running)──▶ retrie
 
 ## Adding your own database
 
-Any PostgreSQL dump (pg_dump custom format, plain SQL, gzipped SQL, or a
-tar.gz around one) or Neo4j dump can be hosted the same way.  Describe its
-tables and, crucially, the **OBO key** of every identifier column:
+Any dump of a supported engine (see [Engines](#engines)) can be hosted the
+same way.  Describe its tables (node labels, collections, indices) and,
+crucially, the **OBO key** of every identifier column:
 
 ```yaml
 databases:
   targets:
     enabled: true
     engine: postgres
-    image: { repository: postgres, tag: "16-alpine" }
     database: targets
-    username: mozg
     dump:
       url: https://data.example.org/targets.dump
       sha256: 0123…ef
@@ -128,9 +174,27 @@ databases:
           relations: []
 ```
 
-For a small table, `initSQL` (run once on first start) replaces the dump.
-The `example` entry in `values.yaml` is a working template; it is what the
-chart's end-to-end test deploys.
+For a small dataset, the engine's inline data (`initSQL`, `initCypher`,
+`initJS`, `initBulk`; run once on first start) replaces the dump.  The
+`example` entry in `values.yaml` is a working template, and
+`ci/e2e-<engine>.yaml` shows the same table for every engine:
+
+```yaml
+databases:
+  interactions:
+    enabled: true
+    engine: neo4j
+    database: interactions
+    initCypher:
+      - "CREATE (:Protein {accession: 'P04637', name: 'Cellular tumor antigen p53'})"
+      - "CREATE (:Protein {accession: 'Q00987', name: 'E3 ubiquitin-protein ligase Mdm2'})"
+    catalog:
+      name: my-interactions
+      entities:
+        - name: proteins            # nodes labelled Protein
+          columns: [accession, name]
+          obo: { accession: uniprot }
+```
 
 ### How OBO keys connect it to everything else
 
@@ -201,18 +265,23 @@ unknown key or a malformed `oboForm` fails the build.
   public APIs.  Services are `ClusterIP` unless you choose otherwise.  The
   policies need a CNI that enforces them.
 - **Secrets are files, not environment variables, for the databases.**
-  PostgreSQL reads `POSTGRES_PASSWORD_FILE` and Neo4j `NEO4J_AUTH_FILE`
-  (composed in memory from the Secret by an init container).  Mozg receives
-  the passwords as environment variables, which its catalog names; they are
-  never returned by its API.
+  - PostgreSQL, MariaDB and ArangoDB read the Secret's file directly.
+  - Neo4j and Elasticsearch insist on a file of their own (`neo4j/<password>`
+    and mode 600 respectively); an init container composes it in memory
+    from the Secret.
+  - First-start scripts pass credentials in files or on stdin, never on a
+    command line.
+
+  Mozg receives the passwords as environment variables, which its catalog
+  names; they are never returned by its API.
 - Mozg runs as UID 10001 with a read-only root filesystem, no Kubernetes API
   access, all capabilities dropped and every container resource-limited.
   Database pods run as their image's own unprivileged user (which owns the
-  data volume); PostgreSQL and every init container run with a read-only
-  root filesystem (Neo4j's entrypoint writes its configuration, so it
-  cannot).
+  data volume).  PostgreSQL, MariaDB, ArangoDB and every init container run
+  with a read-only root filesystem.  Neo4j and Elasticsearch cannot: their
+  entrypoints write configuration and a keystore into the image.
 - The chart passes checkov with no failures at its defaults and with every
-  preset enabled.  The few checks that do not fit a chart are skipped with
+  preset and every engine enabled.  The few checks that do not fit a chart are skipped with
   their reason on the resource: the namespace comes from `helm install -n`,
   and image tags and pull policy are values you control.
 
@@ -221,11 +290,16 @@ unknown key or a malformed `oboForm` fails the build.
 | Value | Default | Meaning |
 |-------|---------|---------|
 | `databases.<name>.enabled` | `false` | Host this database |
-| `databases.<name>.engine` | — | `postgres` or `neo4j` |
-| `databases.<name>.dump.url` / `sha256` / `format` | preset | Dump to restore on first start (`tar.gz`, `dump`, `sql`, `sql.gz`) |
-| `databases.<name>.dump.verifySQL` | preset | Accept a restore whose pg_restore reported errors if this query succeeds |
-| `databases.<name>.initSQL` | `""` | SQL run once on first start (PostgreSQL) |
-| `databases.<name>.storage.size` | preset | Data volume size |
+| `databases.<name>.engine` | — | `postgres`, `mysql`, `neo4j`, `arango`, `elasticsearch` or `sqlite3` |
+| `databases.<name>.image` | per engine | Server image (see [Engines](#engines)) |
+| `databases.<name>.dump.url` / `sha256` / `format` | preset | Dump to restore on first start (formats per engine) |
+| `databases.<name>.dump.verifySQL` | preset | PostgreSQL: accept a restore whose pg_restore reported errors if this query succeeds |
+| `databases.<name>.dump.restoreJobs` | `2` | Parallel pg_restore jobs / arangorestore threads |
+| `databases.<name>.initSQL` / `initCypher` / `initJS` / `initBulk` | — | Inline data loaded once on first start, per engine |
+| `databases.<name>.neo4j.heapSize` / `pageCacheSize` / `config` | `1G` / `1G` / `{}` | Neo4j memory and extra `NEO4J_*` settings |
+| `databases.<name>.elasticsearch.heapSize` / `config` | `512m` / `{}` | Elasticsearch heap and extra settings |
+| `databases.<name>.mysql.args` | `[]` | Extra MySQL / MariaDB server arguments |
+| `databases.<name>.storage.size` | `8Gi` | Data volume size (sqlite3: the in-pod volume's limit) |
 | `databases.<name>.startupTimeoutSeconds` | preset | Startup-probe budget, covering the first restore |
 | `databases.<name>.catalog` | preset | `name`, and `preset` or `label`/`entities` |
 | `databaseDefaults.scaleToZero.enabled` | `true` | Scale between 0 and 1 replica (needs KEDA) |
@@ -238,7 +312,9 @@ unknown key or a malformed `oboForm` fails the build.
 | `networkPolicy.enabled` | `true` | Databases accept only Mozg; Mozg ingress per `networkPolicy.ingressFrom` |
 | `databaseDefaults.resources` / `initResources` | modest | Requests and limits for database and init containers |
 
-The chart is validated in CI (`.github/workflows/helm.yml`): lint, rendering
-of every configuration against the Kubernetes and KEDA schemas, and an
-end-to-end run on kind with KEDA that watches a database scale to zero, wake
-for a query, join to UniProt by OBO key, and scale back to zero.
+The chart is validated in CI (`.github/workflows/helm.yml`):
+- lint;
+- rendering of every configuration against the Kubernetes and KEDA schemas;
+- for each engine, an end-to-end run on kind with KEDA that watches a
+  database scale to zero, wake for a query, join to UniProt by OBO key,
+  scale back to zero, and wake again.
