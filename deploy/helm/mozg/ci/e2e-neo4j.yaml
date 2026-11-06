@@ -1,0 +1,29 @@
+databases:
+  e2e:
+    enabled: true
+    engine: neo4j
+    database: e2e
+    # Nodes labelled Protein are the connector's "proteins" entity.
+    initCypher:
+      - "CREATE (:Protein {id: 1, accession: 'P04637', note: 'tumour suppressor'})"
+      - "CREATE (:Protein {id: 2, accession: 'P00533', note: 'EGFR'})"
+    neo4j:
+      heapSize: 512m
+      pageCacheSize: 128m
+    resources:
+      requests:
+        cpu: 200m
+        memory: 768Mi
+      limits:
+        cpu: "2"
+        memory: 1536Mi
+    catalog:
+      name: e2e-proteins
+      label: E2E proteins
+      entities:
+        - name: proteins
+          description: Two proteins of interest
+          columns: [id, accession, note]
+          obo:
+            accession: uniprot
+          relations: []

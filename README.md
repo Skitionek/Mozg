@@ -46,7 +46,7 @@ Mozg has left the concept phase.  Some parts are production-ready; others are st
 | MySQL, Neo4j (via graphql-mesh), ArangoDB, Elasticsearch | **Beta.** The same suite runs against real servers in CI; MySQL needs `mysql_native_password`. |
 | OpenAPI, OData (via graphql-mesh), BioCyc | **Beta.** Checked against live services; BioCyc needs an account for more than a few requests. |
 | SOAP, Thrift (via graphql-mesh) | **Experimental.** |
-| Self-hosted databases on Kubernetes (Helm, scale to zero) | **Beta.** Exercised end to end on a kind cluster in CI. |
+| Self-hosted databases on Kubernetes (Helm, scale to zero) | **Beta.** Every engine (PostgreSQL, MySQL/MariaDB, Neo4j, ArangoDB, Elasticsearch, SQLite) exercised end to end on a kind cluster in CI. |
 | OWL ontology ingestion | **Experimental.** |
 
 Per-connector details, test coverage and known limitations: [docs/connectors.md](docs/connectors.md).  Deploying with self-hosted databases: [docs/deploy.md](docs/deploy.md).

@@ -1,9 +1,9 @@
 name: Helm
 
-# Validates the Helm chart and, on a real cluster (kind + KEDA), the whole
-# self-hosted path: a database restored on first start, scaled to zero when
-# idle, woken by a Mozg query, joined to a public API by OBO key, and scaled
-# back to zero.
+# Validates the Helm chart and, on a real cluster (kind + KEDA) for every
+# database engine, the whole self-hosted path: a database initialised on
+# first start, scaled to zero when idle, woken by a Mozg query, joined to a
+# public API by OBO key, scaled back to zero and woken again.
 
 on:
   push:
@@ -74,7 +74,10 @@ jobs:
           echo "scale-to-zero off";        helm template m "$CHART" "${all[@]}" --api-versions keda.sh/v1alpha1 --set databaseDefaults.scaleToZero.enabled=false | validate
           echo "ingress, HPA, extra sources"
           helm template m "$CHART" --set ingress.enabled=true --set autoscaling.enabled=true --set 'mozg.extraSourcesConfigMaps[0]=my-sources' | validate
-          echo "e2e values";               helm template m "$CHART" -f "$CHART/ci/e2e-values.yaml" --api-versions keda.sh/v1alpha1 | validate
+          for engine in postgres mysql neo4j arango elasticsearch sqlite3; do
+            echo "e2e values, $engine"
+            helm template m "$CHART" -f "$CHART/ci/e2e-values.yaml" -f "$CHART/ci/e2e-$engine.yaml" --api-versions keda.sh/v1alpha1 | validate
+          done
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -88,16 +91,18 @@ jobs:
         run: |
           set -euo pipefail
           npm ci
-          mkdir -p rendered-sources
-          helm template m "$CHART" \
-            --set databases.chembl.enabled=true \
-            --set databases.reactome.enabled=true \
-            --set databases.example.enabled=true \
-            --show-only templates/sources-configmap.yaml > sources.yaml
-          for key in $(yq -r '.data | keys | .[]' sources.yaml); do
-            yq -r ".data[\"$key\"]" sources.yaml > "rendered-sources/$key"
+          render_sources() {
+            rm -rf rendered-sources && mkdir -p rendered-sources
+            helm template m "$CHART" "$@" --show-only templates/sources-configmap.yaml > sources.yaml
+            for key in $(yq -r '.data | keys | .[]' sources.yaml); do
+              yq -r ".data[\"$key\"]" sources.yaml > "rendered-sources/$key"
+            done
+            node "$CHART/ci/lint-sources.js" rendered-sources
+          }
+          render_sources --set databases.chembl.enabled=true --set databases.reactome.enabled=true --set databases.example.enabled=true
+          for engine in postgres mysql neo4j arango elasticsearch sqlite3; do
+            render_sources -f "$CHART/ci/e2e-values.yaml" -f "$CHART/ci/e2e-$engine.yaml"
           done
-          node "$CHART/ci/lint-sources.js" rendered-sources
 
       - name: Invalid values are rejected
         run: |
@@ -112,14 +117,21 @@ jobs:
           expect_failure --set databases.example.enabled=true --set databases.example.dump.sha256=nothex
           expect_failure --set databases.reactome.enabled=true --set databases.reactome.username=admin
           expect_failure --set databases.My_DB.enabled=true
+          expect_failure --set databases.example.enabled=true --set databases.example.engine=arango --set databases.example.username=admin
+          expect_failure --set databases.example.enabled=true --set databases.example.engine=mysql --set databases.example.username=root
+          expect_failure --set databases.example.enabled=true --set databases.example.engine=sqlite3 --set databases.example.initSQL=
 
   e2e:
-    name: Scale to zero on kind
+    name: Scale to zero on kind (${{ matrix.engine }})
     runs-on: ubuntu-latest
     needs: chart
     timeout-minutes: 30
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [postgres, mysql, neo4j, arango, elasticsearch, sqlite3]
 
     steps:
       - name: Checkout
@@ -146,14 +158,18 @@ jobs:
           docker build -t mozg:e2e .
           kind load docker-image mozg:e2e --name mozg
 
-      - name: Install the chart with a self-hosted database
+      - name: Install the chart with a self-hosted ${{ matrix.engine }} database
+        env:
+          ENGINE: ${{ matrix.engine }}
         run: |
           helm install mozg "$CHART" --namespace bio --create-namespace \
-            -f "$CHART/ci/e2e-values.yaml" --wait --timeout 8m
+            -f "$CHART/ci/e2e-values.yaml" -f "$CHART/ci/e2e-$ENGINE.yaml" --wait --timeout 10m
           helm test mozg --namespace bio --timeout 2m
           kubectl -n bio get all
 
-      - name: Scale to zero, wake on query, join by OBO key, scale back
+      - name: Scale to zero, wake on query, join by OBO key, scale back, wake again
+        env:
+          ENGINE: ${{ matrix.engine }}
         run: |
           kubectl -n bio port-forward svc/mozg 4000:80 >/tmp/port-forward.log 2>&1 &
           for _ in $(seq 1 30); do curl -fsS http://localhost:4000/healthz >/dev/null 2>&1 && break; sleep 1; done
@@ -165,8 +181,8 @@ jobs:
           set +e
           kubectl -n bio get all,scaledobject,hpa,pvc -o wide
           kubectl -n bio describe scaledobject
-          kubectl -n bio describe statefulset mozg-db-example
+          kubectl -n bio describe statefulset mozg-db-e2e
           kubectl -n bio logs deploy/mozg --all-containers --tail=200
-          kubectl -n bio logs statefulset/mozg-db-example --all-containers --tail=200
+          kubectl -n bio logs statefulset/mozg-db-e2e --all-containers --tail=300
           kubectl -n keda logs deploy/keda-operator --tail=200
           kubectl -n bio get events --sort-by=.lastTimestamp | tail -50

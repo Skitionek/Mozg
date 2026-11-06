@@ -52,7 +52,10 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
-        "engine": { "enum": ["postgres", "neo4j"] },
+        "engine": {
+          "enum": ["postgres", "mysql", "neo4j", "arango", "elasticsearch", "sqlite3"],
+          "description": "mysql runs MariaDB by default; sqlite3 is a file Mozg opens in-process"
+        },
         "image": { "$ref": "#/definitions/image" },
         "database": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
         "username": { "type": "string", "minLength": 1 },
@@ -62,13 +65,23 @@
           "properties": {
             "url": { "type": "string" },
             "sha256": { "type": "string", "pattern": "^([0-9a-f]{64})?$" },
-            "format": { "enum": ["tar.gz", "tgz", "dump", "sql", "sql.gz"] },
+            "format": {
+              "enum": ["tar.gz", "tgz", "dump", "sql", "sql.gz", "ndjson", "ndjson.gz", "sqlite", "sqlite.gz"],
+              "description": "postgres: tar.gz, dump, sql, sql.gz; mysql: sql, sql.gz, tar.gz; neo4j: dump; arango: tar.gz of an arangodump directory; elasticsearch: tar.gz (a snapshot repository or NDJSON files), ndjson, ndjson.gz; sqlite3: sqlite, sqlite.gz, tar.gz"
+            },
             "restoreJobs": { "type": "integer", "minimum": 1 },
             "verifySQL": { "type": "string" },
             "migrate": { "type": "boolean" }
           }
         },
-        "initSQL": { "type": "string" },
+        "initSQL": { "type": "string", "description": "postgres, mysql, sqlite3: SQL run once, after any dump" },
+        "initCypher": {
+          "type": ["string", "array"],
+          "items": { "type": "string" },
+          "description": "neo4j: Cypher run once, after any dump; one statement per entry"
+        },
+        "initJS": { "type": "string", "description": "arango: JavaScript run once in arangosh, with db the database" },
+        "initBulk": { "type": "string", "description": "elasticsearch: documents in _bulk NDJSON form, loaded once" },
         "storage": {
           "type": "object",
           "properties": {
@@ -93,6 +106,23 @@
             "heapSize": { "type": "string" },
             "pageCacheSize": { "type": "string" },
             "config": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } }
+          }
+        },
+        "mysql": {
+          "type": "object",
+          "properties": {
+            "args": { "type": "array", "items": { "type": "string" }, "description": "Extra server arguments" }
+          }
+        },
+        "elasticsearch": {
+          "type": "object",
+          "properties": {
+            "heapSize": { "type": "string", "pattern": "^[0-9]+[kKmMgG]$" },
+            "config": {
+              "type": "object",
+              "additionalProperties": { "type": ["string", "number", "boolean"] },
+              "description": "Extra settings, as environment variables"
+            }
           }
         },
         "downloaderImage": { "type": "string" },

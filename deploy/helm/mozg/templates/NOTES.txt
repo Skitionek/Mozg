@@ -9,14 +9,14 @@ Mozg is installed as {{ include "mozg.fullname" . }}.
 
 Self-hosted databases (query them with `source:`):
 {{- range $name, $db := $dbs }}
-  - {{ $db.catalog.name }} ({{ $db.engine }}){{ if and $db.dump $db.dump.url }} — restoring from {{ $db.dump.url }} on first start{{ end }}
+  - {{ $db.catalog.name }} ({{ $db.engine }}){{ if eq $db.engine "sqlite3" }} — a file inside each Mozg pod{{ else if and $db.dump $db.dump.url }} — restoring from {{ $db.dump.url }} on first start{{ end }}
 {{- end }}
 
 The first start restores each dump, which can take hours for ChEMBL:
   kubectl -n {{ .Release.Namespace }} logs -f statefulset/<name> -c fetch-dump
   kubectl -n {{ .Release.Namespace }} logs -f statefulset/<name>
 {{- range $name, $db := $dbs }}
-{{- if and $db.scaleToZero.enabled (not $keda) }}
+{{- if and (ne $db.engine "sqlite3") $db.scaleToZero.enabled (not $keda) }}
 
 WARNING: databases.{{ $name }}.scaleToZero is enabled but KEDA is not
 installed, so {{ $db.catalog.name }} runs one replica permanently.  Install

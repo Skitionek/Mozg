@@ -1,0 +1,31 @@
+databases:
+  e2e:
+    enabled: true
+    engine: elasticsearch
+    initBulk: |
+      {"index":{"_index":"proteins","_id":"1"}}
+      {"id":1,"accession":"P04637","note":"tumour suppressor"}
+      {"index":{"_index":"proteins","_id":"2"}}
+      {"id":2,"accession":"P00533","note":"EGFR"}
+    elasticsearch:
+      heapSize: 512m
+      config:
+        # kind's node disk may be fuller than Elasticsearch's watermarks allow.
+        cluster.routing.allocation.disk.threshold_enabled: "false"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+    catalog:
+      name: e2e-proteins
+      label: E2E proteins
+      entities:
+        - name: proteins
+          description: Two proteins of interest
+          columns: [id, accession, note]
+          obo:
+            accession: uniprot
+          relations: []

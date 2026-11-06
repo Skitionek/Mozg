@@ -2,9 +2,9 @@
 {{- if gt (len $dbs) 0 }}
 # Catalog entries for the self-hosted databases, registered by Mozg at startup
 # (MOZG_SOURCES_DIR).  Every connection field names an environment variable
-# set from the database's Service and Secret, so the server holds the
-# credentials: callers can query these sources but never see or redirect
-# their connections.
+# set from the database's Service and Secret (for sqlite3, the file's path in
+# the Mozg pod), so the server holds the connection: callers can query these
+# sources but never see or redirect it.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -36,13 +36,24 @@ data:
   {{- $_ := set $entry "name" $db.catalog.name }}
   {{- $_ := set $entry "driver" $db.engine }}
   {{- if not $entry.label }}{{ $_ := set $entry "label" $db.catalog.name }}{{ end }}
-  {{- $conn := dict
+  {{- $env := dict
       "host" (dict "env" (printf "%s_HOST" $prefix))
       "port" (dict "env" (printf "%s_PORT" $prefix))
       "database" (dict "env" (printf "%s_DATABASE" $prefix))
       "user" (dict "env" (printf "%s_USER" $prefix))
       "password" (dict "env" (printf "%s_PASSWORD" $prefix)) }}
+  {{- $conn := dict }}
+  {{- if eq $db.engine "sqlite3" }}
+  {{- /* The file Mozg opens, inside its own pod */}}
+  {{- $conn = dict "database" $env.database }}
+  {{- else if eq $db.engine "elasticsearch" }}
+  {{- /* The elasticsearch driver takes the cluster's base URL as `database` */}}
+  {{- $conn = dict "database" (dict "env" (printf "%s_URL" $prefix)) "user" $env.user "password" $env.password }}
+  {{- else }}
+  {{- $conn = $env }}
   {{- if eq $db.engine "neo4j" }}{{ $_ := set $conn "scheme" "bolt" }}{{ end }}
+  {{- if eq $db.engine "arango" }}{{ $_ := set $conn "scheme" "http" }}{{ end }}
+  {{- end }}
   {{- $_ := set $entry "connection" $conn }}
   {{ $db.catalog.name }}.json: |
     {{- toPrettyJson $entry | nindent 4 }}

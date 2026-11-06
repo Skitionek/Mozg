@@ -89,9 +89,13 @@ verified against the live APIs, and joined up across sources.
   `Dockerfile`, and a CI job that builds the image and checks `/healthz`.
 - **Helm chart** (`deploy/helm/mozg`, [docs/deploy.md](docs/deploy.md)) for
   Mozg and the databases you choose to host beside it.
+  - Every engine Mozg queries can be hosted: PostgreSQL, MySQL (MariaDB),
+    Neo4j, ArangoDB and Elasticsearch, and SQLite (a file inside the Mozg
+    pods). Each loads its native dump format on first start (pg_dump, SQL,
+    neo4j-admin dump, arangodump, a snapshot repository or `_bulk` NDJSON),
+    or inline data (`initSQL`, `initCypher`, `initJS`, `initBulk`).
   - Presets: ChEMBL (PostgreSQL dump) and Reactome (Neo4j dump). A
-    `databases:` entry adds your own, restored on first start from a dump
-    URL.
+    `databases:` entry adds your own.
   - Each database is a StatefulSet with a volume behind a stable Service,
     scaled to zero by KEDA when idle and woken by the first query that needs
     it. Mozg waits out the cold start (`MOZG_WAKE_TIMEOUT_MS`).
@@ -99,9 +103,9 @@ verified against the live APIs, and joined up across sources.
     joins the public APIs.
   - Generated passwords live in Secrets mounted as files. A NetworkPolicy
     and a restricted security context apply throughout.
-  - CI lints and validates every configuration. A kind cluster runs the
-    whole path: restore, scale to zero, wake on query, OBO join to UniProt,
-    and back to zero.
+  - CI lints and validates every configuration. For each engine, a kind
+    cluster runs the whole path: first start, scale to zero, wake on query,
+    OBO join to UniProt, back to zero, and wake again.
 - **Connector evaluation** ([docs/connectors.md](docs/connectors.md)): every
   non-`api` driver was tested against a real server or service and given a
   status. A shared behavioural suite runs against PostgreSQL, MySQL, Neo4j,
@@ -163,5 +167,12 @@ verified against the live APIs, and joined up across sources.
   Met return rows instead of one envelope.
 - A relation `limit` is honoured by every connector, and introspection of a
   self-hosted database waits for it to wake, as queries do.
+- Neo4j nodes with integer properties (anything created in Cypher, Reactome's
+  `dbId`) could not be read: the mesh transport's driver returns native
+  BigInts, which `@neo4j/graphql`'s BigInt scalar rejected.  They are
+  returned as numbers (strings beyond 2^53), and BigInt filters work.
+- A query to a self-hosted database waking from zero now also waits through a
+  refused Elasticsearch connection (the HTTP client kept no cause) and through
+  pooled connections the database closed when it scaled down.
 
 [Unreleased]: https://github.com/Skitionek/Mozg/commits/main

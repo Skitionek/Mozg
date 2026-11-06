@@ -5,7 +5,9 @@
 # would rather query locally — ChEMBL, Reactome, your own — can be hosted by
 # this chart under `databases`: each is restored once from its published
 # dump, sits behind its own Service, and (with KEDA installed) scales to zero
-# replicas when nobody has queried it for a while.  See docs/deploy.md.
+# replicas when nobody has queried it for a while.  Every engine Mozg can
+# query is supported: postgres, mysql, neo4j, arango, elasticsearch and
+# sqlite3.  See docs/deploy.md.
 
 # -- Mozg replicas (ignored when autoscaling.enabled)
 replicaCount: 2
@@ -137,6 +139,9 @@ databaseDefaults:
     type: ClusterIP
     annotations: {}
   storage:
+    # -- Size of the data volume (for sqlite3: the size limit of the file's
+    # in-pod volume).  Presets set their own.
+    size: 8Gi
     # -- StorageClass for the data volume ("" = cluster default)
     storageClass: ""
     accessModes: [ReadWriteOnce]
@@ -178,8 +183,24 @@ databaseDefaults:
 # Databases to host alongside Mozg.  Each key is a database; enable the ones
 # you want.  Two presets are provided; add your own with the same shape (see
 # `example` at the bottom and docs/deploy.md).
+#
+# `engine` picks the server, its image (overridable with `image`) and how a
+# first start loads data:
+#
+#   engine         image (default)                  dump.format               inline data
+#   postgres       postgres:16-alpine               tar.gz, dump, sql, sql.gz  initSQL
+#   mysql          mariadb:11.4                     sql, sql.gz, tar.gz        initSQL
+#   neo4j          neo4j:5.26-community             dump                       initCypher (list)
+#   arango         arangodb:3.12.4                  tar.gz (arangodump dir)    initJS
+#   elasticsearch  elasticsearch:8.15.5             tar.gz (snapshot repo or   initBulk (NDJSON)
+#                                                   NDJSON), ndjson, ndjson.gz
+#   sqlite3        (none: Mozg opens the file)      sqlite, sqlite.gz, tar.gz  initSQL
+#
+# Neo4j, ArangoDB and Elasticsearch are reached as their built-in superuser
+# (neo4j, root, elastic), the only account their images create.  sqlite3
+# databases live inside each Mozg pod, so they neither scale nor need a
+# password.
 databases:
-
   # ChEMBL — bioactive molecules, targets, mechanisms and assays, restored
   # from EMBL-EBI's official PostgreSQL dump.  Registered in Mozg as the
   # catalog source "chembl-postgres"; its identifier columns carry OBO keys,
@@ -279,15 +300,12 @@ databases:
       name: reactome-neo4j
       preset: reactome-neo4j
 
-  # Your own database: a small example kept disabled.  Copy it under a new key.
+  # Your own database: a small example kept disabled.  Copy it under a new key;
+  # ci/e2e-<engine>.yaml has the same table for every other engine.
   example:
     enabled: false
     engine: postgres
-    image:
-      repository: postgres
-      tag: "16-alpine"
     database: example
-    username: mozg
     # -- Either a dump to restore ...
     dump:
       url: ""

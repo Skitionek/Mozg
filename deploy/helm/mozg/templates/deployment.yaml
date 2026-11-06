@@ -1,5 +1,7 @@
 {{- $dbs := include "mozg.databases" . | fromYaml }}
 {{- $sources := or (gt (len $dbs) 0) (gt (len .Values.mozg.extraSourcesConfigMaps) 0) }}
+{{- $sqlite := false }}
+{{- range $dbs }}{{ if eq .engine "sqlite3" }}{{ $sqlite = true }}{{ end }}{{ end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,8 +21,12 @@ spec:
     metadata:
       annotations:
         {{- include "mozg.checkov.server" . | trim | nindent 8 }}
-        # Restart when the catalog of self-hosted databases changes.
+        # Restart when the catalog of self-hosted databases (or a SQLite
+        # database's init SQL) changes.
         checksum/sources: {{ include (print $.Template.BasePath "/sources-configmap.yaml") . | sha256sum }}
+        {{- if $sqlite }}
+        checksum/sqlite: {{ include (print $.Template.BasePath "/db-init-configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -39,6 +45,72 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       terminationGracePeriodSeconds: {{ add (div .Values.mozg.shutdownGraceMs 1000) 5 }}
+      {{- if $sqlite }}
+      # SQLite databases live in each Mozg pod: fetched, and given their init
+      # SQL, before Mozg starts.
+      initContainers:
+        {{- range $name, $db := $dbs }}
+        {{- $ctx := dict "root" $ "name" $name "db" $db }}
+        {{- if eq $db.engine "sqlite3" }}
+        {{- if and $db.dump $db.dump.url }}
+        - name: fetch-{{ $name }}
+          image: {{ $db.downloaderImage }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              {{- include "mozg.db.sqliteFetchScript" $ctx | nindent 14 }}
+          env:
+            - name: SQLITE_FILE
+              value: {{ include "mozg.db.sqlitePath" $ctx | quote }}
+            - name: DUMP_URL
+              value: {{ $db.dump.url | quote }}
+            - name: DUMP_SHA256
+              value: {{ $db.dump.sha256 | default "" | quote }}
+            - name: DUMP_FORMAT
+              value: {{ $db.dump.format | default "sqlite" | quote }}
+          resources:
+            {{- toYaml $db.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: sqlite-{{ $name }}
+              mountPath: /var/lib/mozg/sqlite/{{ $name }}
+        {{- end }}
+        {{- if $db.initSQL }}
+        # Mozg's own image carries the SQLite library it queries with.
+        - name: init-{{ $name }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command:
+            - node
+            - -e
+            - |
+              const sqlite3 = require('sqlite3')
+              const sql = require('node:fs').readFileSync('/mozg/init/init.sql', 'utf8')
+              const db = new sqlite3.Database(process.env.SQLITE_FILE)
+              db.exec(sql, (err) => {
+                if (err) { console.error('mozg: init SQL failed: ' + err.message); process.exit(1) }
+                db.close(() => console.log('mozg: ' + process.env.SQLITE_FILE + ' initialised'))
+              })
+          env:
+            - name: SQLITE_FILE
+              value: {{ include "mozg.db.sqlitePath" $ctx | quote }}
+          resources:
+            {{- toYaml $db.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: sqlite-{{ $name }}
+              mountPath: /var/lib/mozg/sqlite/{{ $name }}
+            - name: sqlite-init-{{ $name }}
+              mountPath: /mozg/init
+              readOnly: true
+        {{- end }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
       containers:
         - name: mozg
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -80,13 +152,23 @@ spec:
             {{- range $name, $db := $dbs }}
             {{- $ctx := dict "root" $ "name" $name "db" $db }}
             {{- $prefix := include "mozg.db.envPrefix" $ctx }}
-            # {{ $db.catalog.name }}: connection held by the server, never sent to callers
+            # {{ $db.catalog.name }} ({{ $db.engine }}): connection held by the server, never sent to callers
+            {{- if eq $db.engine "sqlite3" }}
+            - name: {{ $prefix }}_DATABASE
+              value: {{ include "mozg.db.sqlitePath" $ctx | quote }}
+            {{- else }}
+            {{- $host := printf "%s.%s.svc.cluster.local" (include "mozg.db.fullname" $ctx) $.Release.Namespace }}
+            {{- if eq $db.engine "elasticsearch" }}
+            - name: {{ $prefix }}_URL
+              value: "http://{{ $host }}:{{ include "mozg.db.port" $ctx }}"
+            {{- else }}
             - name: {{ $prefix }}_HOST
-              value: "{{ include "mozg.db.fullname" $ctx }}.{{ $.Release.Namespace }}.svc.cluster.local"
+              value: {{ $host | quote }}
             - name: {{ $prefix }}_PORT
               value: {{ include "mozg.db.port" $ctx | quote }}
             - name: {{ $prefix }}_DATABASE
               value: {{ $db.database | quote }}
+            {{- end }}
             - name: {{ $prefix }}_USER
               value: {{ $db.username | quote }}
             - name: {{ $prefix }}_PASSWORD
@@ -94,6 +176,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "mozg.db.secretName" $ctx }}
                   key: password
+            {{- end }}
             {{- end }}
             {{- with .Values.mozg.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -125,9 +208,28 @@ spec:
               mountPath: /etc/mozg/sources
               readOnly: true
             {{- end }}
+            {{- range $name, $db := $dbs }}
+            {{- if eq $db.engine "sqlite3" }}
+            - name: sqlite-{{ $name }}
+              mountPath: /var/lib/mozg/sqlite/{{ $name }}
+            {{- end }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- range $name, $db := $dbs }}
+        {{- $ctx := dict "root" $ "name" $name "db" $db }}
+        {{- if eq $db.engine "sqlite3" }}
+        - name: sqlite-{{ $name }}
+          emptyDir:
+            sizeLimit: {{ $db.storage.size | default "1Gi" | quote }}
+        {{- if $db.initSQL }}
+        - name: sqlite-init-{{ $name }}
+          configMap:
+            name: {{ include "mozg.db.fullname" $ctx }}-init
+        {{- end }}
+        {{- end }}
+        {{- end }}
         {{- if $sources }}
         - name: sources
           projected:

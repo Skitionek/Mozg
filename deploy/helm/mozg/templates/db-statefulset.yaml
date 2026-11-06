@@ -2,14 +2,21 @@
 {{- $keda := .Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
 {{- range $name, $db := $dbs }}
 {{- $ctx := dict "root" $ "name" $name "db" $db }}
+{{- if include "mozg.db.isServer" $ctx }}
 {{- $full := include "mozg.db.fullname" $ctx }}
 {{- $uid := include "mozg.db.uid" $ctx | int }}
-{{- $pg := eq $db.engine "postgres" }}
-{{- $dataDir := ternary "/var/lib/postgresql/data" "/data" $pg }}
-{{- $marker := ternary "/var/lib/postgresql/data/pgdata/.mozg-ready" "/data/.mozg-ready" $pg }}
+{{- $layout := include "mozg.db.layout" $ctx | fromYaml }}
+{{- $engine := $db.engine }}
 {{- $startup := div (int ($db.startupTimeoutSeconds | default 600)) 10 }}
-{{- if and (eq $db.engine "neo4j") (ne (toString $db.username) "neo4j") }}
-{{- fail (printf "databases.%s.username must be neo4j for the neo4j engine" $name) }}
+{{- $readOnlyRoot := not (has $engine (list "neo4j" "elasticsearch")) }}
+{{- /* Every server engine gets init files: first-start scripts, or (Neo4j, Elasticsearch) the start script itself. */}}
+{{- $initFiles := true }}
+{{- /* A probe that also waits for the ready marker, where the engine's port opens before its first start has finished. */}}
+{{- $markerProbe := "" }}
+{{- if eq $engine "neo4j" }}
+{{- $markerProbe = printf "[ -f %s ] && : > /dev/tcp/127.0.0.1/7687" $layout.marker }}
+{{- else if eq $engine "elasticsearch" }}
+{{- $markerProbe = printf "[ -f %s ] && curl -s -o /dev/null -w '%%{http_code}' http://127.0.0.1:9200/ | grep -qE '^(200|401)$'" $layout.marker }}
 {{- end }}
 ---
 apiVersion: apps/v1
@@ -33,7 +40,7 @@ spec:
     metadata:
       labels:
         {{- include "mozg.db.selectorLabels" $ctx | nindent 8 }}
-        mozg.io/engine: {{ $db.engine }}
+        mozg.io/engine: {{ $engine }}
       annotations:
         checksum/config: {{ toJson $db | sha256sum }}
         {{- include "mozg.checkov.db" $ctx | trim | nindent 8 }}
@@ -50,20 +57,20 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        {{- if $pg }}
+        # Clears a first start that did not finish, so the next one begins again.
         - name: prepare
-          image: {{ include "mozg.db.image" $ctx }}
-          imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
+          image: {{ $db.downloaderImage }}
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
             - |
-              set -eu
-              pgdata=/var/lib/postgresql/data/pgdata
-              if [ -f "$pgdata/PG_VERSION" ] && [ ! -f "$pgdata/.mozg-ready" ]; then
-                echo "mozg: a previous first start did not finish; clearing the data directory to retry"
-                rm -rf "$pgdata"
-              fi
+              {{- include "mozg.db.prepareScript" $ctx | nindent 14 }}
+          env:
+            - name: DB_DATA
+              value: {{ $layout.data }}
+            - name: READY_MARKER
+              value: {{ $layout.marker }}
           resources:
             {{- toYaml $db.initResources | nindent 12 }}
           securityContext:
@@ -73,8 +80,7 @@ spec:
               drop: [ALL]
           volumeMounts:
             - name: data
-              mountPath: /var/lib/postgresql/data
-        {{- end }}
+              mountPath: {{ $layout.mount }}
         {{- if and $db.dump $db.dump.url }}
         - name: fetch-dump
           image: {{ $db.downloaderImage }}
@@ -85,10 +91,10 @@ spec:
             - |
               {{- include "mozg.db.fetchScript" $ctx | nindent 14 }}
           env:
-            - name: DATA_DIR
-              value: {{ $dataDir }}
+            - name: DUMP_DIR
+              value: {{ $layout.dump }}
             - name: READY_MARKER
-              value: {{ $marker }}
+              value: {{ $layout.marker }}
             - name: DUMP_URL
               value: {{ $db.dump.url | quote }}
             - name: DUMP_SHA256
@@ -106,15 +112,23 @@ spec:
               drop: [ALL]
           volumeMounts:
             - name: data
-              mountPath: {{ $dataDir }}
+              mountPath: {{ $layout.mount }}
         {{- end }}
-        {{- if not $pg }}
-        # Neo4j reads NEO4J_AUTH_FILE ("neo4j/<password>"); compose it from the
-        # Secret's password so the password never travels in an env variable.
+        {{- if has $engine (list "neo4j" "elasticsearch") }}
+        # The image reads its password from a file it insists on owning
+        # (Neo4j: "neo4j/<password>"; Elasticsearch: mode 600), composed here
+        # from the Secret so the password never travels in an env variable.
         - name: auth
           image: {{ $db.downloaderImage }}
           imagePullPolicy: IfNotPresent
-          command: [sh, -c, 'printf "neo4j/%s" "$(cat /run/secrets/mozg/password)" > /run/auth/neo4j-auth']
+          command:
+            - sh
+            - -c
+            {{- if eq $engine "neo4j" }}
+            - 'umask 077 && printf "neo4j/%s" "$(cat /run/secrets/mozg/password)" > /run/auth/neo4j-auth'
+            {{- else }}
+            - 'umask 077 && cat /run/secrets/mozg/password > /run/auth/elastic-password'
+            {{- end }}
           resources:
             {{- toYaml $db.initResources | nindent 12 }}
           securityContext:
@@ -128,6 +142,9 @@ spec:
               readOnly: true
             - name: auth
               mountPath: /run/auth
+        {{- end }}
+        {{- if eq $engine "neo4j" }}
+        # Loads a dump offline, before the server starts.
         - name: load
           image: {{ include "mozg.db.image" $ctx }}
           imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
@@ -136,20 +153,16 @@ spec:
             - -c
             - |
               set -eu
-              if [ -f /data/.mozg-ready ]; then exit 0; fi
+              if [ -f {{ $layout.marker }} ] || [ ! -f "{{ $layout.dump }}/$DB.dump" ]; then exit 0; fi
               mkdir -p /tmp/conf
               printf 'server.directories.data=/data\nserver.directories.logs=/tmp/logs\n' > /tmp/conf/neo4j.conf
               export NEO4J_CONF=/tmp/conf
-              if [ -f "/data/mozg-dump/$DB.dump" ]; then
-                echo "mozg: loading $DB from its dump"
-                neo4j-admin database load --from-path=/data/mozg-dump --overwrite-destination=true "$DB"
-                if [ "$MIGRATE" = "true" ]; then
-                  echo "mozg: migrating $DB to the Neo4j 5 store format"
-                  neo4j-admin database migrate --force-btree-indexes-to-range "$DB"
-                fi
+              echo "mozg: loading $DB from its dump"
+              neo4j-admin database load --from-path={{ $layout.dump }} --overwrite-destination=true "$DB"
+              if [ "$MIGRATE" = "true" ]; then
+                echo "mozg: migrating $DB to the Neo4j 5 store format"
+                neo4j-admin database migrate --force-btree-indexes-to-range "$DB"
               fi
-              touch /data/.mozg-ready
-              rm -rf /data/mozg-dump
           env:
             - name: DB
               value: {{ $db.database | quote }}
@@ -169,16 +182,25 @@ spec:
               mountPath: /tmp
         {{- end }}
       containers:
-        - name: {{ $db.engine }}
+        - name: {{ $engine }}
           image: {{ include "mozg.db.image" $ctx }}
           imagePullPolicy: {{ $db.image.pullPolicy | default "IfNotPresent" }}
+          {{- if eq $engine "neo4j" }}
+          command: [tini, -g, --, /bin/bash, /mozg/init/start.sh]
+          {{- else if eq $engine "elasticsearch" }}
+          command: [/bin/tini, --, /bin/bash, /mozg/init/start.sh]
+          {{- end }}
+          {{- with (and (eq $engine "mysql") $db.mysql $db.mysql.args) }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: {{ $pg }}
+            readOnlyRootFilesystem: {{ $readOnlyRoot }}
             capabilities:
               drop: [ALL]
           env:
-            {{- if $pg }}
+            {{- if eq $engine "postgres" }}
             - name: POSTGRES_DB
               value: {{ $db.database | quote }}
             - name: POSTGRES_USER
@@ -186,25 +208,74 @@ spec:
             - name: POSTGRES_PASSWORD_FILE
               value: /run/secrets/mozg/password
             - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
+              value: {{ $layout.data }}
             - name: MOZG_RESTORE_JOBS
               value: {{ (and $db.dump $db.dump.restoreJobs) | default 2 | quote }}
             - name: MOZG_VERIFY_SQL
               value: {{ (and $db.dump $db.dump.verifySQL) | default "" | quote }}
-            {{- else }}
+            {{- else if eq $engine "mysql" }}
+            - name: MYSQL_DATABASE
+              value: {{ $db.database | quote }}
+            - name: MYSQL_USER
+              value: {{ $db.username | quote }}
+            - name: MYSQL_PASSWORD_FILE
+              value: /run/secrets/mozg/password
+            # root shares the password but may only log in from inside the pod.
+            - name: MYSQL_ROOT_PASSWORD_FILE
+              value: /run/secrets/mozg/password
+            - name: MYSQL_ROOT_HOST
+              value: localhost
+            {{- else if eq $engine "neo4j" }}
+            - name: DB
+              value: {{ $db.database | quote }}
             - name: NEO4J_AUTH_FILE
               value: /run/auth/neo4j-auth
             - name: NEO4J_initial_dbms_default__database
               value: {{ $db.database | quote }}
             - name: NEO4J_server_memory_heap_initial__size
-              value: {{ $db.neo4j.heapSize | default "1G" | quote }}
+              value: {{ (and $db.neo4j $db.neo4j.heapSize) | default "1G" | quote }}
             - name: NEO4J_server_memory_heap_max__size
-              value: {{ $db.neo4j.heapSize | default "1G" | quote }}
+              value: {{ (and $db.neo4j $db.neo4j.heapSize) | default "1G" | quote }}
             - name: NEO4J_server_memory_pagecache_size
-              value: {{ $db.neo4j.pageCacheSize | default "1G" | quote }}
+              value: {{ (and $db.neo4j $db.neo4j.pageCacheSize) | default "1G" | quote }}
             - name: NEO4J_server_default__listen__address
               value: 0.0.0.0
-            {{- range $k, $v := ($db.neo4j.config | default dict) }}
+            {{- range $k, $v := ((and $db.neo4j $db.neo4j.config) | default dict) }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            {{- else if eq $engine "arango" }}
+            - name: ARANGO_ROOT_PASSWORD_FILE
+              value: /run/secrets/mozg/password
+            - name: MOZG_DATABASE
+              value: {{ $db.database | quote }}
+            - name: MOZG_RESTORE_JOBS
+              value: {{ (and $db.dump $db.dump.restoreJobs) | default 2 | quote }}
+            {{- else if eq $engine "elasticsearch" }}
+            - name: ELASTIC_PASSWORD_FILE
+              value: /run/auth/elastic-password
+            - name: ES_JAVA_OPTS
+              value: {{ printf "-Xms%s -Xmx%s" ((and $db.elasticsearch $db.elasticsearch.heapSize) | default "512m") ((and $db.elasticsearch $db.elasticsearch.heapSize) | default "512m") | quote }}
+            # One node, password authentication over plain HTTP inside the
+            # cluster (the NetworkPolicy admits only Mozg); no memory-mapped
+            # stores, so the node needs no vm.max_map_count tuning.
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "true"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: xpack.security.transport.ssl.enabled
+              value: "false"
+            - name: node.store.allow_mmap
+              value: "false"
+            - name: path.repo
+              value: {{ $layout.dump }}
+            - name: xpack.ml.enabled
+              value: "false"
+            - name: ingest.geoip.downloader.enabled
+              value: "false"
+            {{- range $k, $v := ((and $db.elasticsearch $db.elasticsearch.config) | default dict) }}
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
@@ -213,7 +284,7 @@ spec:
             - name: db
               containerPort: {{ include "mozg.db.port" $ctx }}
               protocol: TCP
-          {{- if $pg }}
+          {{- if eq $engine "postgres" }}
           # During the first start the server listens on its socket only (the
           # restore runs then), so TCP readiness doubles as "restore finished".
           startupProbe:
@@ -230,7 +301,27 @@ spec:
               command: [sh, -c, 'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
             periodSeconds: 30
             failureThreshold: 6
+          {{- else if $markerProbe }}
+          # The server is up before its first start has loaded everything;
+          # it is ready once the ready marker is written.
+          startupProbe:
+            exec:
+              command: [bash, -c, {{ $markerProbe | quote }}]
+            periodSeconds: 10
+            failureThreshold: {{ $startup }}
+          readinessProbe:
+            exec:
+              command: [bash, -c, {{ $markerProbe | quote }}]
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: db
+            periodSeconds: 30
+            failureThreshold: 6
           {{- else }}
+          # MySQL and ArangoDB load their first start through a temporary
+          # server that does not listen on this port, so the port opening
+          # means the load has finished.
           startupProbe:
             tcpSocket:
               port: db
@@ -250,23 +341,41 @@ spec:
             {{- toYaml $db.resources | nindent 12 }}
           volumeMounts:
             - name: data
-              mountPath: {{ $dataDir }}
-            {{- if $pg }}
-            - name: init
-              mountPath: /docker-entrypoint-initdb.d
-            - name: dshm
-              mountPath: /dev/shm
+              mountPath: {{ $layout.mount }}
+            {{- if $layout.engineData }}
+            - name: data
+              mountPath: {{ $layout.engineData }}
+              subPath: data
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
             - name: credentials
               mountPath: /run/secrets/mozg
               readOnly: true
+            {{- if $initFiles }}
+            - name: init
+              mountPath: {{ ternary "/mozg/init" "/docker-entrypoint-initdb.d" (has $engine (list "neo4j" "elasticsearch")) }}
+              readOnly: true
+            {{- end }}
+            {{- if eq $engine "postgres" }}
+            - name: dshm
+              mountPath: /dev/shm
             # Writable paths under a read-only root filesystem.
             - name: run
               mountPath: /var/run/postgresql
-            - name: tmp
-              mountPath: /tmp
-            {{- else }}
+            {{- else if eq $engine "mysql" }}
+            - name: run
+              mountPath: /run/mysqld
+            {{- else if eq $engine "neo4j" }}
             - name: logs
               mountPath: /logs
+            - name: auth
+              mountPath: /run/auth
+              readOnly: true
+            {{- else if eq $engine "arango" }}
+            - name: apps
+              mountPath: /var/lib/arangodb3-apps
+            {{- else if eq $engine "elasticsearch" }}
             - name: auth
               mountPath: /run/auth
               readOnly: true
@@ -281,20 +390,32 @@ spec:
               - key: password
                 path: password
             defaultMode: 0440
-        {{- if $pg }}
-        - name: run
-          emptyDir: {}
+        {{- if $initFiles }}
         - name: init
           configMap:
             name: {{ $full }}-init
-            defaultMode: 0755
+            {{- /* The postgres entrypoint executes executable .sh files; MySQL's must be sourced to see its SQL helper. */}}
+            defaultMode: {{ ternary "0755" "0644" (eq $engine "postgres") }}
+        {{- end }}
+        {{- if eq $engine "postgres" }}
+        - name: run
+          emptyDir: {}
         - name: dshm
           emptyDir:
             medium: Memory
             sizeLimit: 1Gi
-        {{- else }}
+        {{- else if eq $engine "mysql" }}
+        - name: run
+          emptyDir: {}
+        {{- else if eq $engine "arango" }}
+        - name: apps
+          emptyDir: {}
+        {{- end }}
+        {{- if eq $engine "neo4j" }}
         - name: logs
           emptyDir: {}
+        {{- end }}
+        {{- if has $engine (list "neo4j" "elasticsearch") }}
         - name: auth
           emptyDir:
             medium: Memory
@@ -326,4 +447,5 @@ spec:
         resources:
           requests:
             storage: {{ $db.storage.size | quote }}
+{{- end }}
 {{- end }}
