@@ -1,14 +1,14 @@
 # Mozg — production image.
 #   docker build -t mozg .
 #   docker run -p 4000:4000 mozg
-# Debian 13 (trixie): sqlite3's prebuilt binding needs glibc 2.38, which the
-# default node:22-slim (Debian 12, glibc 2.36) lacks.
-FROM node:22-trixie-slim AS deps
+# Node 26, the active LTS line, on Debian 13 (trixie): sqlite3's prebuilt
+# binding needs glibc 2.38, which Debian 12 (glibc 2.36) lacks.
+FROM node:26-trixie-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM node:22-trixie-slim
+FROM node:26-trixie-slim
 ENV NODE_ENV=production PORT=4000
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules

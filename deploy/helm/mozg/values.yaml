@@ -158,7 +158,7 @@ databaseDefaults:
     # restore of a large dump must finish before the database may sleep.
     initialCooldownSeconds: 3600
   # -- Image used to download dumps (needs sh, curl, tar, gzip, sha256sum)
-  downloaderImage: curlimages/curl:8.11.1
+  downloaderImage: curlimages/curl:8.23.0
   # -- Database container resources (presets set their own)
   resources:
     requests:
@@ -188,11 +188,11 @@ databaseDefaults:
 # first start loads data:
 #
 #   engine         image (default)                  dump.format               inline data
-#   postgres       postgres:16-alpine               tar.gz, dump, sql, sql.gz  initSQL
-#   mysql          mariadb:11.4                     sql, sql.gz, tar.gz        initSQL
-#   neo4j          neo4j:5.26-community             dump                       initCypher (list)
-#   arango         arangodb:3.12.4                  tar.gz (arangodump dir)    initJS
-#   elasticsearch  elasticsearch:8.15.5             tar.gz (snapshot repo or   initBulk (NDJSON)
+#   postgres       postgres:18-alpine               tar.gz, dump, sql, sql.gz  initSQL
+#   mysql          mariadb:12.3 (LTS)               sql, sql.gz, tar.gz        initSQL
+#   neo4j          neo4j:5.26-community (LTS)       dump                       initCypher (list)
+#   arango         arangodb:3.12.13                 tar.gz (arangodump dir)    initJS
+#   elasticsearch  elasticsearch:9.5.6              tar.gz (snapshot repo or   initBulk (NDJSON)
 #                                                   NDJSON), ndjson, ndjson.gz
 #   sqlite3        (none: Mozg opens the file)      sqlite, sqlite.gz, tar.gz  initSQL
 #
@@ -211,7 +211,7 @@ databases:
     engine: postgres
     image:
       repository: postgres
-      tag: "16-alpine"
+      tag: "18-alpine"
       pullPolicy: IfNotPresent
     # -- Database, user and (generated, stored in a Secret) password
     database: chembl

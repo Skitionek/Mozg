@@ -29,7 +29,7 @@ spec:
       type: RuntimeDefault
   containers:
     - name: healthz
-      image: curlimages/curl:8.11.1
+      image: curlimages/curl:8.23.0
       imagePullPolicy: IfNotPresent
       command:
         - sh

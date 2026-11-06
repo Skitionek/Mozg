@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: ["20", "22"]
+        node-version: ["22", "24", "26"]
 
     steps:
       - name: Checkout
@@ -38,8 +38,8 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Test with coverage (Node 22+)
-        if: ${{ matrix.node-version == '22' }}
+      - name: Test with coverage (Node 26, the active LTS)
+        if: ${{ matrix.node-version == '26' }}
         # src/catalog is excluded: its files describe external APIs, and their
         # field-mapping functions only run against real responses.  They are
         # covered by tests/catalog-relations.test.js (static lint, above) and

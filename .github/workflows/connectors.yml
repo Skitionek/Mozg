@@ -26,12 +26,14 @@ jobs:
     permissions:
       contents: read
 
-    # Every service runs without a password — nothing secret, nothing for
+    # Every server runs without a password — nothing secret, nothing for
     # secret scanners to trip over.  Bad-credential handling is still tested
-    # where the server refuses unknown users (Postgres, MySQL).
+    # where the server refuses unknown users (Postgres, MySQL).  Versions are
+    # each engine's current LTS line where it has one (MySQL 8.4 — the newest
+    # its connector can reach — and Neo4j 5.26), else its newest release.
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: mozg_it
@@ -40,18 +42,8 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 20
 
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-          MYSQL_DATABASE: mozg_it
-        ports: ["3306:3306"]
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1"
-          --health-interval 5s --health-timeout 5s --health-retries 30
-
       neo4j:
-        image: neo4j:5
+        image: neo4j:5.26
         env:
           NEO4J_AUTH: none
         ports: ["7687:7687"]
@@ -66,7 +58,7 @@ jobs:
         ports: ["8529:8529"]
 
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
         env:
           discovery.type: single-node
           xpack.security.enabled: "false"
@@ -83,19 +75,27 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "26"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Let MySQL's root authenticate with mysql_native_password
+      - name: Start MySQL 8.4 (LTS) with mysql_native_password
         # The MySQL driver goes through the graphql-mesh MySQL handler, whose
-        # client (mysql 2.x) cannot speak MySQL 8's default
-        # caching_sha2_password.  See docs/connectors.md.
+        # client (mysql 2.x) speaks only mysql_native_password: MySQL 8.4
+        # ships it switched off, and 9.x has removed it (docs/connectors.md).
+        # Service containers take no server arguments, so MySQL runs here.
         run: |
-          docker exec ${{ job.services.mysql.id }} mysql -uroot \
-            -e "ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '';"
+          docker run -d --name mysql -p 3306:3306 \
+            -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=mozg_it \
+            mysql:8.4 --mysql-native-password=ON --authentication-policy=mysql_native_password
+          for _ in $(seq 1 60); do
+            if docker exec mysql mysqladmin ping -h 127.0.0.1 --silent; then exit 0; fi
+            sleep 2
+          done
+          docker logs mysql
+          exit 1
 
       - name: Wait for ArangoDB
         run: |

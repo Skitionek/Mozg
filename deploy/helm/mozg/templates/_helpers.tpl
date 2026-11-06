@@ -54,21 +54,22 @@ their built-in superuser on first start, so for them it is fixed.
 */}}
 {{- define "mozg.engineDefaults" -}}
 postgres:
-  image: { repository: postgres, tag: "16-alpine" }
+  image: { repository: postgres, tag: "18-alpine" }
   username: mozg
 mysql:
-  # MariaDB speaks the MySQL protocol and authenticates with
-  # mysql_native_password, which Mozg's mysql connector needs.
-  image: { repository: mariadb, tag: "11.4" }
+  # MariaDB (12.3, its newest LTS) speaks the MySQL protocol and
+  # authenticates with mysql_native_password, which Mozg's mysql connector
+  # needs.
+  image: { repository: mariadb, tag: "12.3" }
   username: mozg
 neo4j:
   image: { repository: neo4j, tag: "5.26-community" }
   username: neo4j
 arango:
-  image: { repository: arangodb, tag: "3.12.4" }
+  image: { repository: arangodb, tag: "3.12.13" }
   username: root
 elasticsearch:
-  image: { repository: docker.elastic.co/elasticsearch/elasticsearch, tag: "8.15.5" }
+  image: { repository: docker.elastic.co/elasticsearch/elasticsearch, tag: "9.5.6" }
   username: elastic
 sqlite3: {}
 {{- end }}

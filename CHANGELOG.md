@@ -118,6 +118,30 @@ verified against the live APIs, and joined up across sources.
 
 ### Changed
 
+- **Dependencies, runtimes and images on their current LTS lines** (as of
+  November 2026):
+  - Node.js: the image runs Node 26 (active LTS), and CI tests 22, 24 and 26.
+    `engines` is `>=22`, since Node 20 reached end of life in April 2026.
+  - Database images:
+    - MariaDB 12.3 LTS (was 11.4);
+    - Neo4j 5.26 LTS, pinned in CI too;
+    - PostgreSQL 18, Elasticsearch 9.5.6 and ArangoDB 3.12.13, the newest
+      releases of projects without LTS lines;
+    - MySQL 8.4 LTS in CI (was 8.0, end of life).
+  - Tooling:
+    - Helm 4.3.1 (`azure/setup-helm` v5);
+    - kubeconform 0.8.0, validating against Kubernetes 1.35 and 1.37;
+    - curl 8.23.0;
+    - the Codespaces image (`javascript-node:5-26-trixie`, was Node 20).
+  - npm: every direct dependency at its latest release.
+    - `graphql-scalars` is pinned to 2.0.1 for a high-severity ReDoS
+      (GHSA-x8rm-f576-gq67) that the mesh packages' `^1` range cannot reach.
+    - The `thrift` override moves to 0.25.
+    - `npm audit --omit=dev` goes from 9 findings (1 high) to 4 moderate.
+      They come only through `@graphql-mesh/openapi`, whose suggested "fix"
+      is a stray 1.0.0 from 2023.
+    - Transitive packages stay pinned: refreshing them all broke the Neo4j
+      handler ("Unknown argument kind on directive @transport").
 - KEGG requests go through the shared HTTP client (3 requests/s, as KEGG
   asks; timeouts; retries); a 404 is an empty result instead of an error.
 - Cross-catalog relations on a row are resolved concurrently.
@@ -175,6 +199,13 @@ verified against the live APIs, and joined up across sources.
   - a refused Elasticsearch connection (the HTTP client kept no cause);
   - pooled connections the database closed when it scaled down;
   - a MySQL server that accepted the connection but has not greeted yet.
+- A self-hosted PostgreSQL scaling down under an idle pooled connection
+  (`57P01`, "terminating connection due to administrator command") failed
+  the next query instead of waiting for it to come back.
+- ArangoDB 3.12.5 and later: the image's entrypoint starts its first-start
+  server on `./arangod` instead of the data directory, so the chart's
+  database creation and restore landed beside the real data. The chart
+  mounts the data directory there too.
 - The Docker image could not load SQLite: `sqlite3`'s prebuilt binding needs
   glibc 2.38, and the image was based on Debian 12 (glibc 2.36).  It is now
   based on `node:22-trixie-slim`, and CI opens a SQLite database inside the

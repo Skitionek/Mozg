@@ -1,6 +1,6 @@
 {
   "name": "Mozg",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-26-trixie",
 
   // Install dependencies right after the container is created
   "postCreateCommand": "npm install",
