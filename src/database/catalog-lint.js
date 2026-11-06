@@ -85,6 +85,10 @@ function lintEntry (entry, lookup) {
         if (!validKey(k)) fail(`${where}: obo.${name} names unknown OBO key "${k}"`)
       }
     }
+    for (const [name, form] of Object.entries(entity.oboForm || {})) {
+      if (!['local', 'curie'].includes(form)) fail(`${where}: oboForm.${name} must be "local" or "curie"`)
+      if (!obo.fieldKey(entity, name)) fail(`${where}: oboForm.${name} is set but "${name}" carries no OBO key`)
+    }
     for (const [name, spec] of Object.entries(entity.params || {})) {
       if (spec && spec.obo != null) {
         for (const k of [].concat(spec.obo)) if (!validKey(k)) fail(`${where}: params.${name}.obo names unknown OBO key "${k}"`)

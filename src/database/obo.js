@@ -292,6 +292,25 @@ function normalize (key, value) {
   return normalizeOne(key, value)
 }
 
+/**
+ * A value written the way a particular store keeps it: `local` (bare id,
+ * `15365`) or `curie` (`CHEBI:15365`).  For joining into a self-hosted table
+ * whose column stores identifiers differently from the canonical form.
+ * @param {string} key
+ * @param {*} value
+ * @param {'local'|'curie'} [form]  defaults to the key's canonical form
+ */
+function toForm (key, value, form) {
+  if (Array.isArray(value)) return value.map((v) => toForm(key, v, form))
+  const canonical = normalize(key, value)
+  const spec = KEYS[key]
+  if (!spec || !form || form === spec.form || canonical == null) return canonical
+  const text = String(canonical)
+  if (form === 'local') return spec.form === 'curie' ? text.slice(spec.prefix.length + 1) : canonical
+  if (form === 'curie') return spec.form === 'curie' ? text : `${spec.prefix}:${text}`
+  return canonical
+}
+
 /** True when a value is in its key's canonical form (lists: every element). */
 function isCanonical (key, value) {
   if (value == null) return true
@@ -346,6 +365,7 @@ module.exports = {
   keyOfCurie,
   keyOfValue,
   normalize,
+  toForm,
   isCanonical,
   accepts
 }

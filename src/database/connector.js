@@ -2,7 +2,7 @@
 
 const registry = require('./registry')
 const { resolveCrossCatalogRelation } = require('./relations')
-const { normalizeQueryInput } = require('./sources')
+const { normalizeQueryInput, normalizeKeyedRows, sourceForConnection } = require('./sources')
 const { withWake } = require('./self-hosted')
 
 async function executeQuery (rawInput) {
@@ -18,6 +18,11 @@ async function executeQuery (rawInput) {
   // A database hosted with this server may be scaled to zero: count the query
   // as demand (which wakes it) and wait out its cold start.
   const result = await withWake(input.connection, () => driver.executeQuery({ ...input, relations: sameSource }))
+
+  // Rows from a catalog SQL table or graph label get their identifier columns
+  // in canonical OBO form, as api rows already have them.
+  const entry = input.connection.driver !== 'api' && !input.raw ? sourceForConnection(input.connection) : null
+  if (entry) normalizeKeyedRows(entry, input.from, result.data, sameSource)
 
   const options = { apiKeys: input.connection.apiKeys }
   await Promise.all(crossCatalog.map((rel) => resolveCrossCatalogRelation(executeQuery, result.data, rel, options)))
