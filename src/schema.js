@@ -498,6 +498,8 @@ const typeDefs = /* GraphQL */ `
     description: String
     """Cap on related rows per parent row, when the catalog sets one"""
     limit: Int
+    """Fixed filters sent with the related lookup (e.g. Open Trivia's amount)"""
+    where: JSON
     """OBO key the join is declared by, when it is"""
     obo: String
   }

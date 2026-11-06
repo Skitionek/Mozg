@@ -938,8 +938,11 @@
     return JSON.stringify(value);
   }
 
+  // `driver` is an enum, written bare; every other field is a literal.
   function connToGQL(conn) {
-    return jsonToGQL(conn);
+    const fields = Object.entries(conn).map(([k, v]) =>
+      `${k}: ${k === 'driver' && /^[A-Za-z_]\w*$/.test(v) ? v : jsonToGQL(v)}`);
+    return `{ ${fields.join(', ')} }`;
   }
 
   // ── Relations ────────────────────────────────────────────────
@@ -983,6 +986,8 @@
     let s = `{ entity: ${JSON.stringify(rel.entity)}, foreignKey: ${JSON.stringify(rel.foreignKey)}, type: ${rel.type}`;
     if (rel.localKey) s += `, localKey: ${JSON.stringify(rel.localKey)}`;
     if (rel.alias)    s += `, alias: ${JSON.stringify(rel.alias)}`;
+    if (rel.where)    s += `, where: ${jsonToGQL(rel.where)}`;
+    if (rel.limit != null) s += `, limit: ${rel.limit}`;
     s += ' }';
     return s;
   }
@@ -1083,6 +1088,8 @@
         const rel = { entity: r.entity, foreignKey: r.foreignKey, type: r.type };
         if (r.localKey) rel.localKey = r.localKey;
         if (r.alias)    rel.alias    = r.alias;
+        if (r.where)    rel.where    = r.where;
+        if (r.limit != null) rel.limit = r.limit;
         return rel;
       });
     }
@@ -1486,7 +1493,7 @@
             entities {
               name description columns example
               params { name required description }
-              relations { entity foreignKey localKey alias type catalog description obo }
+              relations { entity foreignKey localKey alias type catalog description limit where obo }
               links { name obo description }
             }
           }
