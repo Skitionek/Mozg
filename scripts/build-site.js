@@ -42,11 +42,24 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', 
 
 const decodeEntities = (s) => s.replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e])
 
-/** GitHub's heading ids: lower case, punctuation and symbols dropped, spaces to hyphens, repeats numbered. */
+/**
+ * The text a reader sees in inline Markdown tokens: inline HTML tags are
+ * dropped, entities in prose decoded, code spans kept as written.
+ */
+function plainText (tokens) {
+  return tokens.map((token) => {
+    if (token.type === 'html') return ''
+    if (token.tokens) return plainText(token.tokens)
+    if (token.type === 'text') return decodeEntities(token.text)
+    return token.text || ''
+  }).join('')
+}
+
+/** GitHub's heading ids, from a heading's plain text: lower case, punctuation and symbols dropped, spaces to hyphens, repeats numbered. */
 function createSlugger () {
   const seen = new Map()
   return (text) => {
-    const base = decodeEntities(String(text).replace(/<[^>]*>/g, ''))
+    const base = String(text)
       .toLowerCase()
       .trim()
       .replace(/[^\p{L}\p{M}\p{N}\p{Pc}\- ]/gu, '')
@@ -90,8 +103,9 @@ async function renderMarkdown (markdown, from, pages) {
     renderer: {
       heading ({ tokens, depth }) {
         const inner = this.parser.parseInline(tokens)
-        const id = slug(inner)
-        headings.push({ depth, id, text: inner.replace(/<[^>]*>/g, '') })
+        const text = plainText(tokens)
+        const id = slug(text)
+        headings.push({ depth, id, text })
         return `<h${depth} id="${id}"><a class="anchor" href="#${id}" aria-label="Link to this section">#</a>${inner}</h${depth}>\n`
       },
       code ({ text, lang }) {
@@ -106,7 +120,7 @@ async function renderMarkdown (markdown, from, pages) {
   })
   const html = marked.parse(markdown)
   const h1 = headings.find((h) => h.depth === 1)
-  return { html, title: h1 ? decodeEntities(h1.text) : path.basename(from, '.md'), headings }
+  return { html, title: h1 ? h1.text : path.basename(from, '.md'), headings }
 }
 
 /** The examples page, from examples/queries.json, grouped by category. */
@@ -138,7 +152,7 @@ function tableOfContents (headings) {
   if (items.length < 3) return ''
   // Collapsed on narrow screens; the page script opens it where it sits beside the text.
   return `<nav class="toc" aria-label="On this page"><details><summary class="toc-title">On this page</summary><ul>${items
-    .map((h) => `<li class="toc-${h.depth}"><a href="#${h.id}">${escapeHtml(decodeEntities(h.text))}</a></li>`)
+    .map((h) => `<li class="toc-${h.depth}"><a href="#${h.id}">${escapeHtml(h.text)}</a></li>`)
     .join('')}</ul></details></nav>`
 }
 
@@ -250,7 +264,7 @@ async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROO
   return { out, pages: written, media, paper: hasPaper }
 }
 
-module.exports = { PAGES, createSlugger, rewriteHref, renderMarkdown, examplesMarkdown, withoutTitle, build }
+module.exports = { PAGES, createSlugger, rewriteHref, renderMarkdown, examplesMarkdown, withoutTitle, build, tableOfContents }
 
 if (require.main === module) {
   const argv = process.argv.slice(2)
