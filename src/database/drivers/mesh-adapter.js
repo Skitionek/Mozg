@@ -14,6 +14,7 @@ const { MeshStore, InMemoryStoreStorageAdapter } = require('@graphql-mesh/store'
 const { PubSub, DefaultLogger } = require('@graphql-mesh/utils')
 
 const { assertSafeCypherIdentifier } = require('./neo4j-identifiers')
+const { patchNeo4jIntrospectorTypes } = require('./neo4j-types')
 
 // Cache: connection key → { schema, executor }
 // TODO: add LRU eviction to prevent unbounded growth in long-running processes
@@ -148,7 +149,10 @@ async function getOrCreateMeshSource (connection) {
   const cacheKey = cacheKeyFor(connection)
 
   if (meshSourceCache.has(cacheKey)) return meshSourceCache.get(cacheKey)
-  if (driver === 'neo4j') patchNeo4jBigInt()
+  if (driver === 'neo4j') {
+    patchNeo4jBigInt()
+    patchNeo4jIntrospectorTypes()
+  }
 
   const { pkg, config } = buildHandlerDescriptor(driver, connection)
   const HandlerClass = require(pkg).default
