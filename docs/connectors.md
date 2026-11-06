@@ -24,12 +24,12 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
 
 | Driver | Backend | Tested against | Query | Relations | Introspect | Status |
 |--------|---------|----------------|:-----:|:---------:|:----------:|--------|
-| `postgres` | PostgreSQL (knex + pg) | Integration suite: local PostgreSQL 16, CI service container | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
-| `sqlite3` | SQLite file (knex) | Integration suite on a temp file, locally and in CI; unit tests | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ | **Stable** |
-| `mysql` | MySQL via graphql-mesh | Integration suite: local MySQL 8.0, CI service container | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
-| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5) | ✓ | ✓ per row | ✓ | **Beta** (see finding 1) |
-| `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12) | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
-| `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.15) | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
+| `postgres` | PostgreSQL (knex + pg) | Integration suite: local PostgreSQL 16, CI service container; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
+| `sqlite3` | SQLite file (knex) | Integration suite on a temp file, locally and in CI; unit tests; inside the Docker image; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ | **Stable** |
+| `mysql` | MySQL via graphql-mesh | Integration suite: local MySQL 8.0, CI service container; Helm chart end to end on kind (MariaDB 11.4) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
+| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see finding 1) |
+| `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
+| `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.15); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
 | `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12) | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
 | `kegg` | rest.kegg.jp (text) | Unit tests; live `/list`, `/get`, `/link` | ✓ | ✓ via `_pathSuffix` | from catalog | **Stable** |
 | `openapi` | OpenAPI / Swagger via graphql-mesh | Live Petstore v3; shape tests | ✓ | ✓ per row | ✓ operations | **Beta** (see finding 1) |
@@ -180,8 +180,15 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
       (undici's `UND_ERR_SOCKET` "other side closed", MySQL's
       `PROTOCOL_CONNECTION_LOST`) failed the query.
 
-    The error now keeps its cause, and both cases count as a cold start.
+    A third case was missing too: a MySQL server that accepted the connection
+    but had not greeted yet ("Handshake inactivity timeout").
+    The error now keeps its cause, and all three count as a cold start.
     Each engine's kind test wakes its database a second time to cover them.
+15. **The Docker image could not load SQLite.** `sqlite3`'s prebuilt binding
+    needs glibc 2.38; the image was Debian 12 (2.36). It is now Debian 13
+    (`node:22-trixie-slim`), and the Docker CI job opens a SQLite database
+    inside the image. `/healthz`, all that job checked before, never loads
+    a native module.
 
 ## Known limitations
 
