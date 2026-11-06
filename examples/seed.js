@@ -65,15 +65,57 @@ async function seed () {
     created_at TEXT    NOT NULL
   )`)
 
+  // ── Rows ─────────────────────────────────────────────────────────────────
+  // One write transaction: a second seed.js running at the same time waits
+  // (busyTimeout), then finds the rows in place and leaves them.  A database
+  // holding anything but exactly the sample rows (empty, or grown by an older
+  // seed.js that appended a copy on every run) is rebuilt from scratch, so
+  // ids always start at 1.
+  await run('BEGIN IMMEDIATE')
+  try {
+    if (await hasSampleRows()) {
+      await run('COMMIT')
+      return report()
+    }
+    await run('DELETE FROM comments')
+    await run('DELETE FROM posts')
+    await run('DELETE FROM users')
+    await run("DELETE FROM sqlite_sequence WHERE name IN ('users', 'posts', 'comments')")
+    await insertRows()
+    await run('COMMIT')
+  } catch (err) {
+    await run('ROLLBACK').catch(() => {})
+    throw err
+  }
+  return report()
+}
+
+const USER_NAMES = ['Alice Müller', 'Bob Smith', 'Carol Jones', 'Dave Brown', 'Eve Davis']
+const POSTS_PER_USER = 3
+const COMMENTS_PER_POST = 3
+
+async function count (table) {
+  const [{ n }] = await all(`SELECT COUNT(*) AS n FROM ${table}`)
+  return n
+}
+
+async function hasSampleRows () {
+  const posts = USER_NAMES.length * POSTS_PER_USER
+  return await count('users') === USER_NAMES.length &&
+    await count('posts') === posts &&
+    await count('comments') === posts * COMMENTS_PER_POST
+}
+
+async function insertRows () {
   // ── Users ────────────────────────────────────────────────────────────────
   const now = new Date().toISOString()
-  const userNames = ['Alice Müller', 'Bob Smith', 'Carol Jones', 'Dave Brown', 'Eve Davis']
+  const userNames = USER_NAMES
 
   for (let i = 0; i < userNames.length; i++) {
     const name = userNames[i]
     const email = name.toLowerCase().replace(/[^a-z]+/g, '.') + '@example.com'
     await run(
-      'INSERT OR IGNORE INTO users (name, email, created_at) VALUES (?, ?, ?)',
+      'INSERT INTO users (name, email, created_at) VALUES (?, ?, ?)',
       [name, email, now]
     )
   }
@@ -82,9 +124,9 @@ async function seed () {
 
   // ── Posts ────────────────────────────────────────────────────────────────
   for (const user of users) {
-    for (let p = 1; p <= 3; p++) {
+    for (let p = 1; p <= POSTS_PER_USER; p++) {
       await run(
-        'INSERT OR IGNORE INTO posts (user_id, title, body, created_at) VALUES (?, ?, ?, ?)',
+        'INSERT INTO posts (user_id, title, body, created_at) VALUES (?, ?, ?, ?)',
         [
           user.id,
           `Post ${p} by user ${user.id}`,
@@ -99,11 +141,11 @@ async function seed () {
 
   // ── Comments ─────────────────────────────────────────────────────────────
   for (const post of posts) {
-    for (let c = 1; c <= 3; c++) {
+    for (let c = 1; c <= COMMENTS_PER_POST; c++) {
       // Cycle through users as commenters
       const commenter = users[(post.id + c) % users.length]
       await run(
-        'INSERT OR IGNORE INTO comments (post_id, user_id, body, created_at) VALUES (?, ?, ?, ?)',
+        'INSERT INTO comments (post_id, user_id, body, created_at) VALUES (?, ?, ?, ?)',
         [
           post.id,
           commenter.id,
@@ -114,16 +156,13 @@ async function seed () {
     }
   }
 
-  // ── Summary ──────────────────────────────────────────────────────────────
-  const [{ n: userCount }] = await all('SELECT COUNT(*) AS n FROM users')
-  const [{ n: postCount }] = await all('SELECT COUNT(*) AS n FROM posts')
-  const [{ n: commentCount }] = await all('SELECT COUNT(*) AS n FROM comments')
+}
 
+async function report () {
   console.log(`Seeded ${DB_PATH}`)
-  console.log(`  users:    ${userCount}`)
-  console.log(`  posts:    ${postCount}`)
-  console.log(`  comments: ${commentCount}`)
-
+  console.log(`  users:    ${await count('users')}`)
+  console.log(`  posts:    ${await count('posts')}`)
+  console.log(`  comments: ${await count('comments')}`)
   db.close()
 }
 
