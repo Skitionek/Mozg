@@ -41,11 +41,15 @@ Mozg has left the concept phase.  Some parts are production-ready; others are st
 | Area | Status |
 |------|--------|
 | Life-science sources (`api` driver, 47 sources) | **Stable.** Every entity's example and every relation is verified against the live APIs weekly; requests are throttled to each provider's published limits and retried on transient failures. |
-| PostgreSQL, MySQL, SQLite, Neo4j | **Stable.** Covered by unit tests; SQLite queries also run against a real database file in CI. |
-| KEGG, plain REST, Elasticsearch | **Stable.** |
-| OpenAPI, SOAP, OData, Thrift (via graphql-mesh) | **Beta.** Works, but less exercised. |
-| ArangoDB, BioCyc | **Beta.** Not exercised against live servers in CI. |
+| PostgreSQL, SQLite | **Stable.** A shared behavioural suite runs against real servers in CI. |
+| KEGG, plain REST | **Stable.** |
+| MySQL, Neo4j (via graphql-mesh), ArangoDB, Elasticsearch | **Beta.** The same suite runs against real servers in CI; MySQL needs `mysql_native_password`. |
+| OpenAPI, OData (via graphql-mesh), BioCyc | **Beta.** Checked against live services; BioCyc needs an account for more than a few requests. |
+| SOAP, Thrift (via graphql-mesh) | **Experimental.** |
+| Self-hosted databases on Kubernetes (Helm, scale to zero) | **Beta.** Exercised end to end on a kind cluster in CI. |
 | OWL ontology ingestion | **Experimental.** |
+
+Per-connector details, test coverage and known limitations: [docs/connectors.md](docs/connectors.md).  Deploying with self-hosted databases: [docs/deploy.md](docs/deploy.md).
 
 ---
 
@@ -251,6 +255,10 @@ mutation {
 | `MOZG_HTTP_CACHE_TTL_MS` | `0` (off) | Cache identical outbound GETs for this long — trades freshness for speed |
 | `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
 | `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |
+| `MOZG_SOURCES_DIR` | unset | Directory of JSON catalog entries to register at startup (self-hosted databases; see [docs/deploy.md](docs/deploy.md)) |
+| `MOZG_WAKE_TIMEOUT_MS` | `180000` | How long a query waits for a self-hosted database scaled to zero to come up |
+| `MOZG_DEMAND_WINDOW_MS` | `60000` | How long after its last use `/demand/<source>` keeps reporting a self-hosted database as wanted (what KEDA scales on) |
+| `MOZG_PEERS` | unset | Headless-service host name of the other Mozg replicas, so `/demand` counts their in-flight queries too |
 
 - `GET /healthz` answers `{"status":"ok"}` without touching any upstream, for load balancers and orchestrators.
 - The container runs as an unprivileged user and declares a `HEALTHCHECK`.
