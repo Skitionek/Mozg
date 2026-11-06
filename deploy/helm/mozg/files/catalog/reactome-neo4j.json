@@ -9,30 +9,78 @@
     {
       "name": "Pathway",
       "description": "One pathway",
-      "columns": ["dbId", "stId", "displayName", "speciesName", "schemaClass", "isInDisease", "isInferred", "hasDiagram", "releaseDate"],
-      "obo": { "stId": "reactome" },
+      "columns": [
+        "dbId",
+        "stId",
+        "displayName",
+        "speciesName",
+        "schemaClass",
+        "isInDisease",
+        "isInferred",
+        "hasDiagram",
+        "releaseDate"
+      ],
+      "obo": {
+        "stId": "reactome"
+      },
       "relations": []
     },
     {
       "name": "ReactionLikeEvent",
       "description": "One reaction, binding, polymerisation or other reaction-like event",
-      "columns": ["dbId", "stId", "displayName", "speciesName", "schemaClass", "category", "isInDisease", "isInferred", "isChimeric", "releaseDate"],
-      "obo": { "stId": "reactome" },
+      "columns": [
+        "dbId",
+        "stId",
+        "displayName",
+        "speciesName",
+        "schemaClass",
+        "category",
+        "isInDisease",
+        "isInferred",
+        "isChimeric",
+        "releaseDate"
+      ],
+      "obo": {
+        "stId": "reactome"
+      },
       "relations": []
     },
     {
       "name": "ReferenceGeneProduct",
       "description": "A protein referenced by Reactome's physical entities, by UniProt accession",
-      "columns": ["dbId", "identifier", "databaseName", "displayName", "geneName", "variantIdentifier", "url"],
-      "obo": { "identifier": "uniprot" },
+      "columns": [
+        "dbId",
+        "identifier",
+        "databaseName",
+        "displayName",
+        "geneName",
+        "variantIdentifier",
+        "url"
+      ],
+      "obo": {
+        "identifier": "uniprot"
+      },
       "relations": []
     },
     {
       "name": "ReferenceMolecule",
-      "description": "A small molecule referenced by Reactome's physical entities, by ChEBI id (stored without the CHEBI: prefix)",
-      "columns": ["dbId", "identifier", "databaseName", "displayName", "name", "formula", "url"],
-      "obo": { "identifier": "chebi" },
-      "relations": []
+      "description": "A small molecule referenced by Reactome's physical entities, by ChEBI id (stored bare, e.g. 15365)",
+      "columns": [
+        "dbId",
+        "identifier",
+        "databaseName",
+        "displayName",
+        "name",
+        "formula",
+        "url"
+      ],
+      "obo": {
+        "identifier": "chebi"
+      },
+      "relations": [],
+      "oboForm": {
+        "identifier": "local"
+      }
     }
   ]
 }

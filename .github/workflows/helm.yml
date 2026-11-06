@@ -76,6 +76,29 @@ jobs:
           helm template m "$CHART" --set ingress.enabled=true --set autoscaling.enabled=true --set 'mozg.extraSourcesConfigMaps[0]=my-sources' | validate
           echo "e2e values";               helm template m "$CHART" -f "$CHART/ci/e2e-values.yaml" --api-versions keda.sh/v1alpha1 | validate
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Lint the self-hosted catalog entries with Mozg's catalog lint
+        # OBO keys, oboForm, relations and their targets: the same checks
+        # every built-in source passes.
+        run: |
+          set -euo pipefail
+          npm ci
+          mkdir -p rendered-sources
+          helm template m "$CHART" \
+            --set databases.chembl.enabled=true \
+            --set databases.reactome.enabled=true \
+            --set databases.example.enabled=true \
+            --show-only templates/sources-configmap.yaml > sources.yaml
+          for key in $(yq -r '.data | keys | .[]' sources.yaml); do
+            yq -r ".data[\"$key\"]" sources.yaml > "rendered-sources/$key"
+          done
+          node "$CHART/ci/lint-sources.js" rendered-sources
+
       - name: Invalid values are rejected
         run: |
           set -uo pipefail

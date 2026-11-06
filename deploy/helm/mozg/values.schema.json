@@ -40,6 +40,11 @@
           "description": "OBO key (Bioregistry prefix) of each identifier column",
           "additionalProperties": { "type": ["string", "array", "null"] }
         },
+        "oboForm": {
+          "type": "object",
+          "description": "How a keyed column stores its values when not in the key's canonical form",
+          "additionalProperties": { "enum": ["local", "curie"] }
+        },
         "relations": { "type": "array", "items": { "type": "object" } }
       }
     },

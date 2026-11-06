@@ -261,3 +261,64 @@ describe('loadRelations: concurrency', () => {
     assert.ok(result.data.every((row) => row.entry && row.entry.entry))
   })
 })
+
+describe('kegg: flat-file details, select, limits and other catalogs', () => {
+  const kegg = require('../src/database/drivers/kegg')
+  const http = require('../src/database/http')
+
+  function serve (routes) {
+    const original = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      const hit = Object.entries(routes).find(([suffix]) => String(url).endsWith(suffix))
+      if (!hit) return { ok: false, status: 404, statusText: 'Not Found', headers: { get: () => null }, text: async () => '' }
+      return { ok: true, status: 200, statusText: 'OK', headers: { get: () => 'text/plain' }, text: async () => hit[1] }
+    }
+    return () => { globalThis.fetch = original }
+  }
+
+  test('repeated keys with continuation lines extend the last value', () => {
+    const [entry] = kegg.parseFlatFile('ENTRY       C00031\nDBLINKS     CAS: 50-99-7\n            PubChem: 3333\nDBLINKS     ChEBI: 4167\n            LIPIDMAPS: LMSL\n///\n')
+    assert.deepEqual(entry.dblinks, ['CAS: 50-99-7; PubChem: 3333', 'ChEBI: 4167; LIPIDMAPS: LMSL'])
+  })
+
+  test('select narrows rows; a 404 is no rows', async () => {
+    http.reset()
+    const restore = serve({ '/list/pathway': 'path:map00010\tGlycolysis\npath:map00020\tCitrate cycle\n' })
+    try {
+      const { data } = await kegg.executeQuery({ connection: { database: 'https://rest.kegg.jp' }, from: '/list/pathway', select: ['name'] })
+      assert.deepEqual(data, [{ name: 'Glycolysis' }, { name: 'Citrate cycle' }])
+      assert.deepEqual((await kegg.executeQuery({ connection: { database: 'https://rest.kegg.jp' }, from: '/get', where: { _pathSuffix: 'C99999' } })).data, [])
+    } finally {
+      restore()
+    }
+  })
+
+  test('relation limit, missing join values and other catalogs', async () => {
+    http.reset()
+    const restore = serve({
+      '/list/pathway': 'path:map00010\tGlycolysis\n',
+      '/link/compound/path%3Amap00010': 'path:map00010\tcpd:C00031\npath:map00010\tcpd:C00022\n'
+    })
+    try {
+      const { data } = await kegg.executeQuery({
+        connection: { database: 'https://rest.kegg.jp' },
+        from: '/list/pathway',
+        relations: [
+          { entity: '/link/compound', foreignKey: 'entry_id', type: 'hasMany', alias: 'compounds', limit: 1 },
+          { entity: '/get', foreignKey: 'missing', type: 'belongsTo', alias: 'none' },
+          { catalog: 'no-such-catalog', entity: 'x', localKey: 'entry_id', foreignKey: 'id', alias: 'elsewhere' }
+        ]
+      })
+      assert.deepEqual(data[0].compounds, [{ source_id: 'path:map00010', target_id: 'cpd:C00031' }])
+      assert.equal(data[0].none, null)
+      assert.match(data[0].elsewhere.error, /no-such-catalog/)
+    } finally {
+      restore()
+    }
+  })
+
+  test('introspection describes KEGG from its catalog entry', async () => {
+    const { tables } = await kegg.introspect({ driver: 'kegg', database: 'https://rest.kegg.jp' })
+    assert.ok(tables.some((t) => t.name === '/list/pathway'))
+  })
+})

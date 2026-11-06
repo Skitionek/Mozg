@@ -201,7 +201,7 @@ async function loadRelations (connection, rows, relations) {
       continue
     }
 
-    const { entity, foreignKey, alias, type = 'hasMany', select, relations: nested } = rel
+    const { entity, foreignKey, alias, type = 'hasMany', select, limit, relations: nested } = rel
     const resultKey = alias || entity
 
     await mapWithConcurrency(rows, RELATION_CONCURRENCY, async (row) => {
@@ -216,7 +216,8 @@ async function loadRelations (connection, rows, relations) {
           connection,
           from: entity,
           select,
-          where: { _pathSuffix: pathVal }
+          where: { _pathSuffix: pathVal },
+          limit: type === 'hasMany' ? limit : 1
         })
 
         if (nested && nested.length > 0) await loadRelations(connection, data, nested)
