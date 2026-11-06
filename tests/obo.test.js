@@ -335,3 +335,12 @@ describe('explicit relations by OBO key in a query', () => {
     )
   })
 })
+
+describe('CURIEs from spaces the registry does not know', () => {
+  test('pass as canonical when well formed, so a new upstream species does not fail verification', () => {
+    assert.equal(obo.isCanonical('*', 'NewDB:123'), true)
+    assert.equal(obo.isCanonical('*', 'not a curie'), false)
+    assert.equal(obo.normalize('*', 'Xenbase:XB-GENE-484286'), 'Xenbase:XB-GENE-484286')
+    assert.equal(obo.isCanonical('*', 'Xenbase:XB-GENE-484286'), true)
+  })
+})
