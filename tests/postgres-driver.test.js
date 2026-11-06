@@ -84,4 +84,34 @@ describe('postgres driver: connection pooling', () => {
     // not ride on another caller's already-authenticated connection
     assert.notEqual(first, second)
   })
+
+  test('gives up on a server that never answers, with an error recognised as a cold start', async () => {
+    // Given a server that accepts TCP connections and never speaks
+    const net = require('node:net')
+    const { isWakeError } = require('../src/database/self-hosted')
+    const server = net.createServer(() => {})
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const sockets = new Set()
+    server.on('connection', (s) => { sockets.add(s); s.on('close', () => sockets.delete(s)) })
+    try {
+      const knex = getKnexInstance({ host: '127.0.0.1', port: server.address().port, database: 'app', user: 'reader', password: 'x' })
+      knex.client.config.connection.connectionTimeoutMillis = 200
+
+      // When a query is run
+      const error = await knex.raw('select 1').then(() => null, (e) => e)
+
+      // Then pg's connect timeout fails it (not knex's pool timeout, a minute
+      // later), and withWake treats that as a database still coming up
+      assert.equal(error.message, 'timeout expired')
+      assert.ok(isWakeError(error))
+    } finally {
+      for (const s of sockets) s.destroy()
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
+
+  test('sets a connect timeout on every pool', () => {
+    const knex = getKnexInstance({ host: 'db.example', database: 'app', user: 'reader', password: 'p' })
+    assert.equal(knex.client.config.connection.connectionTimeoutMillis, 10_000)
+  })
 })

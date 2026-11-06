@@ -81,7 +81,9 @@ function allDemand (now = Date.now()) {
 // Postgres still recovering, Neo4j's driver finding no server, a pooled
 // connection the database closed when it scaled down (undici's "other side
 // closed" for ArangoDB and Elasticsearch, MySQL's lost connection), and a
-// MySQL server that accepted the connection but has not greeted yet.
+// MySQL server that accepted the connection but has not greeted yet, and
+// PostgreSQL's connect timeout ("timeout expired"), where a network drops
+// connections to a Service with no pods instead of refusing them.
 const WAKE_CODES = new Set([
   'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
   'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_SEQUENCE_TIMEOUT',
@@ -89,7 +91,7 @@ const WAKE_CODES = new Set([
   '57P03', // Postgres: the database system is starting up
   'ServiceUnavailable', 'SessionExpired', 'Neo.TransientError.General.DatabaseUnavailable'
 ])
-const WAKE_MESSAGE = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ServiceUnavailable|starting up|Connection terminated unexpectedly|Could not perform discovery|Failed to connect to server|getaddrinfo|socket hang up|DatabaseUnavailable|other side closed|Connection lost|Handshake inactivity timeout|terminating connection due to administrator command|Connection ended unexpectedly/i
+const WAKE_MESSAGE = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ServiceUnavailable|starting up|Connection terminated unexpectedly|Could not perform discovery|Failed to connect to server|getaddrinfo|socket hang up|DatabaseUnavailable|other side closed|Connection lost|Handshake inactivity timeout|terminating connection due to administrator command|Connection ended unexpectedly|\btimeout expired\b/i
 
 /** Whether an error means the database is not up yet (as opposed to the query being wrong). */
 function isWakeError (err) {
