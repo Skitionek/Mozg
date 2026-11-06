@@ -18,12 +18,12 @@
     "@graphql-mesh/odata": "^0.109.3",
     "@graphql-mesh/openapi": "^0.112.7",
     "@graphql-mesh/soap": "^0.110.3",
-    "@graphql-mesh/store": "^0.107.1",
+    "@graphql-mesh/store": "^0.107.3",
     "@graphql-mesh/thrift": "^0.109.3",
-    "@graphql-mesh/utils": "^0.107.1",
+    "@graphql-mesh/utils": "^0.107.3",
     "arangojs": "^10.6.0",
-    "fast-xml-parser": "^5.11.2",
-    "graphql": "^17.0.2",
+    "fast-xml-parser": "^5.12.0",
+    "graphql": "^17.1.0",
     "graphql-yoga": "^6.0.1",
     "knex": "^3.3.0",
     "n3": "^2.13.12",
@@ -36,12 +36,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@graphql-tools/schema": "^11.0.7",
-    "eslint": "^10.13.0"
+    "@graphql-tools/schema": "^11.0.8",
+    "eslint": "^10.14.0"
   },
   "license": "MIT",
   "overrides": {
     "lodash": "^4.18.1",
-    "thrift": "^0.23.0"
+    "thrift": "^0.25.0",
+    "graphql-scalars": "^2.0.1"
   }
 }

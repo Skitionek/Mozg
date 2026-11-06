@@ -24,12 +24,12 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
 
 | Driver | Backend | Tested against | Query | Relations | Introspect | Status |
 |--------|---------|----------------|:-----:|:---------:|:----------:|--------|
-| `postgres` | PostgreSQL (knex + pg) | Integration suite: local PostgreSQL 16, CI service container; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
+| `postgres` | PostgreSQL (knex + pg) | Integration suite: local PostgreSQL 18, CI service container; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
 | `sqlite3` | SQLite file (knex) | Integration suite on a temp file, locally and in CI; unit tests; inside the Docker image; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ | **Stable** |
-| `mysql` | MySQL via graphql-mesh | Integration suite: local MySQL 8.0, CI service container; Helm chart end to end on kind (MariaDB 11.4) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
-| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see finding 1) |
+| `mysql` | MySQL via graphql-mesh | Integration suite: MySQL 8.4 LTS in CI; Helm chart end to end on kind (MariaDB 12.3 LTS) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
+| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see finding 1) |
 | `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
-| `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.15); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
+| `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 9.5); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
 | `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12) | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
 | `kegg` | rest.kegg.jp (text) | Unit tests; live `/list`, `/get`, `/link` | ✓ | ✓ via `_pathSuffix` | from catalog | **Stable** |
 | `openapi` | OpenAPI / Swagger via graphql-mesh | Live Petstore v3; shape tests | ✓ | ✓ per row | ✓ operations | **Beta** (see finding 1) |
@@ -52,10 +52,16 @@ To run it locally, point `MOZG_IT_<DRIVER>_URL` at a server, with the password
    - The MySQL suite then passes. This is a `package.json` change and is
      tracked separately from the driver fixes.
 2. **MySQL authentication.** The mesh MySQL handler uses the `mysql` 2.x
-   client, which cannot speak MySQL 8's default `caching_sha2_password`.
-   Users need `mysql_native_password`; that plugin is off by default in MySQL
-   8.4 and gone in 9. MariaDB is unaffected. Replacing the handler with knex
-   and `mysql2`, as the postgres driver did, would remove the limitation.
+   client, which cannot speak MySQL 8's default `caching_sha2_password`, even
+   for an empty password. Users need `mysql_native_password`:
+   - MariaDB uses it by default.
+   - MySQL 8.4 (LTS) ships it switched off, and needs
+     `--mysql-native-password=ON --authentication-policy=mysql_native_password`.
+     The connector suite runs that way in CI.
+   - MySQL 9 (9.7 LTS included) has removed it; the connector cannot reach it.
+
+   Replacing the handler with knex and `mysql2`, as the postgres driver did,
+   would remove the limitation.
 3. **MySQL paging was swapped.** The handler renders `LIMIT ${limit},${offset}`,
    which MySQL reads as offset first, then count; it also drops zeros. The
    adapter now asks only for a row count and skips the offset itself.

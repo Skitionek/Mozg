@@ -33,8 +33,8 @@ databases:
 
 | Preset | Engine | Source | Registered as | Disk | Memory |
 |--------|--------|--------|---------------|------|--------|
-| `chembl` | PostgreSQL 16 | [ChEMBL 37 PostgreSQL dump](https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_37/) (2.1 GB, sha256-verified) | `chembl-postgres` | ~30 GB restored, plus ~4 GB during the restore (default PVC 80 Gi) | 2–4 GiB |
-| `reactome` | Neo4j 5.26 | [Reactome 98 graph database dump](https://reactome.org/download-data) (0.5 GB) | `reactome-neo4j` | ~10 GB (default PVC 20 Gi) | 4–6 GiB (2 G heap, 2 G page cache) |
+| `chembl` | PostgreSQL 18 | [ChEMBL 37 PostgreSQL dump](https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_37/) (2.1 GB, sha256-verified) | `chembl-postgres` | ~30 GB restored, plus ~4 GB during the restore (default PVC 80 Gi) | 2–4 GiB |
+| `reactome` | Neo4j 5.26 (LTS) | [Reactome 98 graph database dump](https://reactome.org/download-data) (0.5 GB) | `reactome-neo4j` | ~10 GB (default PVC 20 Gi) | 4–6 GiB (2 G heap, 2 G page cache) |
 
 Each enabled database gets:
 
@@ -67,11 +67,11 @@ how its first start loads data; the image can be overridden with `image`.
 
 | `engine` | Default image | Dump (`dump.format`) | Inline data | Mozg connects as |
 |----------|---------------|----------------------|-------------|------------------|
-| `postgres` | `postgres:16-alpine` | pg_dump custom format (`dump`), `sql`, `sql.gz`, or a `tar.gz` around one | `initSQL` | `username` |
-| `mysql` | `mariadb:11.4` | `sql`, `sql.gz`, or a `tar.gz` of SQL files | `initSQL` | `username` (not root) |
-| `neo4j` | `neo4j:5.26-community` | `neo4j-admin database dump` file (`dump`), migrated from Neo4j 4 with `dump.migrate` | `initCypher` (a list of statements) | `neo4j` |
-| `arango` | `arangodb:3.12.4` | `tar.gz` of an `arangodump` directory | `initJS` (arangosh, `db` is the database) | `root` |
-| `elasticsearch` | `elasticsearch:8.15.5` | `tar.gz` of a snapshot repository (its latest snapshot is restored) or of `_bulk` NDJSON files; `ndjson`, `ndjson.gz` | `initBulk` (`_bulk` NDJSON) | `elastic` |
+| `postgres` | `postgres:18-alpine` | pg_dump custom format (`dump`), `sql`, `sql.gz`, or a `tar.gz` around one | `initSQL` | `username` |
+| `mysql` | `mariadb:12.3` (LTS) | `sql`, `sql.gz`, or a `tar.gz` of SQL files | `initSQL` | `username` (not root) |
+| `neo4j` | `neo4j:5.26-community` (LTS) | `neo4j-admin database dump` file (`dump`), migrated from Neo4j 4 with `dump.migrate` | `initCypher` (a list of statements) | `neo4j` |
+| `arango` | `arangodb:3.12.13` | `tar.gz` of an `arangodump` directory | `initJS` (arangosh, `db` is the database) | `root` |
+| `elasticsearch` | `elasticsearch:9.5.6` | `tar.gz` of a snapshot repository (its latest snapshot is restored) or of `_bulk` NDJSON files; `ndjson`, `ndjson.gz` | `initBulk` (`_bulk` NDJSON) | `elastic` |
 | `sqlite3` | none — a file Mozg opens | the file (`sqlite`), `sqlite.gz`, or a `tar.gz` holding one | `initSQL` | — |
 
 Every server engine follows the same first start:
@@ -83,11 +83,20 @@ A first start that dies part-way is cleared and retried from the dump.
 Until the database is ready, Mozg's queries treat it as a cold start and
 wait.
 
-- **MySQL** runs MariaDB by default, which speaks the MySQL protocol and
-  authenticates with `mysql_native_password`, as Mozg's mysql connector
-  needs.  Oracle's `mysql` image works where that plugin is enabled; pass
-  server flags with `mysql.args`.  `root` shares the Secret's password but
-  may only log in from inside the pod.
+- **MySQL** runs MariaDB by default (12.3, its newest LTS).  MariaDB speaks
+  the MySQL protocol and authenticates with `mysql_native_password`, as
+  Mozg's mysql connector needs.  Oracle MySQL 8.4 (LTS) works with that
+  plugin switched on, which its image needs as server flags:
+
+  ```yaml
+  image: { repository: mysql, tag: "8.4" }
+  mysql:
+    args: [--mysql-native-password=ON, --authentication-policy=mysql_native_password]
+  ```
+
+  MySQL 9 (9.7 LTS included) has removed the plugin and cannot be used.
+  `root` shares the Secret's password but may only log in from inside the
+  pod.
 - **Neo4j, ArangoDB and Elasticsearch** create only their built-in
   superuser on first start, so Mozg connects as that user.  Mozg's
   connectors only read.

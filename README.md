@@ -94,7 +94,7 @@ Click the button below to open a fully configured dev environment in your browse
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Skitionek/Mozg)
 
 The Codespace will automatically:
-1. Start a Node 20 container
+1. Start a Node 26 (LTS) container
 2. Run `npm install`
 3. Start the dev server (`npm run dev`)
 4. Forward port **4000** and open a preview
