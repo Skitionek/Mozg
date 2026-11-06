@@ -1,0 +1,8 @@
+# Findings dismissed by the maintainer (PR #189).  Format: commit:file:rule:line
+#
+# RNAcentral's public read-only Postgres password (hh-pgsql-public.ebi.ac.uk,
+# user `reader`), which RNAcentral publishes on its public-database help page.
+# It lived in src/catalog/rnacentral.js on main until PR #189 replaced that
+# entry with the RNAcentral REST API; these are its two appearances in history.
+99c0955eb7e5feb2238ab8c8c64e94c0c26df02a:src/catalog/rnacentral.js:generic-api-key:20
+de4f5abbb39f93f769aa93e3842de24e17e44745:src/catalog/rnacentral.js:generic-api-key:20
