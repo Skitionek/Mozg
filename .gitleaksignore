@@ -14,5 +14,5 @@ d0299c0438f2ebbae9246e95adec858a7fcee97f:paper/mozg.tex:generic-api-key:678
 # containers in an earlier version of the connectors workflow.  Those
 # containers now run without authentication and the workflow sends no
 # credentials.
-a267f8ba1417d47187458f0ccdeac96de6ced8da:.github/workflows/connectors.yml:curl-auth-user:77
-a267f8ba1417d47187458f0ccdeac96de6ced8da:.github/workflows/connectors.yml:curl-auth-user:104
+3369f1a50f95382cf45463232d47e4bcb93d0585:.github/workflows/connectors.yml:curl-auth-user:77
+3369f1a50f95382cf45463232d47e4bcb93d0585:.github/workflows/connectors.yml:curl-auth-user:104
