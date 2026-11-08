@@ -317,6 +317,11 @@ unknown key or a malformed `oboForm` fails the build.
 | `databaseDefaults.scaleToZero.cooldownSeconds` | `900` | Idle time before scaling to zero |
 | `databaseDefaults.scaleToZero.pollingIntervalSeconds` | `15` | KEDA polling interval |
 | `databaseDefaults.scaleToZero.initialCooldownSeconds` | `3600` | No scale-down for this long after install |
+| `metrics.enabled` / `metrics.port` | `true` / `9464` | Serve `/metrics` on its own port, which the Service and Ingress do not route to |
+| `metrics.scrapeFrom` | `[]` | NetworkPolicy peers allowed to scrape (empty = anything that can reach the pod) |
+| `metrics.annotations` | `true` | `prometheus.io/*` pod annotations |
+| `metrics.podMonitor.enabled` / `interval` / `labels` | `false` / `30s` / `{}` | A Prometheus Operator PodMonitor |
+| `mozg.logLevel` / `logFormat` / `slowQueryMs` | `info` / `json` / `10000` | Logging |
 | `mozg.httpCacheTtlMs` / `mozg.httpCacheMaxEntries` | `0` / `500` | Cache identical outbound GETs (HTTP-backed sources only) |
 | `mozg.resultCache.ttlMs` | `0` (off) | Reuse the answer to a whole query for every driver; callers can pass `fresh: true` |
 | `mozg.resultCache.perSource` | `{}` | Per-source TTL in ms, overriding `ttlMs`; `0` turns it off for that source |

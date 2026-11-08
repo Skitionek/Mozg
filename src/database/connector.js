@@ -5,13 +5,16 @@ const { resolveCrossCatalogRelation } = require('./relations')
 const { normalizeQueryInput, normalizeKeyedRows, sourceForConnection } = require('./sources')
 const { withWake } = require('./self-hosted')
 const { getResultCache } = require('./result-cache')
+const telemetry = require('../telemetry')
 
 async function executeQuery (rawInput) {
   // `source` / `include` are shorthand for a catalog connection and catalog
   // relations; expand them first so every driver sees the explicit form (and
   // so the result cache keys on what actually runs).
   const normalized = normalizeQueryInput(rawInput)
-  return getResultCache().run(normalized, () => runQuery(normalized))
+  // Timed and counted around the cache, so a cached answer shows up as the
+  // fast query it was.
+  return telemetry.trackQuery(normalized, () => getResultCache().run(normalized, () => runQuery(normalized)))
 }
 
 async function runQuery (normalized) {

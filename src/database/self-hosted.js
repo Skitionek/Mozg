@@ -23,6 +23,8 @@
  * database the Helm chart deploys has.
  */
 
+const telemetry = require('../telemetry')
+
 const state = new Map()
 
 const demandWindowMs = () => Number(process.env.MOZG_DEMAND_WINDOW_MS) || 60_000
@@ -123,14 +125,19 @@ async function withWake (connection, run, options = {}) {
 
   s.inFlight++
   s.lastUsed = Date.now()
+  let wokeAt = null // when this query first found the database not up yet
   try {
     let delay = 500
     for (;;) {
       try {
-        return await run()
+        const result = await run()
+        if (wokeAt != null) telemetry.recordWake(entry.name, (Date.now() - wokeAt) / 1000)
+        return result
       } catch (err) {
         if (!isWakeError(err)) throw err
+        if (wokeAt == null) wokeAt = Date.now()
         if (Date.now() >= deadline) {
+          telemetry.logger.warn('self-hosted database did not come up', { source: entry.name, waitedMs: Date.now() - wokeAt })
           const wrapped = new Error(`${entry.name} did not come up within ${Math.round(timeoutMs / 1000)} s (it may be scaled to zero and still starting): ${err.message}`)
           wrapped.cause = err
           throw wrapped

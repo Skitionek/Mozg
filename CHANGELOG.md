@@ -121,6 +121,18 @@ verified against the live APIs, and joined up across sources.
   (`owner.login`, `types[].type.url`) and entity paths with `{field}`
   placeholders (`/carts/user/{id}`).
 
+- **Metrics and logs.**  `GET /metrics` serves Prometheus text (a small
+  registry in `src/metrics.js`, no new dependency): inbound requests, queries
+  by driver and source, rows, outbound requests by host with retries, cold
+  starts, cache sizes and hit counts, process memory and CPU.  Label values
+  that come from callers are capped.  `MOZG_METRICS_PORT` serves it on a
+  separate port; the Helm chart does so by default (`metrics.*`, with a
+  NetworkPolicy rule, pod annotations and an optional PodMonitor).  Logs are
+  one JSON line per request and query with a `requestId` (from `X-Request-Id`
+  or generated, and returned in the response); queries log the names of their
+  `where` keys, never the values (`MOZG_LOG_LEVEL`, `MOZG_LOG_FORMAT`,
+  `MOZG_SLOW_QUERY_MS`).  The server now lives in `src/server.js`, started by
+  `src/index.js`, so it can be started on any port.
 - **Result cache.** `MOZG_RESULT_CACHE_TTL_MS` (Helm `mozg.resultCache.ttlMs`)
   reuses the answer to a whole query, relations included, for every driver
   and for `/stream`; `MOZG_RESULT_CACHE_TTL_BY_SOURCE` (`perSource`) overrides

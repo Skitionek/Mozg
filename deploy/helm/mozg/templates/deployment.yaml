@@ -27,6 +27,11 @@ spec:
         {{- if $sqlite }}
         checksum/sqlite: {{ include (print $.Template.BasePath "/db-init-configmap.yaml") . | sha256sum }}
         {{- end }}
+        {{- if and .Values.metrics.enabled .Values.metrics.annotations }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metrics.port | quote }}
+        prometheus.io/path: /metrics
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -121,6 +126,11 @@ spec:
             - name: http
               containerPort: 4000
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           env:
             - name: PORT
               value: "4000"
@@ -130,6 +140,19 @@ spec:
               value: {{ .Values.mozg.httpTimeoutMs | quote }}
             - name: MOZG_HTTP_RETRIES
               value: {{ .Values.mozg.httpRetries | quote }}
+            - name: MOZG_LOG_LEVEL
+              value: {{ .Values.mozg.logLevel | quote }}
+            - name: MOZG_LOG_FORMAT
+              value: {{ .Values.mozg.logFormat | quote }}
+            - name: MOZG_SLOW_QUERY_MS
+              value: {{ .Values.mozg.slowQueryMs | quote }}
+            {{- if .Values.metrics.enabled }}
+            - name: MOZG_METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
+            {{- else }}
+            - name: MOZG_METRICS
+              value: "off"
+            {{- end }}
             - name: MOZG_HTTP_CACHE_TTL_MS
               value: {{ .Values.mozg.httpCacheTtlMs | quote }}
             - name: MOZG_HTTP_CACHE_MAX_ENTRIES
