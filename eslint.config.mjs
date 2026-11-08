@@ -27,6 +27,8 @@ export default [
         queueMicrotask: 'readonly',
         structuredClone: 'readonly',
         Response: 'readonly',
+        TextEncoder: 'readonly',
+        ReadableStream: 'readonly',
         Headers: 'readonly',
         Promise: 'readonly',
         Map: 'readonly',
@@ -48,6 +50,14 @@ export default [
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': 'off'
+    }
+  },
+  {
+    // The SDK is an ES module meant for Node and browsers, unlike the CommonJS server.
+    files: ['sdk/**/*.js'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: { crypto: 'readonly' }
     }
   },
   {

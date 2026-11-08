@@ -25,6 +25,11 @@ YAML_V8R_FILTER_REGEX_EXCLUDE: "deploy/helm/.*/templates/"
 # Exclude JSONC files (which support comments) from strict JSON linting
 JSON_JSONLINT_FILTER_REGEX_EXCLUDE: "(devcontainer\\.json|\\.vscode/)"
 
+# The SDK's declarations are written by hand; the repository carries no
+# TypeScript toolchain on purpose, and ts-standard cannot read a file without
+# a tsconfig.json.
+TYPESCRIPT_STANDARD_FILTER_REGEX_EXCLUDE: "sdk/src/index\\.d\\.ts"
+
 # Keep kingfisher off the files that deliberately carry credential-shaped
 # strings. kingfisher reports one finding per run, so these were enumerated
 # from the tree rather than one red CI round at a time:

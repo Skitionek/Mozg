@@ -1,0 +1,33 @@
+{
+  "name": "@skitionek/mozg-sdk",
+  "version": "0.1.0",
+  "description": "A client for Mozg: one GraphQL endpoint over 47 life-science databases and any you add.",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "graphql",
+    "bioinformatics",
+    "life-science",
+    "mozg"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Skitionek/Mozg.git",
+    "directory": "sdk"
+  },
+  "license": "MIT"
+}
