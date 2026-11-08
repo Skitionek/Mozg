@@ -253,6 +253,11 @@ mutation {
 | `PORT` | `4000` | HTTP port |
 | `MOZG_HTTP_TIMEOUT_MS` | `30000` | Timeout per outbound request |
 | `MOZG_HTTP_RETRIES` | `2` | Retries for 408/429/502/503/504 and network errors |
+| `MOZG_LOG_LEVEL` | `info` | `error`, `warn`, `info` or `debug` |
+| `MOZG_LOG_FORMAT` | `json` (`text` on a terminal) | One JSON object per line, or plain text |
+| `MOZG_SLOW_QUERY_MS` | `10000` | Log queries slower than this at `warn` (`0` = off) |
+| `MOZG_METRICS` | `on` | Set `off` to serve no `/metrics` |
+| `MOZG_METRICS_PORT` | unset | Serve `/metrics` on this port, and nothing else, instead of the main one |
 | `MOZG_HTTP_CACHE_TTL_MS` | `0` (off) | Cache identical outbound GETs for this long — trades freshness for speed |
 | `MOZG_HTTP_CACHE_MAX_ENTRIES` | `500` | Most outbound responses kept; the least recently used go first |
 | `MOZG_RESULT_CACHE_TTL_MS` | `0` (off) | Reuse the answer to a whole query, relations included, for every driver. A caller can always pass `fresh: true` |
@@ -268,6 +273,8 @@ mutation {
 | `MOZG_DEMAND_WINDOW_MS` | `60000` | How long after its last use `/demand/<source>` keeps reporting a self-hosted database as wanted (what KEDA scales on) |
 | `MOZG_PEERS` | unset | Headless-service host name of the other Mozg replicas, so `/demand` counts their in-flight queries too |
 
+- **Metrics.** `GET /metrics` is Prometheus text: inbound requests by route and status, queries by driver and source (relation fetches counted separately as `nested`), rows returned, outbound requests by host and status with retries, cold starts of self-hosted databases, every cache's size and hit counts, and process memory and CPU.  Source and host labels are capped, so a caller cannot create series by naming new hosts.  Set `MOZG_METRICS_PORT` to serve it on a port of its own; the Helm chart does by default, so it never reaches the Service or the Ingress.
+- **Logs.** One JSON line per request and per query, each with the request's `requestId` (taken from the caller's `X-Request-Id` if it is short and plain, else generated, and returned in the response).  Queries log the *names* of their `where` keys, never the values, and every message is scrubbed of connection-string passwords.  Probes and scrapes log at `debug`.  There is no tracing SDK; the request id is what ties a request's lines together.
 - `GET /healthz` answers `{"status":"ok"}` without touching any upstream, for load balancers and orchestrators.
 - The container runs as an unprivileged user and declares a `HEALTHCHECK`.
 - `npm run verify:sources` checks every life-science source and relation against the live APIs; `npm run health` probes every catalog entry.  Both run weekly in CI and upload their reports.
