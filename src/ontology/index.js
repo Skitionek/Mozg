@@ -9,11 +9,17 @@ const { extractOntology, xsdToGraphqlType } = require('./extractor')
 const { mapOntology } = require('./mapper')
 const { validateOntologyAgainstDb } = require('./validator')
 const { secureFetch } = require('./url-validator')
+const { LruCache } = require('../cache')
+const { intOption, OPTIONS } = require('../config')
 
 // ---------------------------------------------------------------------------
-// In-memory cache: SHA-256 (first 16 hex chars) of raw content → result
+// In-memory cache: SHA-256 (first 16 hex chars) of raw content → result.
+// Bounded (MOZG_ONTOLOGY_CACHE_MAX): the key is derived from caller-supplied
+// content, and a parsed ontology can be large.
 // ---------------------------------------------------------------------------
-const ontologyCache = new Map()
+const ontologyCache = new LruCache({
+  max: intOption('MOZG_ONTOLOGY_CACHE_MAX', OPTIONS.MOZG_ONTOLOGY_CACHE_MAX) || OPTIONS.MOZG_ONTOLOGY_CACHE_MAX
+})
 
 function contentHash (str) {
   return crypto.createHash('sha256').update(str).digest('hex').slice(0, 16)
@@ -116,7 +122,8 @@ async function parseOntology (input) {
   let { content, url, format, validate, connection } = input || {}
 
   // ── Fetch from URL if content not provided ─────────────────────────────
-  // TODO(#2) SSRF protection: URL validation, timeout, and size limits added
+  // secureFetch screens the URL against private addresses and bounds the
+  // request's time and size (see url-validator.js).
   if (url && !content) {
     const { text, contentType } = await secureFetch(url)
     content = text
@@ -140,8 +147,9 @@ async function parseOntology (input) {
 
   // ── Check cache ─────────────────────────────────────────────────────────
   const hash = contentHash(content)
-  if (ontologyCache.has(hash) && !validate) {
-    return ontologyCache.get(hash)
+  if (!validate) {
+    const cached = ontologyCache.get(hash)
+    if (cached) return cached
   }
 
   // ── Route to parser ─────────────────────────────────────────────────────

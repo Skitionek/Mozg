@@ -1,6 +1,8 @@
 'use strict'
 
 const { Database } = require('arangojs')
+const { LruCache } = require('../../cache')
+const { intOption, OPTIONS } = require('../../config')
 
 /**
  * ArangoDB driver.
@@ -16,7 +18,12 @@ const { Database } = require('arangojs')
 // password included, so a wrong password never rides on a client another
 // caller already authenticated.  The key stays in this process's memory,
 // beside the client that holds the same password already.
-const dbCache = new Map()
+const dbCache = new LruCache({
+  max: intOption('MOZG_CONNECTION_CACHE_MAX', OPTIONS.MOZG_CONNECTION_CACHE_MAX),
+  ttlMs: intOption('MOZG_CONNECTION_IDLE_MS', OPTIONS.MOZG_CONNECTION_IDLE_MS),
+  sliding: true,
+  onEvict: (db) => { if (typeof db.close === 'function') db.close() }
+})
 
 function getDatabase (config) {
   const scheme = config.scheme || 'http'
@@ -24,17 +31,17 @@ function getDatabase (config) {
   const port = config.port || 8529
   const key = JSON.stringify([scheme, host, port, config.database, config.user, config.password || ''])
 
-  if (!dbCache.has(key)) {
-    dbCache.set(
-      key,
-      new Database({
-        url: `${scheme}://${host}:${port}`,
-        databaseName: config.database,
-        auth: { username: config.user || 'root', password: config.password || '' }
-      })
-    )
+  dbCache.prune()
+  let db = dbCache.get(key)
+  if (!db) {
+    db = new Database({
+      url: `${scheme}://${host}:${port}`,
+      databaseName: config.database,
+      auth: { username: config.user || 'root', password: config.password || '' }
+    })
+    dbCache.set(key, db)
   }
-  return dbCache.get(key)
+  return db
 }
 
 /**
@@ -189,10 +196,9 @@ async function introspect (connection) {
 
 /** Close every cached client's connections. */
 async function destroyAll () {
-  for (const db of dbCache.values()) {
+  for (const db of dbCache.drain()) {
     if (typeof db.close === 'function') db.close()
   }
-  dbCache.clear()
 }
 
 module.exports = { executeQuery, introspect, destroyAll }

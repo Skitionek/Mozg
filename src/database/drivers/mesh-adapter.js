@@ -15,10 +15,29 @@ const { PubSub, DefaultLogger } = require('@graphql-mesh/utils')
 
 const { assertSafeCypherIdentifier } = require('./neo4j-identifiers')
 const { patchNeo4jIntrospectorTypes } = require('./neo4j-types')
+const { LruCache } = require('../../cache')
+const { intOption, OPTIONS } = require('../../config')
 
-// Cache: connection key → { schema, executor }
-// TODO: add LRU eviction to prevent unbounded growth in long-running processes
-const meshSourceCache = new Map()
+/** Close a mesh source's connections (pools, sockets). */
+async function disposeSource (source) {
+  const dispose = source && source.executor && source.executor[Symbol.asyncDispose]
+  if (typeof dispose === 'function') await dispose.call(source.executor)
+}
+
+// Cache: connection key → { schema, executor }.  Bounded and idle-expiring
+// like the knex pools (MOZG_CONNECTION_CACHE_MAX, MOZG_CONNECTION_IDLE_MS):
+// each entry holds a built schema and open connections, and its key is caller
+// input.
+const meshSourceCache = new LruCache({
+  max: intOption('MOZG_CONNECTION_CACHE_MAX', OPTIONS.MOZG_CONNECTION_CACHE_MAX),
+  ttlMs: intOption('MOZG_CONNECTION_IDLE_MS', OPTIONS.MOZG_CONNECTION_IDLE_MS),
+  sliding: true,
+  onEvict: disposeSource
+})
+
+// Sources handed in with registerMeshSource.  The embedder owns these, so the
+// cache's eviction must never drop one.
+const registeredMeshSources = new Map()
 
 // ── Handler config builders ───────────────────────────────────────────────────
 
@@ -148,7 +167,10 @@ async function getOrCreateMeshSource (connection) {
   const { driver } = connection
   const cacheKey = cacheKeyFor(connection)
 
-  if (meshSourceCache.has(cacheKey)) return meshSourceCache.get(cacheKey)
+  if (registeredMeshSources.has(cacheKey)) return registeredMeshSources.get(cacheKey)
+  meshSourceCache.prune()
+  const cached = meshSourceCache.get(cacheKey)
+  if (cached) return cached
   if (driver === 'neo4j') {
     patchNeo4jBigInt()
     patchNeo4jIntrospectorTypes()
@@ -191,8 +213,8 @@ async function getOrCreateMeshSource (connection) {
  */
 function registerMeshSource (connection, source) {
   const cacheKey = cacheKeyFor(connection)
-  meshSourceCache.set(cacheKey, source)
-  return () => meshSourceCache.delete(cacheKey)
+  registeredMeshSources.set(cacheKey, source)
+  return () => registeredMeshSources.delete(cacheKey)
 }
 
 // ── Schema helpers ────────────────────────────────────────────────────────────
@@ -777,12 +799,9 @@ async function loadRelations (connection, rows, relations) {
 
 /** Close every cached source's connections (pools, sockets). */
 async function destroyAll () {
-  const sources = [...meshSourceCache.values()]
-  meshSourceCache.clear()
-  for (const source of sources) {
-    const dispose = source.executor && source.executor[Symbol.asyncDispose]
-    if (typeof dispose === 'function') await dispose.call(source.executor)
-  }
+  const sources = [...meshSourceCache.drain(), ...registeredMeshSources.values()]
+  registeredMeshSources.clear()
+  for (const source of sources) await disposeSource(source)
 }
 
 // ── Introspection ─────────────────────────────────────────────────────────────

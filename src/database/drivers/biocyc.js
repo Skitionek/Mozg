@@ -28,6 +28,7 @@
  */
 
 const http = require('../http')
+const { LruCache } = require('../../cache')
 
 const CLASS_MAP = {
   genes: 'Genes',
@@ -42,8 +43,8 @@ const CLASS_MAP = {
 // A class listing is one large document, and BioCyc rations anonymous
 // requests, so the listing a query already fetched is reused briefly.
 const LISTING_TTL_MS = 5 * 60_000
-const listingCache = new Map()
-const sessionCache = new Map()
+const listingCache = new LruCache({ max: 50, ttlMs: LISTING_TTL_MS })
+const sessionCache = new LruCache({ max: 50 })
 
 function baseUrl (config) {
   if (config.host) {
@@ -57,7 +58,8 @@ function baseUrl (config) {
 async function authenticate (config) {
   if (!config.user || !config.password) return null
   const key = `${baseUrl(config)}|${config.user}`
-  if (sessionCache.has(key)) return sessionCache.get(key)
+  const session = sessionCache.get(key)
+  if (session) return session
 
   const res = await globalThis.fetch(`${baseUrl(config)}/credentials/login/`, {
     method: 'POST',
@@ -140,11 +142,11 @@ function parseListing (xml) {
 async function listClass (config, className) {
   const key = `${baseUrl(config)}|${config.database}|${className}|${config.user || ''}`
   const hit = listingCache.get(key)
-  if (hit && hit.expires > Date.now()) return hit.rows
+  if (hit) return hit
 
   const id = encodeURIComponent(`${config.database}:${className}`)
   const rows = parseListing(await biocycGet(`/apixml?fn=get-class-all-instances&id=${id}&detail=low`, config))
-  listingCache.set(key, { rows, expires: Date.now() + LISTING_TTL_MS })
+  listingCache.set(key, rows)
   return rows
 }
 

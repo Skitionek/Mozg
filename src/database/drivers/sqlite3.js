@@ -12,9 +12,9 @@
 const { existsSync } = require('node:fs')
 const { executeKnexQuery, createConnectionCache } = require('./knex-query')
 
-// Connection cache keyed by file path.
-// TODO: add LRU eviction to prevent unbounded growth in long-running processes
-const pool = createConnectionCache()
+// Connection cache keyed by file path.  Bounded and idle-expiring: see
+// createConnectionCache (MOZG_CONNECTION_CACHE_MAX, MOZG_CONNECTION_IDLE_MS).
+const pool = createConnectionCache('sqlite3')
 
 // SQLite creates a database when asked to open a path that has none.  Here the
 // path arrives as untrusted GraphQL input, so opening it unchecked lets any

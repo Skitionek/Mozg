@@ -19,10 +19,14 @@
  *
  * Responses are not cached by default — Mozg is "slow by design" and every
  * query reads live data.  Set MOZG_HTTP_CACHE_TTL_MS to opt in to a short
- * in-process cache when latency matters more than freshness.
+ * in-process cache when latency matters more than freshness; it holds at most
+ * MOZG_HTTP_CACHE_MAX_ENTRIES responses and drops the least recently used first.
+ * (The Helm chart sets both from `cache.httpTtlMs` / `cache.httpMaxEntries`.)
  */
 
 const { version } = require('../../package.json')
+const { LruCache } = require('../cache')
+const { intOption, OPTIONS } = require('../config')
 
 const USER_AGENT = `mozg/${version} (+https://github.com/Skitionek/Mozg)`
 
@@ -32,8 +36,9 @@ const DEFAULTS = {
   backoffMs: 500,
   maxRetryAfterMs: 15_000,
   maxConcurrent: 4,
-  cacheTtlMs: Number(process.env.MOZG_HTTP_CACHE_TTL_MS) || 0,
-  cacheMaxEntries: 500
+  cacheTtlMs: intOption('MOZG_HTTP_CACHE_TTL_MS', OPTIONS.MOZG_HTTP_CACHE_TTL_MS),
+  // 0 would mean "unbounded" to the cache; an operator who sets it means "default".
+  cacheMaxEntries: intOption('MOZG_HTTP_CACHE_MAX_ENTRIES', OPTIONS.MOZG_HTTP_CACHE_MAX_ENTRIES) || OPTIONS.MOZG_HTTP_CACHE_MAX_ENTRIES
 }
 
 const RETRYABLE_STATUS = new Set([408, 429, 502, 503, 504])
@@ -136,7 +141,10 @@ class HostLimiter {
   }
 }
 
-const limiters = new Map()
+// One limiter per host a query has named.  The host comes from caller input
+// (a REST base URL), so the map is bounded; a limiter in use was touched by
+// its own request and is the last one an LRU would drop.
+const limiters = new LruCache({ max: 1000 })
 
 function limiterFor (host) {
   let limiter = limiters.get(host)
@@ -150,22 +158,20 @@ function limiterFor (host) {
 // ── In-flight de-duplication and optional cache ─────────────────────────────
 
 const inFlight = new Map()
-const cache = new Map()
+const cache = new LruCache({ max: DEFAULTS.cacheMaxEntries })
 
 function cacheGet (key) {
-  const hit = cache.get(key)
-  if (!hit) return undefined
-  if (hit.expires < Date.now()) {
-    cache.delete(key)
-    return undefined
-  }
-  return hit.value
+  return cache.get(key)
 }
 
 function cacheSet (key, value, ttlMs) {
   if (!(ttlMs > 0)) return
-  if (cache.size >= DEFAULTS.cacheMaxEntries) cache.delete(cache.keys().next().value)
-  cache.set(key, { value, expires: Date.now() + ttlMs })
+  cache.set(key, value, { ttlMs })
+}
+
+/** Size and hit/miss counters of the response cache, for the metrics. */
+function cacheStats () {
+  return { size: cache.size, max: DEFAULTS.cacheMaxEntries, ttlMs: DEFAULTS.cacheTtlMs, ...cache.stats }
 }
 
 // ── Request ─────────────────────────────────────────────────────────────────
@@ -318,4 +324,4 @@ function reset () {
   cache.clear()
 }
 
-module.exports = { request, redactUrl, reset, HttpError, USER_AGENT, RETRYABLE_STATUS }
+module.exports = { request, redactUrl, reset, cacheStats, HttpError, USER_AGENT, RETRYABLE_STATUS }

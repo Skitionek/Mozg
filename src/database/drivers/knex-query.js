@@ -1,39 +1,61 @@
 'use strict'
 
 const knex = require('knex')
+const { LruCache } = require('../../cache')
+const { intOption, OPTIONS } = require('../../config')
 
 /**
  * Generic knex-backed query execution, relation loading, and connection
  * pooling.
  *
  * Shared by every driver that talks to a SQL database through knex (sqlite3,
- * postgres) — only the knex config each one builds, and how it introspects,
- * differ between them, so everything else lives once here instead of twice.
+ * postgres, mysql) — only the knex config each one builds, and how it
+ * introspects, differ between them, so everything else lives once here instead
+ * of once per driver.
  */
 
+/** Every connection cache made here, so the metrics can report them. */
+const connectionCaches = new Map()
+
 /**
- * A cache of lazily-created knex instances, keyed however the caller likes
- * (a file path for sqlite3, a JSON-encoded connection for postgres).
+ * A bounded cache of lazily-created knex instances, keyed however the caller
+ * likes (a file path for sqlite3, a JSON-encoded connection for postgres).
+ *
+ * The key is caller input, so an unbounded cache is a leak a caller can drive
+ * by varying a port or a database name: each entry holds a connection pool.
+ * Past MOZG_CONNECTION_CACHE_MAX entries the least recently used instance is
+ * destroyed, and an instance idle for MOZG_CONNECTION_IDLE_MS is destroyed too.
+ *
+ * @param {string} [name]  label for the metrics (the driver's name)
  */
-function createConnectionCache () {
-  const cache = new Map()
+function createConnectionCache (name = 'knex') {
+  const cache = new LruCache({
+    max: intOption('MOZG_CONNECTION_CACHE_MAX', OPTIONS.MOZG_CONNECTION_CACHE_MAX) || 0,
+    ttlMs: intOption('MOZG_CONNECTION_IDLE_MS', OPTIONS.MOZG_CONNECTION_IDLE_MS),
+    sliding: true,
+    // destroy() waits for connections that are checked out, so a query still
+    // running on an evicted instance finishes before its pool closes.
+    onEvict: (instance) => instance.destroy()
+  })
+  connectionCaches.set(name, cache)
 
   /** Return the cached instance for `cacheKey`, building one on first use. */
   function getOrCreate (cacheKey, buildKnexConfig) {
-    if (!cache.has(cacheKey)) {
-      cache.set(cacheKey, knex(buildKnexConfig()))
+    cache.prune()
+    let instance = cache.get(cacheKey)
+    if (!instance) {
+      instance = knex(buildKnexConfig())
+      cache.set(cacheKey, instance)
     }
-    return cache.get(cacheKey)
+    return instance
   }
 
   async function destroyAll () {
-    for (const instance of cache.values()) {
-      await instance.destroy()
-    }
-    cache.clear()
+    // drain() skips onEvict: each instance is destroyed, and awaited, once.
+    for (const instance of cache.drain()) await instance.destroy()
   }
 
-  return { getOrCreate, destroyAll }
+  return { getOrCreate, destroyAll, cache }
 }
 
 // Column name for the per-parent row number; never returned to callers.
@@ -140,4 +162,4 @@ async function loadKnexRelations (db, rows, relations) {
   }
 }
 
-module.exports = { executeKnexQuery, loadKnexRelations, createConnectionCache }
+module.exports = { executeKnexQuery, loadKnexRelations, createConnectionCache, connectionCaches }
