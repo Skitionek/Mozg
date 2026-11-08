@@ -1,0 +1,253 @@
+name: Release
+
+# Releases are date-based, not semver: Mozg ships continuously from main and
+# there is no supported-version matrix for a version number to communicate, so
+# a calendar date says more.  The pattern is the one Skitionek/mycelium uses.
+#
+# A push to main that leaves every required workflow green tags the validated
+# commit vYYYY-MM-DD (vYYYY-MM-DD.1, .2, … for a second release the same day),
+# publishes a GitHub release whose notes come from the `## [Unreleased]`
+# section of CHANGELOG.md, and pushes the container image under that tag.
+#
+# Nothing is pushed to main: a bot's direct push cannot satisfy a branch
+# ruleset that requires status checks, and a tag is not covered by one.  Nothing
+# rewrites CHANGELOG.md either, so keep `[Unreleased]` current as you go.
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Lint
+      - CodeQL Advanced
+      - Connectors
+    types:
+      - completed
+
+permissions: read-all
+
+concurrency:
+  group: release-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release on successful push checks
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      sha: ${{ steps.gate.outputs.sha }}
+
+    steps:
+      # Each required workflow finishes at its own time and triggers this job
+      # when it does.  Only the run that finds all of them done proceeds.
+      - name: Verify all required workflows passed for this commit
+        id: gate
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const requiredWorkflows = ['CI', 'Lint', 'CodeQL Advanced', 'Connectors'];
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.payload.workflow_run.head_sha;
+            const branch = context.payload.workflow_run.head_branch;
+
+            const ref = await github.rest.git.getRef({
+              owner,
+              repo,
+              ref: `heads/${branch}`
+            }).catch((error) => {
+              core.warning(`Failed to resolve branch ref heads/${branch}: ${error.message}`);
+              return null;
+            });
+
+            if (!ref || ref.data.object.sha !== sha) {
+              core.info(`Branch ${branch} no longer points at ${sha}; skipping stale release run.`);
+              core.setOutput('ready', 'false');
+              return;
+            }
+
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              {
+                owner,
+                repo,
+                event: 'push',
+                branch,
+                head_sha: sha,
+                per_page: 100
+              }
+            );
+
+            const latestByName = new Map();
+            for (const run of runs) {
+              if (!requiredWorkflows.includes(run.name)) continue;
+              const previous = latestByName.get(run.name);
+              if (!previous || new Date(run.created_at) > new Date(previous.created_at)) {
+                latestByName.set(run.name, run);
+              }
+            }
+
+            const missing = [];
+            const incomplete = [];
+            const failed = [];
+            for (const name of requiredWorkflows) {
+              const run = latestByName.get(name);
+              if (!run) {
+                missing.push(name);
+                continue;
+              }
+              if (run.status !== 'completed') {
+                incomplete.push(`${name} (${run.status})`);
+                continue;
+              }
+              if (run.conclusion !== 'success') {
+                failed.push(`${name} (${run.conclusion})`);
+              }
+            }
+
+            if (missing.length || incomplete.length || failed.length) {
+              core.info(`Skipping release; missing=${missing.join(', ') || 'none'} incomplete=${incomplete.join(', ') || 'none'} failed=${failed.join(', ') || 'none'}`);
+              core.setOutput('ready', 'false');
+              return;
+            }
+
+            core.setOutput('ready', 'true');
+            core.setOutput('sha', sha);
+
+      - name: Checkout repository
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          # Pin the commit the gate validated. For a workflow_run event
+          # checkout would otherwise take the default branch's current head,
+          # so the release notes could describe a commit that is not the one
+          # being tagged.
+          ref: ${{ steps.gate.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Read release notes from CHANGELOG
+        if: steps.gate.outputs.ready == 'true'
+        id: notes
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          marker = "## [Unreleased]"
+          text = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          if marker not in text:
+              raise RuntimeError("CHANGELOG.md is missing '## [Unreleased]' section")
+
+          after = text.split(marker, 1)[1]
+          next_section = re.search(r"(?m)^## \[", after)
+          body = (after[: next_section.start()] if next_section else after).strip("\n")
+
+          if not re.search(r"(?m)^\s*-\s+", body):
+              body = "No documented changelog entries for this release."
+
+          # A heredoc delimiter keeps multi-line markdown intact in the step
+          # output. The delimiter must not occur in the body itself.
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"body<<CHANGELOG_EOF\n{body}\nCHANGELOG_EOF\n")
+          PY
+
+      - name: Create and push the release tag
+        if: steps.gate.outputs.ready == 'true'
+        id: tag
+        # An annotated tag records a tagger, and the runner has no git
+        # identity. Without one `git tag -a` dies with "Committer identity
+        # unknown".
+        env:
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          SHA: ${{ steps.gate.outputs.sha }}
+        run: |
+          git fetch --tags
+
+          # Two required workflows can finish together, and both runs then find
+          # the gate open.  The concurrency group runs them one after the other;
+          # this makes the second one a no-op instead of a second tag on the
+          # same commit.
+          EXISTING="$(git tag --points-at "$SHA" --list 'v[0-9]*')"
+          if [ -n "$EXISTING" ]; then
+            echo "Commit $SHA is already released as: $EXISTING"
+            exit 0
+          fi
+
+          TAG_BASE="v$(date -u +%Y-%m-%d)"
+          TAG="$TAG_BASE"
+          INDEX=1
+          while git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; do
+            TAG="${TAG_BASE}.${INDEX}"
+            INDEX=$((INDEX + 1))
+          done
+
+          # Tag the exact commit the gate validated rather than whatever main
+          # points at now. main moving on in the meantime is normal on an
+          # active branch and has no bearing on the release.
+          git tag -a "$TAG" -m "Release $TAG" "$SHA"
+          git push origin "refs/tags/$TAG"
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        if: steps.tag.outputs.tag != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ steps.gate.outputs.sha }}
+          name: Release ${{ steps.tag.outputs.tag }} (${{ steps.tag.outputs.release_date }})
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: true
+
+  # The image is built here, after the tag, and not by a workflow that triggers
+  # on `tags: v*`: a tag pushed with the workflow's own GITHUB_TOKEN does not
+  # start other workflows, so such a trigger would never fire.
+  image:
+    name: Publish the container image
+    needs: release
+    if: needs.release.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout the released commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ needs.release.outputs.tag }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

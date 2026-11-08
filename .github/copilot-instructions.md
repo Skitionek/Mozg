@@ -65,6 +65,16 @@ Resolved since this table was first written:
 | ArangoDB AQL injection | Collection, attribute and sort names travel as bind parameters |
 | `src/database/drivers/biocyc.js` refetch per related id | One listing per related class serves every parent row, cached briefly |
 
+## Changelog and releases
+
+- **Update `CHANGELOG.md`** under `## [Unreleased]` for every user-facing change
+  (feat, fix, perf, refactor, breaking).  The release workflow copies that
+  section into the release notes, so it is read, not just kept.
+- Do not add entries for pure dependency bumps Dependabot handles.
+- Releases are date-based (`vYYYY-MM-DD`), tagged by `.github/workflows/release.yml`
+  once `CI`, `Lint`, `CodeQL Advanced` and `Connectors` pass on `main`.  Never
+  push a release commit or tag by hand.
+
 ## Commit messages
 
 **All commit messages MUST follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.**

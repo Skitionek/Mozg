@@ -281,6 +281,18 @@ mutation {
 
 ---
 
+## Releases
+
+Releases are **date-based, not semver**: Mozg ships continuously from `main` and has no supported-version matrix, so a calendar date says more than a version number would.  (`package.json` stays at `0.1.0`.)
+
+A push to `main` that leaves `CI`, `Lint`, `CodeQL Advanced` and `Connectors` all green triggers [`release.yml`](.github/workflows/release.yml), which
+
+1. tags the validated commit `vYYYY-MM-DD` (`.1`, `.2`, … for a second release the same day; a commit is never tagged twice);
+2. publishes a GitHub release whose notes are the `## [Unreleased]` section of [`CHANGELOG.md`](CHANGELOG.md), plus GitHub's generated notes;
+3. pushes the container image as `ghcr.io/skitionek/mozg:<tag>` and `:latest`.
+
+Nothing is pushed to `main` and nothing rewrites the changelog, so **keep `[Unreleased]` current** — it is read at release time.  Pin a deployment to a release with `--set image.tag=v2026-11-08` (the chart otherwise defaults to its `appVersion`).
+
 ## Commit conventions
 
 This project uses **[Conventional Commits](https://www.conventionalcommits.org/)**.  
