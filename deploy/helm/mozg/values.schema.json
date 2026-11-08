@@ -180,6 +180,20 @@
         "httpTimeoutMs": { "type": "integer", "minimum": 1 },
         "httpRetries": { "type": "integer", "minimum": 0 },
         "httpCacheTtlMs": { "type": "integer", "minimum": 0 },
+        "httpCacheMaxEntries": { "type": "integer", "minimum": 1 },
+        "resultCache": {
+          "type": "object",
+          "properties": {
+            "ttlMs": { "type": "integer", "minimum": 0 },
+            "perSource": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+            "maxEntries": { "type": "integer", "minimum": 1 },
+            "maxBytes": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "connectionCacheMax": { "type": "integer", "minimum": 1 },
+        "connectionIdleMs": { "type": "integer", "minimum": 0 },
+        "ontologyCacheMax": { "type": "integer", "minimum": 1 },
         "allowPrivateMirrors": { "type": "boolean" },
         "shutdownGraceMs": { "type": "integer", "minimum": 0 },
         "wakeTimeoutMs": { "type": "integer", "minimum": 0 },

@@ -117,6 +117,11 @@ const typeDefs = /* GraphQL */ `
     apiKeys: JSON
     """Return records exactly as the source sent them instead of the catalog's normalized fields (api sources)"""
     raw: Boolean
+    """
+    Read live data even if the server caches results (MOZG_RESULT_CACHE_TTL_MS).  Reaches
+    every relation fetched for this query, and refreshes the cached result for others.
+    """
+    fresh: Boolean
     """Maximum number of rows to return"""
     limit: Int
     """Number of rows to skip"""
@@ -242,6 +247,11 @@ const typeDefs = /* GraphQL */ `
     data: JSON!
     """Number of rows returned"""
     count: Int!
+    """
+    How the answer was produced.  Absent unless the server caches results:
+    { cache: "hit" | "miss" | "bypass", ageMs, ttlMs }.  Other features add their own keys.
+    """
+    meta: JSON
   }
 
   type DatabaseSchema {

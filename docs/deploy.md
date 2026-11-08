@@ -317,6 +317,12 @@ unknown key or a malformed `oboForm` fails the build.
 | `databaseDefaults.scaleToZero.cooldownSeconds` | `900` | Idle time before scaling to zero |
 | `databaseDefaults.scaleToZero.pollingIntervalSeconds` | `15` | KEDA polling interval |
 | `databaseDefaults.scaleToZero.initialCooldownSeconds` | `3600` | No scale-down for this long after install |
+| `mozg.httpCacheTtlMs` / `mozg.httpCacheMaxEntries` | `0` / `500` | Cache identical outbound GETs (HTTP-backed sources only) |
+| `mozg.resultCache.ttlMs` | `0` (off) | Reuse the answer to a whole query for every driver; callers can pass `fresh: true` |
+| `mozg.resultCache.perSource` | `{}` | Per-source TTL in ms, overriding `ttlMs`; `0` turns it off for that source |
+| `mozg.resultCache.maxEntries` / `maxBytes` | `500` / `64 MiB` | Bounds on the result cache |
+| `mozg.connectionCacheMax` / `connectionIdleMs` | `32` / `600000` | Database clients kept, and how long an idle one lives |
+| `mozg.ontologyCacheMax` | `20` | Parsed ontologies kept in memory |
 | `mozg.wakeTimeoutMs` | `180000` | How long a query waits for a cold start |
 | `mozg.demandWindowMs` | `60000` | Demand persists this long after the last query |
 | `mozg.extraSourcesConfigMaps` | `[]` | ConfigMaps of extra catalog entries (`*.json`) |

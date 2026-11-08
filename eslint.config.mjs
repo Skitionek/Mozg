@@ -25,6 +25,7 @@ export default [
         clearInterval: 'readonly',
         setImmediate: 'readonly',
         queueMicrotask: 'readonly',
+        structuredClone: 'readonly',
         Response: 'readonly',
         Headers: 'readonly',
         Promise: 'readonly',
