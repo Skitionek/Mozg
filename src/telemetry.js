@@ -54,6 +54,10 @@ const upstreamRequests = registry.counter('mozg_upstream_requests_total', 'Outbo
 const upstreamDuration = registry.histogram('mozg_upstream_request_duration_seconds', 'Outbound HTTP request duration, one attempt each.', ['host'])
 const upstreamRetries = registry.counter('mozg_upstream_retries_total', 'Outbound HTTP requests retried after a transient failure.', ['host'])
 
+// Labels come from fixed vocabularies in src/mcp (methods, tools, eras), never from the caller.
+const mcpRequests = registry.counter('mozg_mcp_requests_total', 'MCP requests by protocol era (modern, legacy), method and outcome (ok, tool_error = a tool result that says it failed, error = a JSON-RPC error).', ['era', 'method', 'outcome'])
+const mcpToolCalls = registry.counter('mozg_mcp_tool_calls_total', 'MCP tool calls by tool and outcome.', ['tool', 'outcome'])
+
 const wakes = registry.counter('mozg_self_hosted_wakes_total', 'Queries that found a self-hosted database scaled to zero and waited for it.', ['source'])
 const wakeDuration = registry.histogram('mozg_self_hosted_wake_seconds', 'Time a query waited for a self-hosted database to come up.', ['source'], [1, 2.5, 5, 10, 20, 30, 60, 120, 180])
 
@@ -96,6 +100,7 @@ registry.collectedCounter('mozg_connection_cache_evictions_total', 'Database cli
 function routeOf (pathname) {
   if (pathname.startsWith('/graphql')) return 'graphql'
   if (pathname === '/stream') return 'stream'
+  if (pathname === '/mcp' || pathname === '/mcp/') return 'mcp'
   if (pathname.startsWith('/demand')) return 'demand'
   if (pathname === '/healthz') return 'healthz'
   if (pathname === '/metrics') return 'metrics'
@@ -202,6 +207,14 @@ function recordUpstreamRetry (host) {
   upstreamRetries.inc([hostLabel(host)])
 }
 
+function recordMcp (era, method, outcome) {
+  mcpRequests.inc([era, method, outcome])
+}
+
+function recordMcpTool (tool, outcome) {
+  mcpToolCalls.inc([tool, outcome])
+}
+
 function recordWake (source, seconds) {
   const label = sourceLabel(source)
   wakes.inc([label])
@@ -226,6 +239,8 @@ module.exports = {
   trackQuery,
   recordUpstream,
   recordUpstreamRetry,
+  recordMcp,
+  recordMcpTool,
   recordWake,
   serveMetrics,
   CONTENT_TYPE

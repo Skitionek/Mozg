@@ -83,7 +83,7 @@ test('the built site: every page, and every internal link and anchor resolves', 
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'mozg-site-'))
   try {
     const { pages } = await build({ out, commit: '0123456789abcdef' })
-    for (const page of ['index.html', 'sources.html', 'model.html', 'examples.html', 'connectors.html', 'deploy.html', 'dumps.html', 'changelog.html']) {
+    for (const page of ['index.html', 'sources.html', 'model.html', 'examples.html', 'mcp.html', 'connectors.html', 'deploy.html', 'dumps.html', 'changelog.html']) {
       assert.ok(pages.includes(page), `${page} built`)
     }
     assert.ok(fs.existsSync(path.join(out, 'style.css')))

@@ -17,6 +17,7 @@ const { handleStreamRequest } = require('./stream')
 const { serveStatic } = require('./static')
 const { maskError } = require('./errors')
 const { handleDemandRequest } = require('./database/self-hosted')
+const { createMcpHandler } = require('./mcp')
 const { trackRequest, serveMetrics } = require('./telemetry')
 const { boolOption, intOption } = require('./config')
 const { version } = require('../package.json')
@@ -77,6 +78,8 @@ function createMozgServer ({ env = process.env } = {}) {
     maskedErrors: { maskError }
   })
   const metrics = metricsSettings(env)
+  // The same schema as /graphql: an MCP tool is a fixed GraphQL document run against it.
+  const mcp = createMcpHandler({ schema, env })
 
   return createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost')
@@ -84,6 +87,9 @@ function createMozgServer ({ env = process.env } = {}) {
       if (url.pathname.startsWith('/graphql')) return yoga(req, res)
 
       if (url.pathname === '/stream') return handleStreamRequest(req, res)
+
+      // Model Context Protocol, for AI assistants.  When switched off the path is just not there.
+      if ((url.pathname === '/mcp' || url.pathname === '/mcp/') && mcp.enabled) return mcp.handle(req, res)
 
       // Demand for self-hosted databases, polled by KEDA to scale them to and
       // from zero (see deploy/helm/mozg and src/database/self-hosted.js).
