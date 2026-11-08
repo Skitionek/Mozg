@@ -18,8 +18,9 @@ async function executeQuery (rawInput) {
 }
 
 async function runQuery (normalized) {
-  // `fresh` is the caller's wish about the result cache, not a driver option.
-  const { fresh: _fresh, ...input } = normalized
+  // `fresh` is the caller's wish about the result cache, and `link` is applied
+  // here to the finished rows: neither is a driver option.
+  const { fresh: _fresh, link, ...input } = normalized
   const driver = registry.getDriver(input.connection.driver)
 
   const relations = input.relations || []
@@ -37,6 +38,10 @@ async function runQuery (normalized) {
 
   const options = { apiKeys: input.connection.apiKeys }
   await Promise.all(crossCatalog.map((rel) => resolveCrossCatalogRelation(executeQuery, result.data, rel, options)))
+
+  // After the relations, so a link can follow a field of a related row
+  // (`field: "target.diseaseId"`).  Required lazily: most queries link nothing.
+  if (link && link.length) await require('../ontology/links').applyLinks(result.data, link)
 
   return result
 }

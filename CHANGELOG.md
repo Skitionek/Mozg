@@ -121,6 +121,18 @@ verified against the live APIs, and joined up across sources.
   (`owner.login`, `types[].type.url`) and entity paths with `{field}`
   placeholders (`/carts/user/{id}`).
 
+- **Link database values to ontology terms.**  `QueryInput.link` resolves a
+  result field's values to the terms of an ontology and writes the term beside
+  the value (`<field>Term`, or `as`): by identifier (any spelling, the IRI, or
+  a bare id plus the ontology's OBO key), label, synonym or cross-reference,
+  in the order `match` gives.  Works on lists and, with `a.b`, on the fields
+  of included relations.  Ontologies are named in `MOZG_ONTOLOGIES` (Helm
+  `mozg.ontologies`) and load once on first use, or given inline as `url` /
+  `content`; the new `ontologies` and `ontologyTerms` queries list and search
+  them.  Terms are read from the OBO flat-file format (new; a tenth the size
+  of OWL), Turtle and RDF/XML.  Checked on the real Human Phenotype Ontology
+  (20,482 terms, 288 ms).  Callers cannot register a named ontology: without
+  authentication that would let anyone rewrite everyone's links.
 - **Metrics and logs.**  `GET /metrics` serves Prometheus text (a small
   registry in `src/metrics.js`, no new dependency): inbound requests, queries
   by driver and source, rows, outbound requests by host with retries, cold
