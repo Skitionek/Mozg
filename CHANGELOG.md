@@ -121,6 +121,15 @@ verified against the live APIs, and joined up across sources.
   (`owner.login`, `types[].type.url`) and entity paths with `{field}`
   placeholders (`/carts/user/{id}`).
 
+- **SDK** (`sdk/`, `@skitionek/mozg-sdk`; not yet published to npm).  A
+  dependency-free JavaScript client with TypeScript types for Node 18+ and
+  browsers: awaitable immutable query builders (`mozg.source('uniprot').from('protein')
+  .where({…}).include(…)`), views, ontology links, `stream()` / `streamAll()`
+  for `/stream`, discovery (`catalog`, `oboKeys`, `introspect`), retries for
+  reads only, timeouts and cancellation, and a `MozgError` carrying the
+  server's code and the request id that appears in its logs.  The query always
+  travels as a GraphQL variable.  Run against a real server in
+  `tests/sdk.test.js`; the declarations were compiled under `tsc --strict`.
 - **Materialised views.**  A named, operator-defined query (`MOZG_VIEWS`, Helm
   `mozg.views`) whose rows Mozg stores and serves instead of reading live data
   each time: `query(input: { view: "name", where, select, orderBy, limit })`

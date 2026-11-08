@@ -15,6 +15,7 @@ Key files:
 - `src/database/result-cache.js` – whole-query result cache (off by default)
 - `src/views.js` – materialised views: operator-defined named queries whose rows are stored and served with visible freshness
 - `src/ontology/terms.js`, `src/ontology/links.js` – ontology term index and `QueryInput.link`
+- `sdk/` – the client library (ES module, hand-written `index.d.ts`); keep `index.d.ts` and `sdk/README.md` in step with `src/schema.js`
 - `src/schema.js` – GraphQL type definitions and resolvers
 - `src/database/registry.js` – driver resolution (single source of truth)
 - `src/database/connector.js` – query execution router
