@@ -121,6 +121,20 @@ verified against the live APIs, and joined up across sources.
   (`owner.login`, `types[].type.url`) and entity paths with `{field}`
   placeholders (`/carts/user/{id}`).
 
+- **The model** (documentation site, `docs/model.md`).  An interactive force
+  graph, computed from the live catalog at build time, of how the databases
+  connect their entities through shared ontologies and identifier spaces: a
+  pill is an OBO key (an ontology such as MONDO or GO, or the identifier space
+  of a database), a coloured shape is one entity of one database, and a line
+  says the entity returns or accepts that key.  Three examples to start from,
+  any eight of the 47 databases to compare; each database keeps its colour
+  while others come and go, and has its own node shape as well, so colour is
+  never the only cue.  Hover, select, drag, pan and zoom; a legend that
+  isolates a database; optional declared relations; a table of every
+  connection beside it, operable by keyboard, which is also what a reader
+  without JavaScript sees.  Light and dark, and a layout that adapts to a
+  phone.  No library is loaded.  The in-browser tests run where Playwright is
+  installed and skip where it is not.
 - **SDK** (`sdk/`, `@skitionek/mozg-sdk`; not yet published to npm).  A
   dependency-free JavaScript client with TypeScript types for Node 18+ and
   browsers: awaitable immutable query builders (`mozg.source('uniprot').from('protein')
