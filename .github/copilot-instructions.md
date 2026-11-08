@@ -9,7 +9,10 @@ MySQL, SQLite).  A single `/graphql` endpoint accepts user-supplied credentials 
 executes federated queries that traverse those relations at query time.
 
 Key files:
-- `src/index.js` – HTTP server (graphql-yoga)
+- `src/index.js` – process entry point; `src/server.js` – the HTTP servers (graphql-yoga), built by functions so tests can start them
+- `src/telemetry.js`, `src/metrics.js`, `src/log.js` – `/metrics`, request ids and structured logs
+- `src/cache.js`, `src/config.js` – the shared bounded LRU and deployment-option parsing
+- `src/database/result-cache.js` – whole-query result cache (off by default)
 - `src/schema.js` – GraphQL type definitions and resolvers
 - `src/database/registry.js` – driver resolution (single source of truth)
 - `src/database/connector.js` – query execution router
@@ -50,9 +53,8 @@ items should **not** be fixed inline — add a `// TODO(#issue)` comment instead
 
 | Category | Area | Status | Description |
 |----------|------|--------|-------------|
-| Performance | `src/database/drivers/rest.js` | Open (mitigated) | Relations issue one request per parent row (REST has no generic batch filter); they now run four at a time instead of one after another |
-| Performance | `src/database/drivers/mesh-adapter.js` | Open (mitigated) | Same per-row relation lookups for MySQL / Neo4j / OpenAPI / OData / SOAP — handler filter types share no generic `in` operator — now four at a time |
-| Performance | `src/database/drivers/{sqlite3,mesh-adapter,arango}.js` | Open | Connection/source caches have no eviction; long-running servers that see many distinct connections grow without bound |
+| Performance | `src/database/drivers/rest.js`, `mesh-adapter.js` | Open (mitigated) | Relations on APIs that cannot take a list of keys still make one request per *distinct* parent key (four at a time); only Neo4j (`in`) and REST relations marked `batch: true` fetch all parents at once |
+| Upstream | `@graphql-mesh/thrift` | Open | String parameters get no type and struct results lose their field names; see the `todo` tests in `tests/thrift-driver.test.js` |
 
 Resolved since this table was first written:
 
@@ -64,6 +66,10 @@ Resolved since this table was first written:
 | Connection cache keyed without password (`sql.js`, now postgres / mesh-adapter / arango) | Every cache key includes the password, so a wrong password never reuses an authenticated connection (shown live against MySQL before the fix) |
 | ArangoDB AQL injection | Collection, attribute and sort names travel as bind parameters |
 | `src/database/drivers/biocyc.js` refetch per related id | One listing per related class serves every parent row, cached briefly |
+| Connection/source caches without eviction (`sqlite3`, `postgres`, `mysql`, `mesh-adapter`, `arango`, …) | Every such cache is bounded and idle-expiring through `src/cache.js` (`MOZG_CONNECTION_CACHE_MAX`, `MOZG_CONNECTION_IDLE_MS`) |
+| MySQL unreachable on MySQL 8's default login and on MySQL 9 | The driver is knex over `mysql2` (`src/database/drivers/mysql.js`), which speaks `caching_sha2_password` |
+| SOAP ran any operation named in `from` | `src/database/drivers/soap-policy.js`: read-named operations only, unless `MOZG_SOAP_OPERATIONS` allows more |
+| Thrift sent no arguments | Arguments are written as literals (the Thrift executor drops variables); covered end to end by `tests/thrift-driver.test.js` |
 
 ## Changelog and releases
 

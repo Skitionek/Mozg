@@ -310,7 +310,7 @@ function expandIncludes (entry, entityName, include) {
       alias,
       type: rel.type || 'hasMany'
     }
-    for (const key of ['localKey', 'ownerKey', 'where', 'select', 'limit', 'obo']) {
+    for (const key of ['localKey', 'ownerKey', 'where', 'select', 'limit', 'obo', 'batch']) {
       if (rel[key] != null) relation[key] = rel[key]
     }
     if (rel.catalog && rel.catalog !== sourceEntry.name) relation.catalog = rel.catalog

@@ -13,7 +13,6 @@
     "health": "node scripts/catalog-health.js"
   },
   "dependencies": {
-    "@graphql-mesh/mysql": "^0.108.3",
     "@graphql-mesh/neo4j": "^0.110.3",
     "@graphql-mesh/odata": "^0.109.3",
     "@graphql-mesh/openapi": "^0.112.7",
@@ -26,6 +25,7 @@
     "graphql": "^17.1.0",
     "graphql-yoga": "^6.0.1",
     "knex": "^3.3.0",
+    "mysql2": "^3.24.6",
     "n3": "^2.13.12",
     "pg": "^8.23.1",
     "rdfxml-streaming-parser": "^3.3.0",

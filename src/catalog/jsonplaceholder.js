@@ -19,7 +19,7 @@ module.exports = {
       name: '/posts',
       columns: ['id', 'userId', 'title', 'body'],
       relations: [
-        { entity: '/comments', foreignKey: 'postId', type: 'hasMany', alias: 'comments' },
+        { entity: '/comments', foreignKey: 'postId', type: 'hasMany', batch: true, alias: 'comments' },
         { entity: '/users', foreignKey: 'userId', localKey: 'userId', type: 'belongsTo', alias: 'user' }
       ]
     },
@@ -27,9 +27,9 @@ module.exports = {
       name: '/users',
       columns: ['id', 'name', 'username', 'email', 'phone', 'website'],
       relations: [
-        { entity: '/posts', foreignKey: 'userId', type: 'hasMany', alias: 'posts' },
-        { entity: '/todos', foreignKey: 'userId', type: 'hasMany', alias: 'todos' },
-        { entity: '/albums', foreignKey: 'userId', type: 'hasMany', alias: 'albums' }
+        { entity: '/posts', foreignKey: 'userId', type: 'hasMany', batch: true, alias: 'posts' },
+        { entity: '/todos', foreignKey: 'userId', type: 'hasMany', batch: true, alias: 'todos' },
+        { entity: '/albums', foreignKey: 'userId', type: 'hasMany', batch: true, alias: 'albums' }
       ]
     },
     {
@@ -50,7 +50,7 @@ module.exports = {
       name: '/albums',
       columns: ['id', 'userId', 'title'],
       relations: [
-        { entity: '/photos', foreignKey: 'albumId', type: 'hasMany', alias: 'photos' },
+        { entity: '/photos', foreignKey: 'albumId', type: 'hasMany', batch: true, alias: 'photos' },
         { entity: '/users', foreignKey: 'userId', localKey: 'userId', type: 'belongsTo', alias: 'user' }
       ]
     },

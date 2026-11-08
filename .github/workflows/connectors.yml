@@ -105,18 +105,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Start MySQL ${{ matrix.preset.mysql }} with mysql_native_password
-        # The MySQL driver goes through the graphql-mesh MySQL handler, whose
-        # client (mysql 2.x) speaks only mysql_native_password: MySQL 8.4
-        # ships it switched off, and 9.x has removed it, so every preset pins
-        # 8.4 (docs/connectors.md).  Service containers take no server
-        # arguments, so MySQL runs here.
+      - name: Start MySQL ${{ matrix.preset.mysql }}
+        # With its default login method, caching_sha2_password: the driver
+        # (knex over mysql2) speaks it, and MySQL 9 and later have no other.
         env:
           MYSQL_IMAGE: mysql:${{ matrix.preset.mysql }}
         run: |
           docker run -d --name mysql -p 3306:3306 \
             -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=mozg_it \
-            "$MYSQL_IMAGE" --mysql-native-password=ON --authentication-policy=mysql_native_password
+            "$MYSQL_IMAGE"
           for _ in $(seq 1 60); do
             if docker exec mysql mysqladmin ping -h 127.0.0.1 --silent; then exit 0; fi
             sleep 2

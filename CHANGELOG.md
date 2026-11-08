@@ -147,6 +147,18 @@ verified against the live APIs, and joined up across sources.
 
 ### Changed
 
+- **SOAP is read-only by default.**  A WSDL does not say whether an operation
+  changes data and the SOAP handler exposes all of them as mutations, so
+  naming one in `from` ran it.  Now only operations whose first word is a read
+  verb (`Get…`, `List…`, `Search…`) run, plus those in `MOZG_SOAP_OPERATIONS`
+  (Helm `mozg.soapOperations`); `*` restores the old behaviour.
+  **Breaking** for anyone calling other SOAP operations.
+- **Relations fetch each distinct parent key once** (REST and mesh
+  connectors); a mesh handler whose filters take an `in` list (Neo4j) is asked
+  once per 200 parents, falling back to one query per key if that fails; and a
+  REST relation that says `batch: true` (`RelationInput.batch`, set on
+  JSONPlaceholder's relations) fetches all parents with one repeated filter,
+  checked live (6 requests became 2, same answer).
 - **Dependencies, runtimes and images on their current LTS lines** (as of
   November 2026):
   - Node.js: the image runs Node 26 (active LTS); CI tests 22, 26 and the
@@ -215,6 +227,27 @@ verified against the live APIs, and joined up across sources.
 
 ### Fixed
 
+- **MySQL 8's default login and MySQL 9 work.** The driver is now knex over
+  `mysql2` (`src/database/drivers/mysql.js`), like PostgreSQL, replacing the
+  graphql-mesh MySQL handler, whose `mysql` 2.x client answered
+  `ER_NOT_SUPPORTED_AUTH_MODE` to `caching_sha2_password` and could not reach
+  MySQL 9 at all.  Against a stock MySQL 8.0 the connector suite went from 8
+  of 8 failing to 8 of 8 passing, with both login methods.  CI now starts
+  MySQL without `--mysql-native-password=ON` and tests 8.4, 9.7 and 26.10
+  (not yet run: the Connectors workflow is its test).  Relations batch (one
+  query each) and `where` values keep their types.  `@graphql-mesh/mysql` is
+  no longer a dependency; `mysql2` is.
+- **Thrift calls carried no arguments.**  The Thrift executor drops arguments
+  given as GraphQL variables, so every call reached the server with an empty
+  argument struct.  They are now written as literals (built by GraphQL's own
+  serialiser, so a value still cannot become query text), and Thrift is
+  tested end to end against a real server.  Two limits are upstream and have
+  `todo` tests: string parameters get no type, and struct results lose their
+  field names.
+- `Int` filters no longer read a number out of text (`"2) { evil } #"` was
+  `2`, `2.5` was `2`); a value that is not an integer is refused.
+- Operations that return a scalar (a Thrift `i32`, a SOAP string) appear in
+  introspection, as a table with one `value` column.
 - **Caches no longer grow without bound.** The database client per distinct
   connection (SQLite, PostgreSQL, ArangoDB, graphql-mesh), the Elasticsearch
   mapping, BioCyc's listing and session, parsed ontologies and the per-host

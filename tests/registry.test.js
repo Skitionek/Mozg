@@ -13,8 +13,10 @@ describe('registry.getDriver', () => {
     assert.equal(typeof d.introspect, 'function')
   })
 
-  test('resolves mysql to mesh adapter', () => {
+  test('resolves mysql to the knex driver, not a mesh handler', () => {
     const d = getDriver('mysql')
+    assert.equal(d, require('../src/database/drivers/mysql'))
+    assert.notEqual(d, require('../src/database/drivers/mesh-adapter'))
     assert.equal(typeof d.executeQuery, 'function')
     assert.equal(typeof d.introspect, 'function')
   })
