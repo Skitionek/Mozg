@@ -83,7 +83,7 @@ test('the built site: every page, and every internal link and anchor resolves', 
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'mozg-site-'))
   try {
     const { pages } = await build({ out, commit: '0123456789abcdef' })
-    for (const page of ['index.html', 'sources.html', 'examples.html', 'connectors.html', 'deploy.html', 'dumps.html', 'changelog.html']) {
+    for (const page of ['index.html', 'sources.html', 'model.html', 'examples.html', 'connectors.html', 'deploy.html', 'dumps.html', 'changelog.html']) {
       assert.ok(pages.includes(page), `${page} built`)
     }
     assert.ok(fs.existsSync(path.join(out, 'style.css')))
@@ -113,6 +113,32 @@ test('the built site: every page, and every internal link and anchor resolves', 
     assert.match(html.get('index.html'), /<section class="hero">/)
     assert.match(html.get('index.html'), /commit\/0123456789abcdef/)
   } finally {
+    fs.rmSync(out, { recursive: true, force: true })
+  }
+})
+
+test('the model page carries catalog text exactly, even where it looks like a replacement pattern', async () => {
+  // Given a source whose description holds the sequences String.replace expands
+  const { registerCatalog } = require('../src/catalog')
+  const description = "costs $& or $' or $` or $$ per query"
+  const unregister = registerCatalog({
+    name: 'dollar-test',
+    label: 'Dollar test',
+    description,
+    driver: 'api',
+    connection: { database: 'https://dollar.example' },
+    entities: [{ name: 'thing', path: '/thing/{id}', params: { id: {} }, fields: { id: 'id' } }]
+  })
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'mozg-site-'))
+  try {
+    // When the site is built
+    await build({ out, commit: '0123456789abcdef' })
+
+    // Then the page holds the description as written
+    const page = fs.readFileSync(path.join(out, 'model.html'), 'utf8')
+    assert.ok(page.includes(description), 'the description survived intact')
+  } finally {
+    unregister()
     fs.rmSync(out, { recursive: true, force: true })
   }
 })

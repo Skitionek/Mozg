@@ -67,6 +67,7 @@ Per-connector details, test coverage and known limitations: [docs/connectors.md]
 - 🌐 **Web UI** – visual query builder at `/` with examples and a catalog browser
 - 🧪 **GraphiQL** – full IDE at `/graphql`
 - ⚡ **Streaming** – `POST /stream` returns progressive JSON as relations resolve
+- 🕸 **[The model](https://skitionek.github.io/Mozg/model.html)** – an interactive force graph, drawn from the live catalog, of how the databases connect their entities through shared ontologies and identifier spaces
 - 🧰 **SDK** – a dependency-free JavaScript/TypeScript client in [`sdk/`](sdk/README.md): query builders, streaming, ontology links, retries and typed errors
 - 🦉 **OWL ontology ingestion** – parse Turtle, RDF/XML, OWL/XML and Manchester Syntax ontologies via `ingestOntology` mutation
 
