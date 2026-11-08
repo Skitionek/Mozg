@@ -33,7 +33,7 @@ run once per preset:
 | Node.js | 22 | 26 | 28 nightly (image: 26) |
 | PostgreSQL | 14 | 18 | 19 RC1 |
 | MariaDB (the chart's `mysql` engine) | 10.11 | 12.3 | 13.1 RC |
-| MySQL | 8.4 | 8.4 | 8.4 (pinned, finding 2) |
+| MySQL | 8.4 | 9.7 | 26.10 |
 | Neo4j | 5.26 | 5.26 | 2026.10.1 |
 | ArangoDB | 3.12.13 | 3.12.13 | 3.12.13 (its only supported line) |
 | Elasticsearch | 8.19.24 | 9.5.6 | 9.7.0 snapshot |
@@ -55,16 +55,16 @@ reaches its end of life on 2026-11-12.
 |--------|---------|----------------|:-----:|:---------:|:----------:|--------|
 | `postgres` | PostgreSQL (knex + pg) | Integration suite on PostgreSQL 14, 18 and 19 RC1 (the three presets); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` applied in SQL | ✓ `pg_catalog` | **Stable** |
 | `sqlite3` | SQLite file (knex) | Integration suite on a temp file, locally and in CI; unit tests; inside the Docker image; Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ | **Stable** |
-| `mysql` | MySQL via graphql-mesh | Integration suite: MySQL 8.4 LTS, and MariaDB 10.11, 12.3 and 13.1 RC, in CI; Helm chart end to end on kind (MariaDB) | ✓ | ✓ per row, 4 in flight | ✓ | **Beta**: needs `mysql_native_password` (see findings 1 and 2) |
-| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS and 2026.10.1); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ per row | ✓ | **Beta** (see findings 1, 13, 16 and 18) |
+| `mysql` | MySQL / MariaDB (knex + mysql2) | Integration suite: MySQL 8.4, 9.7 and 26.10 with their default `caching_sha2_password`, and MariaDB 10.11, 12.3 and 13.1 RC, in CI; Helm chart end to end on kind (MariaDB). Also run by hand against MySQL 8.0 with both `caching_sha2_password` and `mysql_native_password` users | ✓ | ✓ batched, per-parent `limit` in SQL | ✓ `information_schema` | **Beta** until the Connectors workflow has run green on the new presets (finding 2) |
+| `neo4j` | Neo4j via graphql-mesh (`@neo4j/graphql` 7) | Shape tests against a schema of the same form; integration suite in CI (Neo4j 5.26 LTS and 2026.10.1); Helm chart end to end on kind, with Cypher-created integer properties | ✓ | ✓ one `in` query per 200 parents when the schema declares `in`, else one per distinct key (finding 19) | ✓ | **Beta** (see findings 1, 13, 16, 18 and 19) |
 | `arango` | ArangoDB (arangojs) | Unit tests on the generated AQL; integration suite in CI (ArangoDB 3.12.13); Helm chart end to end on kind | ✓ | ✓ batched, per-parent `limit` in AQL | ✓ sampled | **Beta** |
 | `elasticsearch` | Elasticsearch / OpenSearch REST | Unit tests against an in-memory stand-in; integration suite in CI (Elasticsearch 8.19, 9.5 and a 9.7 snapshot); Helm chart end to end on kind | ✓ | ✓ batched `terms` / `_mget` | ✓ mappings | **Beta** |
-| `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12) | ✓ | ✓ per row, 4 in flight | from catalog | **Stable** for JSON APIs |
+| `rest` | Any JSON HTTP API | Unit tests; every relation of the demo sources followed live (see finding 12); `batch` relations checked live against JSONPlaceholder (finding 19) | ✓ | ✓ one request per distinct key, 4 in flight; one request for all parents where a relation says `batch: true` | from catalog | **Stable** for JSON APIs |
 | `kegg` | rest.kegg.jp (text) | Unit tests; live `/list`, `/get`, `/link` | ✓ | ✓ via `_pathSuffix` | from catalog | **Stable** |
-| `openapi` | OpenAPI / Swagger via graphql-mesh | Live Petstore v3; shape tests | ✓ | ✓ per row | ✓ operations | **Beta** (see finding 1) |
-| `odata` | OData v4 via graphql-mesh | Live TripPin; shape tests | ✓ server-side `$top/$skip/$orderby/$filter` | ✓ per row | ✓ entry points | **Beta** (see finding 1) |
-| `soap` | SOAP / WSDL via graphql-mesh | Live NumberConversion WSDL; shape tests | ✓ runs the named operation | — | ✓ operations | **Experimental**: operations may have side effects |
-| `thrift` | Apache Thrift via graphql-mesh | Schema built from a local IDL; transport reaches the network | untested end to end | — | ✓ | **Experimental**: no public server for a round trip |
+| `openapi` | OpenAPI / Swagger via graphql-mesh | Live Petstore v3; shape tests | ✓ | ✓ one request per distinct key | ✓ operations | **Beta** (see finding 1) |
+| `odata` | OData v4 via graphql-mesh | Live TripPin; shape tests | ✓ server-side `$top/$skip/$orderby/$filter` | ✓ one request per distinct key | ✓ entry points | **Beta** (see finding 1) |
+| `soap` | SOAP / WSDL via graphql-mesh | Live NumberConversion WSDL; shape tests | ✓ runs the named operation, if the policy allows it (finding 20) | — | ✓ operations | **Experimental**: read-named operations only, unless the operator allows more |
+| `thrift` | Apache Thrift via graphql-mesh | End to end against a real Thrift server in the unit tests (finding 21): IDL, handler, HTTP/binary wire, reply | ✓ methods returning `i32`, `bool`; not string parameters or struct results (upstream) | — | ✓ | **Experimental**: two upstream limits (finding 21) |
 | `biocyc` | BioCyc / Pathway Tools web services | Unit tests on the documented `apixml` format; one live EcoCyc listing | ✓ | ✓ via frame references | static schema | **Beta**: needs a BioCyc account (see finding 7) |
 
 ## Findings and fixes
@@ -80,20 +80,28 @@ reaches its end of life on 2026-11-12.
    - `npm audit --omit=dev` is unchanged by this (no new findings).
    - The MySQL suite then passes. This is a `package.json` change and is
      tracked separately from the driver fixes.
-2. **MySQL authentication.** The mesh MySQL handler uses the `mysql` 2.x
-   client, which cannot speak MySQL 8's default `caching_sha2_password`, even
-   for an empty password. Users need `mysql_native_password`:
-   - MariaDB uses it by default.
-   - MySQL 8.4 (LTS) ships it switched off, and needs
-     `--mysql-native-password=ON --authentication-policy=mysql_native_password`.
-     The connector suite runs that way in CI.
-   - MySQL 9 (9.7 LTS included) has removed it; the connector cannot reach it.
-
-   Replacing the handler with knex and `mysql2`, as the postgres driver did,
-   would remove the limitation.
-3. **MySQL paging was swapped.** The handler renders `LIMIT ${limit},${offset}`,
-   which MySQL reads as offset first, then count; it also drops zeros. The
-   adapter now asks only for a row count and skips the offset itself.
+2. **MySQL authentication (fixed).** The mesh MySQL handler used the `mysql`
+   2.x client, which cannot speak MySQL 8's default `caching_sha2_password`,
+   even for an empty password, so a stock MySQL 8 answered
+   `ER_NOT_SUPPORTED_AUTH_MODE` and MySQL 9, which removed
+   `mysql_native_password`, could not be reached at all.
+   - The driver is now knex over `mysql2`, like PostgreSQL
+     (`src/database/drivers/mysql.js`); `@graphql-mesh/mysql` and the `mysql`
+     client are gone from the dependencies.
+   - Checked against a real MySQL 8.0 server: before, the connector suite
+     failed 8 of 8 on `ER_NOT_SUPPORTED_AUTH_MODE`; after, it passes 8 of 8
+     with a `caching_sha2_password` user and with a `mysql_native_password`
+     one.
+   - CI no longer starts MySQL with `--mysql-native-password=ON`, and the
+     presets are 8.4, 9.7 and 26.10 instead of 8.4 throughout. That change
+     could not be run where it was made: the Connectors workflow is its test.
+   - A side effect: relations now batch (one query each, `row_number()` for
+     per-parent limits) instead of one query per row, and `where` values keep
+     their types instead of all becoming strings.
+3. **MySQL paging was swapped (no longer applies).** The mesh handler rendered
+   `LIMIT ${limit},${offset}`, which MySQL reads as offset first, then count.
+   The adapter worked around it; the driver that replaced the handler pages
+   through knex, and the workaround is gone.
 4. **Mesh filters were built for one handler's types only.** The MySQL handler
    types every `where` field as `String`. `@neo4j/graphql` 7 wants operator
    objects (`{ id: { eq: 1 } }`) and `sort: [{ f: DESC }]`. The adapter used to
@@ -255,13 +263,58 @@ reaches its end of life on 2026-11-12.
       that name. Checked against Neo4j 5.26.
     - Found while writing [the list of public dumps](dumps.md).
 
+19. **Relations asked for the same record again and again.** A relation was
+    fetched once per parent row: fifty posts by five authors made fifty author
+    lookups (the HTTP layer only shares requests that are in flight together,
+    and rows ran four at a time). Now:
+    - REST and mesh connectors fetch each distinct parent key once and give
+      every row its own copy.
+    - A mesh handler whose `where` takes an `in` list (Neo4j) is asked once
+      per 200 parents, then the answer is grouped and any per-parent `limit`
+      applied. If that query fails, the per-key path runs instead, so a
+      relation is never worse for having tried. Only checked against a schema
+      of Neo4j's form, not a Neo4j server.
+    - A REST relation that says `batch: true` fetches all parents with one
+      repeated filter (`?userId=1&userId=2`). It is set on JSONPlaceholder's
+      relations, checked live: 6 requests became 2 with an identical answer.
+      If the API answers with a record whose key was not asked for (it ignores
+      the repeated filter), it falls back to one request per key.
+20. **SOAP ran any operation named in `from`.** A WSDL does not say whether an
+    operation reads or changes data, and the SOAP handler exposes every one as
+    a mutation, so `from: "DeleteAccount"` ran it. Now only operations whose
+    first word is a read verb (`Get…`, `List…`, `Search…`) run, plus those the
+    operator allows with `MOZG_SOAP_OPERATIONS` (Helm `mozg.soapOperations`);
+    `*` restores the old behaviour. The refusal happens before the service is
+    called, and says how to allow the operation.
+21. **Thrift never sent its arguments.** Run against a real Thrift server for
+    the first time (`tests/thrift-driver.test.js`, with a hand-written server
+    on the HTTP/binary wire), every call arrived with an empty argument
+    struct: the Thrift executor drops arguments given as GraphQL variables.
+    They are now written into the document as literals built by GraphQL's own
+    serialiser, which escapes them against the argument's type. Two more
+    limits are upstream, in `@graphql-mesh/thrift` and its transport, and have
+    `todo` tests that will start passing when they are fixed:
+    - a string parameter gets no type in the generated type map, so the call
+      fails before it is sent;
+    - the binary reply carries no field names, so every field of a struct
+      result is named `success` and the selected fields come back null.
+    Methods with integer and boolean parameters and scalar results work end to
+    end.
+22. **`Int` filters read a number out of text.** `parseInt` turned
+    `"2) { evil } #"` into `2` and `2.5` into `2`. A value that is not an
+    integer is now refused.
+23. **Introspection hid scalar-returning operations** (a Thrift `i32`, a SOAP
+    string, an OpenAPI count) although they could be queried. They are listed
+    now, as a table with one `value` column.
+
 ## Known limitations
 
-- MySQL users must use `mysql_native_password` (finding 2).
-- REST and mesh relations issue one request per parent row. REST has no
-  generic batch filter, and the mesh handlers' filter types share no `in`
-  operator. They run four at a time.
-- SOAP has no read/write distinction: naming an operation in `from` runs it.
-- Thrift is verified only up to the transport.
+- Relations batch only where the target can take a list of keys: Neo4j (`in`)
+  and REST relations marked `batch: true`. Other REST and mesh relations make
+  one request per distinct parent key, four at a time.
+- SOAP has no read/write distinction, so only operations named like reads run
+  unless the operator allows more (finding 20).
+- Thrift: string parameters and struct results do not work, both upstream
+  (finding 21).
 - A REST API that pages by default but cannot sort (PokéAPI) is sorted only
   within its first page.

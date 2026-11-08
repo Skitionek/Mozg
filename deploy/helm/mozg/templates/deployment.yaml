@@ -140,6 +140,10 @@ spec:
               value: {{ .Values.mozg.httpTimeoutMs | quote }}
             - name: MOZG_HTTP_RETRIES
               value: {{ .Values.mozg.httpRetries | quote }}
+            {{- if .Values.mozg.soapOperations }}
+            - name: MOZG_SOAP_OPERATIONS
+              value: {{ .Values.mozg.soapOperations | quote }}
+            {{- end }}
             - name: MOZG_LOG_LEVEL
               value: {{ .Values.mozg.logLevel | quote }}
             - name: MOZG_LOG_FORMAT

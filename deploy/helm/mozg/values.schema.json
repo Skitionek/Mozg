@@ -197,6 +197,7 @@
         "httpTimeoutMs": { "type": "integer", "minimum": 1 },
         "httpRetries": { "type": "integer", "minimum": 0 },
         "httpCacheTtlMs": { "type": "integer", "minimum": 0 },
+        "soapOperations": { "type": "string" },
         "logLevel": { "enum": ["error", "warn", "info", "debug"] },
         "logFormat": { "enum": ["json", "text"] },
         "slowQueryMs": { "type": "integer", "minimum": 0 },
