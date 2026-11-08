@@ -4,11 +4,19 @@ const registry = require('./registry')
 const { resolveCrossCatalogRelation } = require('./relations')
 const { normalizeQueryInput, normalizeKeyedRows, sourceForConnection } = require('./sources')
 const { withWake } = require('./self-hosted')
+const { getResultCache } = require('./result-cache')
 
 async function executeQuery (rawInput) {
   // `source` / `include` are shorthand for a catalog connection and catalog
-  // relations; expand them first so every driver sees the explicit form.
-  const input = normalizeQueryInput(rawInput)
+  // relations; expand them first so every driver sees the explicit form (and
+  // so the result cache keys on what actually runs).
+  const normalized = normalizeQueryInput(rawInput)
+  return getResultCache().run(normalized, () => runQuery(normalized))
+}
+
+async function runQuery (normalized) {
+  // `fresh` is the caller's wish about the result cache, not a driver option.
+  const { fresh: _fresh, ...input } = normalized
   const driver = registry.getDriver(input.connection.driver)
 
   const relations = input.relations || []

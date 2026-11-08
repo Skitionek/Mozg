@@ -20,6 +20,8 @@ class LruCache {
   /**
    * @param {object} [options]
    * @param {number} [options.max=100]     entries kept; 0 or less means unbounded
+   * @param {number} [options.maxWeight=0] total weight kept; 0 or less means no weight limit
+   * @param {(value: V) => number} [options.weigh]  an entry's weight (e.g. bytes); needed with maxWeight
    * @param {number} [options.ttlMs=0]     lifetime of an entry; 0 means it never expires
    * @param {boolean} [options.sliding=false]  a read renews the lifetime (idle expiry)
    * @param {(value: V, key: string, reason: 'lru'|'expired'|'delete'|'clear') => void} [options.onEvict]
@@ -28,8 +30,11 @@ class LruCache {
    *        cannot break the caller that triggered the eviction
    * @param {() => number} [options.now]  clock, for tests
    */
-  constructor ({ max = 100, ttlMs = 0, sliding = false, onEvict, now = Date.now } = {}) {
+  constructor ({ max = 100, maxWeight = 0, weigh, ttlMs = 0, sliding = false, onEvict, now = Date.now } = {}) {
     this.max = max
+    this.maxWeight = maxWeight
+    this.weigh = weigh
+    this.weight = 0
     this.ttlMs = ttlMs
     this.sliding = sliding
     this.onEvict = onEvict
@@ -82,10 +87,16 @@ class LruCache {
     const previous = this.entries.get(key)
     if (previous) {
       this.entries.delete(key)
+      this.weight -= previous.weight
       if (previous.value !== value) this.#notify(previous.value, key, 'delete')
     }
+    const weight = this.weigh ? this.weigh(value) : 0
+    // A value heavier than the whole budget can never fit; storing it would
+    // only evict everything else on its way out.
+    if (this.maxWeight > 0 && weight > this.maxWeight) return this
     const life = ttlMs != null ? ttlMs : this.ttlMs
-    this.entries.set(key, { value, expires: life > 0 ? this.now() + life : Infinity })
+    this.entries.set(key, { value, weight, expires: life > 0 ? this.now() + life : Infinity })
+    this.weight += weight
     this.#trim()
     return this
   }
@@ -123,6 +134,7 @@ class LruCache {
   clear () {
     const all = [...this.entries]
     this.entries.clear()
+    this.weight = 0
     for (const [key, entry] of all) this.#notify(entry.value, key, 'clear')
   }
 
@@ -133,6 +145,7 @@ class LruCache {
   drain () {
     const values = this.values()
     this.entries.clear()
+    this.weight = 0
     return values
   }
 
@@ -151,17 +164,24 @@ class LruCache {
 
   #remove (key, entry, reason) {
     this.entries.delete(key)
+    this.weight -= entry.weight
     this.#notify(entry.value, key, reason)
   }
 
   #trim () {
-    if (!(this.max > 0)) return
-    while (this.entries.size > this.max) {
+    while (this.#overBudget()) {
       const [key, entry] = this.entries.entries().next().value
       this.entries.delete(key)
+      this.weight -= entry.weight
       this.stats.evictions++
       this.#notify(entry.value, key, 'lru')
     }
+  }
+
+  #overBudget () {
+    if (this.entries.size === 0) return false
+    return (this.max > 0 && this.entries.size > this.max) ||
+      (this.maxWeight > 0 && this.weight > this.maxWeight)
   }
 
   #notify (value, key, reason) {

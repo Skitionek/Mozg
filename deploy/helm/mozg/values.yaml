@@ -113,8 +113,30 @@ mozg:
   httpTimeoutMs: 30000
   # -- Retries for 408/429/502/503/504 and network errors
   httpRetries: 2
-  # -- Cache identical outbound GETs for this long (0 = off; trades freshness for speed)
+  # -- Cache identical outbound GETs for this long (0 = off; trades freshness for speed).
+  # Helps the HTTP-backed sources only; `resultCache` below covers every driver.
   httpCacheTtlMs: 0
+  # -- Most outbound responses kept (least recently used go first)
+  httpCacheMaxEntries: 500
+  # Cache the answer to a whole query, relations included, for every driver.
+  # Off by default: Mozg is slow by design and reads live data.  A caller can
+  # always ask for live data with `fresh: true`.
+  resultCache:
+    # -- How long a result is reused (0 = off)
+    ttlMs: 0
+    # -- Per-source override in ms, taking precedence over ttlMs; 0 turns the
+    # cache off for that source.  e.g. { uniprot: 3600000, my-postgres: 0 }
+    perSource: {}
+    # -- Most results kept
+    maxEntries: 500
+    # -- Most bytes of results kept (64 MiB)
+    maxBytes: 67108864
+  # -- Database clients (connection pools) kept; the least recently used is closed
+  connectionCacheMax: 32
+  # -- A database client unused for this long is closed
+  connectionIdleMs: 600000
+  # -- Parsed ontologies kept in memory
+  ontologyCacheMax: 20
   # -- Allow callers to point a public catalog source at a private-network mirror
   allowPrivateMirrors: false
   # -- How long SIGTERM waits for in-flight queries

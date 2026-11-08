@@ -254,6 +254,13 @@ mutation {
 | `MOZG_HTTP_TIMEOUT_MS` | `30000` | Timeout per outbound request |
 | `MOZG_HTTP_RETRIES` | `2` | Retries for 408/429/502/503/504 and network errors |
 | `MOZG_HTTP_CACHE_TTL_MS` | `0` (off) | Cache identical outbound GETs for this long — trades freshness for speed |
+| `MOZG_HTTP_CACHE_MAX_ENTRIES` | `500` | Most outbound responses kept; the least recently used go first |
+| `MOZG_RESULT_CACHE_TTL_MS` | `0` (off) | Reuse the answer to a whole query, relations included, for every driver. A caller can always pass `fresh: true` |
+| `MOZG_RESULT_CACHE_TTL_BY_SOURCE` | unset | JSON object of per-source overrides in ms, e.g. `{"uniprot":3600000,"my-postgres":0}`; `0` turns the cache off for that source |
+| `MOZG_RESULT_CACHE_MAX_ENTRIES` / `MOZG_RESULT_CACHE_MAX_BYTES` | `500` / `67108864` | Bounds on the result cache |
+| `MOZG_CONNECTION_CACHE_MAX` | `32` | Database clients (connection pools) kept per driver; the least recently used is closed |
+| `MOZG_CONNECTION_IDLE_MS` | `600000` | A database client unused for this long is closed |
+| `MOZG_ONTOLOGY_CACHE_MAX` | `20` | Parsed ontologies kept in memory |
 | `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
 | `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |
 | `MOZG_SOURCES_DIR` | unset | Directory of JSON catalog entries to register at startup (self-hosted databases; see [docs/deploy.md](docs/deploy.md)) |
