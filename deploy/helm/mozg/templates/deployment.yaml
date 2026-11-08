@@ -132,6 +132,24 @@ spec:
               value: {{ .Values.mozg.httpRetries | quote }}
             - name: MOZG_HTTP_CACHE_TTL_MS
               value: {{ .Values.mozg.httpCacheTtlMs | quote }}
+            - name: MOZG_HTTP_CACHE_MAX_ENTRIES
+              value: {{ .Values.mozg.httpCacheMaxEntries | quote }}
+            - name: MOZG_RESULT_CACHE_TTL_MS
+              value: {{ .Values.mozg.resultCache.ttlMs | quote }}
+            {{- if .Values.mozg.resultCache.perSource }}
+            - name: MOZG_RESULT_CACHE_TTL_BY_SOURCE
+              value: {{ .Values.mozg.resultCache.perSource | toJson | quote }}
+            {{- end }}
+            - name: MOZG_RESULT_CACHE_MAX_ENTRIES
+              value: {{ .Values.mozg.resultCache.maxEntries | quote }}
+            - name: MOZG_RESULT_CACHE_MAX_BYTES
+              value: {{ .Values.mozg.resultCache.maxBytes | int64 | quote }}
+            - name: MOZG_CONNECTION_CACHE_MAX
+              value: {{ .Values.mozg.connectionCacheMax | quote }}
+            - name: MOZG_CONNECTION_IDLE_MS
+              value: {{ .Values.mozg.connectionIdleMs | quote }}
+            - name: MOZG_ONTOLOGY_CACHE_MAX
+              value: {{ .Values.mozg.ontologyCacheMax | quote }}
             {{- if .Values.mozg.allowPrivateMirrors }}
             - name: MOZG_ALLOW_PRIVATE_MIRRORS
               value: "1"

@@ -40,6 +40,7 @@ const connector = require('./database/connector')
 const { fetchRelation: fetchRelationRows, connectionForCatalog } = require('./database/relations')
 const { normalizeQueryInput } = require('./database/sources')
 const { redactCredentials } = require('./errors')
+const { withFresh } = require('./database/result-cache')
 
 /**
  * Fetch the data for a single relation of a single parent row.
@@ -61,6 +62,11 @@ async function fetchRelation (connection, row, rel) {
  * @param {import('node:http').ServerResponse} res
  */
 async function streamQuery (rawInput, res) {
+  // `fresh` must reach the per-relation fetches below, not only the first query.
+  return rawInput && rawInput.fresh ? withFresh(() => streamQueryNow(rawInput, res)) : streamQueryNow(rawInput, res)
+}
+
+async function streamQueryNow (rawInput, res) {
   // Expand `source` / `include` up front so the per-relation fan-out below
   // sees the same explicit relations the GraphQL path would.
   const input = normalizeQueryInput(rawInput)

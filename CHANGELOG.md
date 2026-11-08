@@ -121,6 +121,18 @@ verified against the live APIs, and joined up across sources.
   (`owner.login`, `types[].type.url`) and entity paths with `{field}`
   placeholders (`/carts/user/{id}`).
 
+- **Result cache.** `MOZG_RESULT_CACHE_TTL_MS` (Helm `mozg.resultCache.ttlMs`)
+  reuses the answer to a whole query, relations included, for every driver
+  and for `/stream`; `MOZG_RESULT_CACHE_TTL_BY_SOURCE` (`perSource`) overrides
+  it per source, `0` turning it off for one.  Off by default, so Mozg still
+  reads live data unless an operator chooses otherwise.  `QueryInput.fresh`
+  reads live data for one query (and every relation fetched for it) and
+  refreshes the entry; `QueryResult.meta` says whether an answer was a
+  `hit`, `miss`, `bypass` or `shared`.  Keys cover credentials and API keys,
+  errors and SOAP/Thrift are never cached, and identical concurrent queries
+  share one execution.  `MOZG_HTTP_CACHE_TTL_MS` keeps its meaning (it caches
+  single outbound GETs).
+
 ### Changed
 
 - **Dependencies, runtimes and images on their current LTS lines** (as of
@@ -191,6 +203,15 @@ verified against the live APIs, and joined up across sources.
 
 ### Fixed
 
+- **Caches no longer grow without bound.** The database client per distinct
+  connection (SQLite, PostgreSQL, ArangoDB, graphql-mesh), the Elasticsearch
+  mapping, BioCyc's listing and session, parsed ontologies and the per-host
+  rate limiters were keyed by caller input and never evicted.  They now share
+  one LRU; clients also close after sitting idle
+  (`MOZG_CONNECTION_CACHE_MAX`, `MOZG_CONNECTION_IDLE_MS`,
+  `MOZG_ONTOLOGY_CACHE_MAX`).  The HTTP response cache now evicts the least
+  recently used entry, not the oldest, and its size is
+  `MOZG_HTTP_CACHE_MAX_ENTRIES` (Helm `mozg.httpCacheMaxEntries`).
 - Cross-catalog relations between the life-science sources resolve.  They
   previously sent the join key as a query parameter to endpoints that take it
   in the path, so every one of them failed.
