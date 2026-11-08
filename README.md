@@ -211,6 +211,37 @@ mutation {
 
 ---
 
+## Materialised views
+
+Mozg reads live data, every time, and that is the right default.  A few queries are expensive, stable and asked again and again — everything known about one protein across five databases, say.  A **materialised view** is the one place where precomputation is chosen, on purpose, for a named query.  The operator defines it; Mozg runs the query, keeps the rows, and answers reads from them:
+
+```json
+MOZG_VIEWS=[{
+  "name": "tp53",
+  "description": "TP53 across UniProt, PDBe and Reactome",
+  "query": { "source": "uniprot", "from": "protein", "where": { "uniprotAccession": "P04637" },
+             "include": ["structures", "pathways"] },
+  "refresh": { "ttlMs": 86400000, "everyMs": 21600000 }
+}]
+```
+
+```graphql
+{
+  query(input: { view: "tp53", where: { symbol: "TP53" }, select: ["symbol", "structures"], limit: 10 }) {
+    count data meta
+  }
+}
+```
+
+- **Freshness is never hidden.**  `meta` carries `refreshedAt`, `ageMs`, `ttlMs`, `stale`, `refreshing`, `total` (rows that matched before paging) and `truncated`.  The `views` query lists every view, its columns, row count, age and last error.
+- **Refresh.**  `ttlMs` marks a snapshot stale after that long; a stale read is answered from the old rows while a refresh runs behind it (`staleWhileRevalidate`, on by default; off makes the read wait).  `everyMs` refreshes on a timer, starting at launch; `onStart` refreshes once at launch.  A view with neither refreshes on its first read, which waits for it.  The `refreshView` mutation refreshes on request.
+- **A failed refresh keeps the last good rows** and records the error; the view is then retried no more than once per `minIntervalMs` (default 60 s), however many reads or `refreshView` calls arrive, so a source that is down is not hammered.
+- **Reading.**  `where` takes a value or `{ eq, ne, in, gt, gte, lt, lte, contains }`; an unknown column is an error naming the real ones.  A read with no `limit` returns 1000 rows and says in `meta.total` how many matched.  `link` works on a view's rows like on any query's.  `include` and `relations` belong in the view's own query.
+- **Bounds.**  `maxRows` per view (default 10 000, rows past it are dropped and `truncated` says so) and `MOZG_VIEWS_MAX_BYTES` for all views together; a refresh that would exceed it fails and keeps the old rows.  Put a `limit` in the query itself for sources that need one.
+- **Credentials.**  A value in a view's query can be `{ "env": "VAR" }`, read from the environment at each refresh, so a password need not sit in the definition.
+- **Defined by the operator, not by callers.**  A view is a recurring job against your sources, and with no authentication in front of Mozg a public "define view" call would let anyone start one.  A caller can only ask for a refresh, which is single-flight and limited by `minIntervalMs`.
+- **Per replica.**  Rows are kept in each Mozg process, so every replica builds its own and sources see one refresh per replica.  They are rebuilt after a restart.  Views are not available on `/stream`.
+
 ## Linking values to ontology terms
 
 A database column holding `MONDO:0005015`, `diabetes mellitus` or `MESH:D003920` is a name for something an ontology defines.  A query can ask Mozg to resolve those values to the ontology's terms:
@@ -289,6 +320,8 @@ Each row gains `phenotype`: the term (`iri`, `id`, `label`, `matchedBy`), or `nu
 | `MOZG_ONTOLOGY_CACHE_MAX` | `20` | Parsed ontologies kept in memory |
 | `MOZG_ONTOLOGIES` | unset | JSON array of ontologies queries may link values to, by name: `[{"name":"mondo","url":"https://…/mondo.obo","format":"obo","obo":"mondo"}]`; each loads on first use |
 | `MOZG_ONTOLOGY_TTL_MS` | `86400000` | A loaded ontology is read again after this long |
+| `MOZG_VIEWS` | unset | JSON array of materialised views to keep (see [Materialised views](#materialised-views)) |
+| `MOZG_VIEWS_MAX_BYTES` / `MOZG_VIEWS_DEFAULT_LIMIT` | `134217728` / `1000` | Total size of stored view rows; rows a read returns when it gives no limit |
 | `MOZG_SOAP_OPERATIONS` | unset | SOAP operations Mozg may run besides those named like reads (`Get…`, `List…`, `Search…`): comma-separated, `*` a wildcard, `*` alone for all |
 | `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
 | `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |

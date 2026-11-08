@@ -13,6 +13,8 @@ Key files:
 - `src/telemetry.js`, `src/metrics.js`, `src/log.js` – `/metrics`, request ids and structured logs
 - `src/cache.js`, `src/config.js` – the shared bounded LRU and deployment-option parsing
 - `src/database/result-cache.js` – whole-query result cache (off by default)
+- `src/views.js` – materialised views: operator-defined named queries whose rows are stored and served with visible freshness
+- `src/ontology/terms.js`, `src/ontology/links.js` – ontology term index and `QueryInput.link`
 - `src/schema.js` – GraphQL type definitions and resolvers
 - `src/database/registry.js` – driver resolution (single source of truth)
 - `src/database/connector.js` – query execution router

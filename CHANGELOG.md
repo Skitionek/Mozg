@@ -121,6 +121,20 @@ verified against the live APIs, and joined up across sources.
   (`owner.login`, `types[].type.url`) and entity paths with `{field}`
   placeholders (`/carts/user/{id}`).
 
+- **Materialised views.**  A named, operator-defined query (`MOZG_VIEWS`, Helm
+  `mozg.views`) whose rows Mozg stores and serves instead of reading live data
+  each time: `query(input: { view: "name", where, select, orderBy, limit })`
+  filters (a value, or `eq ne in gt gte lt lte contains`), orders and pages the
+  stored rows.  Freshness is always visible (`meta`: `refreshedAt`, `ageMs`,
+  `stale`, `total`, `truncated`; the `views` query).  Refresh by `ttlMs` with
+  stale-while-revalidate, on a timer (`everyMs`), at start, or by the
+  `refreshView` mutation (single-flight, once per `minIntervalMs`); a failed
+  refresh keeps the last good rows and is not retried more than once per
+  interval.  Bounded by `maxRows` and `MOZG_VIEWS_MAX_BYTES`; credentials can
+  be `{ env: VAR }`; callers cannot define a view.  Per replica, in memory.
+  `QueryInput.from` is optional (a view needs none).  Metrics:
+  `mozg_view_rows`, `mozg_view_age_seconds`, `mozg_view_refreshes_total`,
+  `mozg_view_refresh_seconds`.
 - **Link database values to ontology terms.**  `QueryInput.link` resolves a
   result field's values to the terms of an ontology and writes the term beside
   the value (`<field>Term`, or `as`): by identifier (any spelling, the IRI, or

@@ -54,6 +54,8 @@ const upstreamRequests = registry.counter('mozg_upstream_requests_total', 'Outbo
 const upstreamDuration = registry.histogram('mozg_upstream_request_duration_seconds', 'Outbound HTTP request duration, one attempt each.', ['host'])
 const upstreamRetries = registry.counter('mozg_upstream_retries_total', 'Outbound HTTP requests retried after a transient failure.', ['host'])
 
+const viewRefreshes = registry.counter('mozg_view_refreshes_total', 'Materialised view refreshes, by outcome.', ['view', 'outcome'])
+const viewRefreshDuration = registry.histogram('mozg_view_refresh_seconds', 'Time a materialised view took to refresh.', ['view'], [0.5, 1, 2.5, 5, 10, 30, 60, 120, 300])
 const wakes = registry.counter('mozg_self_hosted_wakes_total', 'Queries that found a self-hosted database scaled to zero and waited for it.', ['source'])
 const wakeDuration = registry.histogram('mozg_self_hosted_wake_seconds', 'Time a query waited for a self-hosted database to come up.', ['source'], [1, 2.5, 5, 10, 20, 30, 60, 120, 180])
 
@@ -64,6 +66,10 @@ registry.collectedCounter('process_cpu_seconds_total', 'User and system CPU time
   const { user, system } = process.cpuUsage()
   return (user + system) / 1e6
 })
+
+registry.gauge('mozg_view_rows', 'Rows a materialised view holds.', ['view'], () => require('./views').getViews().list().map((v) => [{ view: v.name }, v.rowCount ?? 0]))
+registry.gauge('mozg_view_age_seconds', 'Seconds since a materialised view was last refreshed (absent until the first refresh).', ['view'], () =>
+  require('./views').getViews().list().filter((v) => v.ageMs != null).map((v) => [{ view: v.name }, v.ageMs / 1000]))
 
 // Caches and the result cache report their own tallies.  Required lazily so
 // that loading telemetry never loads a driver.
@@ -202,6 +208,11 @@ function recordUpstreamRetry (host) {
   upstreamRetries.inc([hostLabel(host)])
 }
 
+function recordViewRefresh (view, outcome, seconds) {
+  viewRefreshes.inc([view, outcome])
+  viewRefreshDuration.observe([view], seconds)
+}
+
 function recordWake (source, seconds) {
   const label = sourceLabel(source)
   wakes.inc([label])
@@ -227,6 +238,7 @@ module.exports = {
   recordUpstream,
   recordUpstreamRetry,
   recordWake,
+  recordViewRefresh,
   serveMetrics,
   CONTENT_TYPE
 }

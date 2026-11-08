@@ -2,6 +2,7 @@
 
 const { createMozgServer, createMetricsServer, metricsSettings } = require('./server')
 const { logger } = require('./telemetry')
+const { getViews } = require('./views')
 
 const PORT = process.env.PORT || 4000
 
@@ -19,6 +20,13 @@ server.listen(PORT, () => {
   if (metrics.enabled && !metricsServer) console.log(`  Metrics        →  http://localhost:${PORT}/metrics`)
 })
 
+// Materialised views refresh in the background; a bad MOZG_VIEWS is reported, not fatal.
+try {
+  getViews().start()
+} catch (err) {
+  logger.error('materialised views not started', { error: err.message })
+}
+
 if (metricsServer) {
   metricsServer.listen(metrics.port, () => console.log(`  Metrics        →  http://localhost:${metrics.port}/metrics (separate port)`))
 }
@@ -31,6 +39,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
   process.once(signal, () => {
     logger.info(`${signal} received — draining connections`)
     if (metricsServer) metricsServer.close()
+    try { getViews().stop() } catch { /* nothing to stop */ }
     server.close(() => process.exit(0))
     if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections()
     setTimeout(() => process.exit(1), SHUTDOWN_GRACE_MS).unref()

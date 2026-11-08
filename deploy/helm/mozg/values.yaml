@@ -168,6 +168,21 @@ mozg:
   #     label: Mondo Disease Ontology
   #     maxBytes: 268435456  # optional download cap
   ontologies: []
+  # -- Materialised views: named queries whose rows Mozg stores and serves on
+  # purpose, instead of reading live data each time.  Each is rebuilt per
+  # replica.  Nothing is stored unless you list it here.  e.g.
+  #   - name: tp53-overview
+  #     description: TP53 across UniProt, PDBe and Reactome
+  #     query: { source: uniprot, from: protein, where: { uniprotAccession: P04637 }, include: [structures, pathways] }
+  #     refresh: { ttlMs: 86400000, everyMs: 21600000, staleWhileRevalidate: true }
+  #     maxRows: 10000
+  # A credential in a query can be { env: VAR }, read from the pod's
+  # environment (see extraEnv) when the view refreshes.
+  views: []
+  # -- Most bytes of rows all views may hold together (128 MiB)
+  viewsMaxBytes: 134217728
+  # -- Rows a read of a view returns when it gives no limit
+  viewsDefaultLimit: 1000
   # -- Allow callers to point a public catalog source at a private-network mirror
   allowPrivateMirrors: false
   # -- How long SIGTERM waits for in-flight queries

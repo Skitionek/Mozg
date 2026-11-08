@@ -216,6 +216,33 @@
         "connectionIdleMs": { "type": "integer", "minimum": 0 },
         "ontologyCacheMax": { "type": "integer", "minimum": 1 },
         "ontologyTtlMs": { "type": "integer", "minimum": 0 },
+        "viewsMaxBytes": { "type": "integer", "minimum": 1 },
+        "viewsDefaultLimit": { "type": "integer", "minimum": 1 },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "query"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$" },
+              "description": { "type": "string" },
+              "query": { "type": "object", "required": ["from"] },
+              "refresh": {
+                "type": "object",
+                "properties": {
+                  "ttlMs": { "type": "integer", "minimum": 0 },
+                  "everyMs": { "type": "integer", "minimum": 0 },
+                  "onStart": { "type": "boolean" },
+                  "staleWhileRevalidate": { "type": "boolean" },
+                  "minIntervalMs": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              },
+              "maxRows": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+            },
+            "additionalProperties": false
+          }
+        },
         "ontologies": {
           "type": "array",
           "items": {
