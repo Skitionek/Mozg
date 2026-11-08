@@ -22,9 +22,6 @@ const INTROSPECT = 'query ($connection: ConnectionInput, $source: String) { intr
 const OBO_KEYS = '{ oboKeys { key label prefix form pattern field } }'
 const ONTOLOGIES = '{ ontologies { name label url format obo loaded termCount error } }'
 const ONTOLOGY_TERMS = 'query ($search: String!, $ontology: String, $url: String, $content: String, $format: TermFormat, $match: [OntologyMatch!], $limit: Int) { ontologyTerms(search: $search, ontology: $ontology, url: $url, content: $content, format: $format, match: $match, limit: $limit) { iri id label synonyms definition xrefs parents deprecated ontology } }'
-const VIEW_FIELDS = 'name description source from columns rowCount truncated refreshedAt ageMs ttlMs everyMs stale refreshing lastDurationMs error'
-const VIEWS = `{ views { ${VIEW_FIELDS} } }`
-const REFRESH_VIEW = `mutation ($name: String!) { refreshView(name: $name) { ${VIEW_FIELDS} } }`
 const INGEST = 'mutation ($input: OntologyInput!) { ingestOntology(input: $input) { tripleCount classes { iri label subClassOf } objectProperties { iri label domain range relationType } dataProperties { iri label domain range } generatedTypeDefs } }'
 
 const CATALOG_SUMMARY = 'name label description category driver selfHosted auth { required param header signup } entities { name description }'
@@ -171,7 +168,7 @@ export class Mozg {
   /**
    * Run a query.  `input` is a QueryInput: a `source` (or `connection`) and
    * `from`, with `where`, `select`, `include`, `relations`, `link`, `limit`,
-   * `offset`, `orderBy`, `fresh` … — or a `view`.
+   * `offset`, `orderBy`, `fresh` ….
    * @returns {Promise<{ count: number, data: object[], meta?: object }>}
    */
   async query (input, options) {
@@ -187,11 +184,6 @@ export class Mozg {
   /** Start a query on a database you give the connection for. */
   connect (connection) {
     return new QueryBuilder(this, { connection })
-  }
-
-  /** Read a materialised view: `mozg.view('tp53').where({ symbol: 'TP53' }).limit(10)`. */
-  view (name) {
-    return new ViewBuilder(this, name)
   }
 
   /**
@@ -300,18 +292,6 @@ export class Mozg {
     return (await this.graphql(INGEST, { input: defined(input) }, { ...options, retry: false })).ingestOntology
   }
 
-  // ── Materialised views ────────────────────────────────────────────────────
-
-  /** Every materialised view the operator defined: size, age, last error. */
-  async views (options) {
-    return (await this.graphql(VIEWS, {}, options)).views
-  }
-
-  /** Refresh a view now.  Refused, with the time to wait, if it was refreshed too recently. */
-  async refreshView (name, options) {
-    return (await this.graphql(REFRESH_VIEW, { name }, { ...options, retry: false })).refreshView
-  }
-
   // ── The server itself ─────────────────────────────────────────────────────
 
   /** `{ status: 'ok', version }` — touches no upstream. */
@@ -372,42 +352,6 @@ export class QueryBuilder {
   stream (options) { return this.client.stream(this.toInput(), options) }
   streamAll (options) { return this.client.streamAll(this.toInput(), options) }
 
-  then (onFulfilled, onRejected) { return this.run().then(onFulfilled, onRejected) }
-  catch (onRejected) { return this.run().catch(onRejected) }
-  finally (onFinally) { return this.run().finally(onFinally) }
-}
-
-/** A read of a materialised view: where, select, orderBy, limit, offset and link. */
-export class ViewBuilder {
-  constructor (client, name, input = {}) {
-    this.client = client
-    this.name = name
-    this.input = input
-  }
-
-  #with (patch) {
-    return new ViewBuilder(this.client, this.name, { ...this.input, ...patch })
-  }
-
-  where (conditions) { return this.#with({ where: { ...this.input.where, ...conditions } }) }
-  select (...columns) { return this.#with({ select: columns.flat() }) }
-  link (...specs) { return this.#with({ link: [...(this.input.link || []), ...specs.flat()] }) }
-  limit (n) { return this.#with({ limit: n }) }
-  offset (n) { return this.#with({ offset: n }) }
-  orderBy (column, direction) { return this.#with({ orderBy: column, orderDirection: direction }) }
-
-  toInput () { return defined({ view: this.name, ...this.input }) }
-
-  run (options) { return this.client.query(this.toInput(), options) }
-  /** This view's description, size and age. */
-  async info (options) {
-    const all = await this.client.views(options)
-    const found = all.find((v) => v.name.toLowerCase() === this.name.toLowerCase())
-    if (!found) throw new MozgError(`Unknown view "${this.name}". Defined: ${all.map((v) => v.name).join(', ') || '(none)'}.`)
-    return found
-  }
-
-  refresh (options) { return this.client.refreshView(this.name, options) }
   then (onFulfilled, onRejected) { return this.run().then(onFulfilled, onRejected) }
   catch (onRejected) { return this.run().catch(onRejected) }
   finally (onFinally) { return this.run().finally(onFinally) }

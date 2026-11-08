@@ -69,15 +69,13 @@ export interface OntologyLinkInput {
   details?: boolean
 }
 
-/** What to run. Give a `source` or a `connection` and `from` — or a `view`. */
+/** What to run: a `source` (or a `connection`) and `from`. */
 export interface QueryInput {
   /** A catalog source, e.g. `"uniprot"`. */
   source?: string
   connection?: Partial<ConnectionInput>
   /** The entity (table, label, path or catalog entity). */
-  from?: string
-  /** A materialised view, instead of the above. */
-  view?: string
+  from: string
   select?: string[]
   where?: Record<string, unknown>
   relations?: RelationInput[]
@@ -98,17 +96,9 @@ export interface QueryInput {
 export interface ResultMeta {
   /** Result cache: `hit`, `miss`, `bypass` or `shared`. */
   cache?: 'hit' | 'miss' | 'bypass' | 'shared'
+  /** For a cache hit: how old the stored answer is, and how long it is kept. */
   ageMs?: number
   ttlMs?: number
-  /** Present when the answer came from a materialised view. */
-  view?: string
-  refreshedAt?: string | null
-  stale?: boolean
-  refreshing?: boolean
-  /** Rows that matched, before limit and offset (views). */
-  total?: number
-  truncated?: boolean
-  error?: string | null
   [key: string]: unknown
 }
 
@@ -231,25 +221,6 @@ export interface LinkedTerm {
   parents?: string[]
 }
 
-export interface ViewInfo {
-  name: string
-  description: string | null
-  source: string | null
-  from: string | null
-  /** Null until the first refresh. */
-  columns: string[] | null
-  rowCount: number | null
-  truncated: boolean | null
-  refreshedAt: string | null
-  ageMs: number | null
-  ttlMs: number | null
-  everyMs: number | null
-  stale: boolean | null
-  refreshing: boolean
-  lastDurationMs: number | null
-  error: string | null
-}
-
 export interface OntologyResult {
   tripleCount: number
   classes: Array<{ iri: string, label: string | null, subClassOf: string[] }>
@@ -321,8 +292,6 @@ export class Mozg {
   source<Row = Record<string, unknown>>(name: string): QueryBuilder<Row>
   /** Start a query on a database you give the connection for. */
   connect<Row = Record<string, unknown>>(connection: ConnectionInput): QueryBuilder<Row>
-  /** Read a materialised view. */
-  view<Row = Record<string, unknown>>(name: string): ViewBuilder<Row>
 
   stream (input: QueryInput, options?: RequestOptions): AsyncGenerator<StreamEvent, void, void>
   streamAll<Row = Record<string, unknown>>(input: QueryInput, options?: RequestOptions): Promise<StreamResult<Row>>
@@ -334,8 +303,6 @@ export class Mozg {
   ontologyTerms (args: { search: string, ontology?: string, url?: string, content?: string, format?: TermFormat, match?: OntologyMatch[], limit?: number }, options?: RequestOptions): Promise<OntologyTerm[]>
   ingestOntology (input: OntologyInput, options?: RequestOptions): Promise<OntologyResult>
 
-  views (options?: RequestOptions): Promise<ViewInfo[]>
-  refreshView (name: string, options?: RequestOptions): Promise<ViewInfo>
 
   health (options?: RequestOptions): Promise<{ status: 'ok', version: string }>
   metrics (options?: RequestOptions): Promise<string>
@@ -355,28 +322,10 @@ export class QueryBuilder<Row = Record<string, unknown>> implements PromiseLike<
   apiKeys (keys: Record<string, string>): QueryBuilder<Row>
   raw (on?: boolean): QueryBuilder<Row>
   fresh (on?: boolean): QueryBuilder<Row>
-  toInput (): QueryInput
+  toInput (): Partial<QueryInput>
   run (options?: RequestOptions): Promise<QueryResult<Row>>
   stream (options?: RequestOptions): AsyncGenerator<StreamEvent, void, void>
   streamAll (options?: RequestOptions): Promise<StreamResult<Row>>
-  then<R1 = QueryResult<Row>, R2 = never>(onFulfilled?: ((value: QueryResult<Row>) => R1 | PromiseLike<R1>) | null, onRejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null): Promise<R1 | R2>
-  catch<R = never>(onRejected?: ((reason: unknown) => R | PromiseLike<R>) | null): Promise<QueryResult<Row> | R>
-  finally(onFinally?: (() => void) | null): Promise<QueryResult<Row>>
-}
-
-/** A read of a materialised view. Awaiting it runs it. */
-export class ViewBuilder<Row = Record<string, unknown>> implements PromiseLike<QueryResult<Row>> {
-  readonly name: string
-  where (conditions: Record<string, unknown>): ViewBuilder<Row>
-  select (...columns: Array<string | string[]>): ViewBuilder<Row>
-  link (...specs: Array<OntologyLinkInput | OntologyLinkInput[]>): ViewBuilder<Row>
-  limit (n: number): ViewBuilder<Row>
-  offset (n: number): ViewBuilder<Row>
-  orderBy (column: string, direction?: SortDirection): ViewBuilder<Row>
-  toInput (): QueryInput
-  run (options?: RequestOptions): Promise<QueryResult<Row>>
-  info (options?: RequestOptions): Promise<ViewInfo>
-  refresh (options?: RequestOptions): Promise<ViewInfo>
   then<R1 = QueryResult<Row>, R2 = never>(onFulfilled?: ((value: QueryResult<Row>) => R1 | PromiseLike<R1>) | null, onRejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null): Promise<R1 | R2>
   catch<R = never>(onRejected?: ((reason: unknown) => R | PromiseLike<R>) | null): Promise<QueryResult<Row> | R>
   finally(onFinally?: (() => void) | null): Promise<QueryResult<Row>>

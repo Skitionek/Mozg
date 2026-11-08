@@ -8,20 +8,10 @@ const { getResultCache } = require('./result-cache')
 const telemetry = require('../telemetry')
 
 async function executeQuery (rawInput) {
-  // A materialised view is read as stored: no driver and no result cache (it is
-  // a cache already, with its own freshness rules).  See src/views.js.
-  if (rawInput && rawInput.view) {
-    return telemetry.trackQuery(
-      { connection: { driver: 'view', source: rawInput.view }, from: rawInput.view, where: rawInput.where },
-      () => require('../views').getViews().query(rawInput)
-    )
-  }
-
   // `source` / `include` are shorthand for a catalog connection and catalog
   // relations; expand them first so every driver sees the explicit form (and
   // so the result cache keys on what actually runs).
   const normalized = normalizeQueryInput(rawInput)
-  if (!normalized.from) throw new Error('A query needs from (the entity to query), unless it reads a view')
   // Timed and counted around the cache, so a cached answer shows up as the
   // fast query it was.
   return telemetry.trackQuery(normalized, () => getResultCache().run(normalized, () => runQuery(normalized)))

@@ -86,12 +86,6 @@ const typeDefs = /* GraphQL */ `
     ontologies: [OntologyInfo!]!
 
     """
-    The materialised views the operator defined (MOZG_VIEWS): what each holds,
-    how old it is, and whether it is being refreshed.
-    """
-    views: [ViewInfo!]!
-
-    """
     Search an ontology's terms by label, synonym, identifier or cross-reference.
     Name a configured ontology, or give url or content.
     """
@@ -107,13 +101,6 @@ const typeDefs = /* GraphQL */ `
   }
 
   type Mutation {
-    """
-    Refresh a materialised view now.  One refresh runs at a time, and a view
-    may be refreshed no more often than its minIntervalMs (default 60 s); a
-    request inside that window is refused with the time to wait.
-    """
-    refreshView(name: String!): ViewInfo!
-
     """
     Parse an OWL ontology (Turtle, RDF/XML, OWL/XML, or Manchester Syntax),
     extract its TBox, map it to a GraphQL schema, and cache the result.
@@ -132,17 +119,8 @@ const typeDefs = /* GraphQL */ `
     source: String
     """Database connection credentials (required unless source is given; fields given here override the source's)"""
     connection: ConnectionInput
-    """The entity (table, label, path, or catalog entity name) to query.  Not used when reading a view."""
-    from: String
-    """
-    Read a materialised view the operator defined (see the views query) instead
-    of running a query: the rows Mozg stored, filtered by where (a value, or
-    { eq, ne, in, gt, gte, lt, lte, contains }), ordered, paged and selected.
-    meta says how old they are.  Without a limit, 1000 rows are returned and
-    meta.total says how many matched.  Takes no source, connection, include or
-    relations.
-    """
-    view: String
+    """The entity (table, label, path, or catalog entity name) to query"""
+    from: String!
     """Columns to select (defaults to all)"""
     select: [String!]
     """Filter conditions as a JSON object {column: value, …}"""
@@ -390,34 +368,6 @@ const typeDefs = /* GraphQL */ `
     turtle
     rdfxml
     owlxml
-  }
-
-  """
-  A materialised view: a named query whose rows Mozg stores and serves, on
-  purpose, instead of reading live data each time.
-  """
-  type ViewInfo {
-    name: String!
-    description: String
-    """The source (or driver) its query reads"""
-    source: String
-    from: String
-    """Null until the first refresh"""
-    columns: [String!]
-    rowCount: Int
-    """True when the query returned more than the view's maxRows and the rest was dropped"""
-    truncated: Boolean
-    refreshedAt: String
-    ageMs: Float
-    """A snapshot older than this is stale"""
-    ttlMs: Float
-    """Refresh on a timer, this often"""
-    everyMs: Float
-    stale: Boolean
-    refreshing: Boolean!
-    lastDurationMs: Float
-    """Why the last refresh failed, if it did; the last good rows are kept"""
-    error: String
   }
 
   """An ontology the operator configured for linking"""
@@ -702,7 +652,6 @@ const resolvers = {
       .filter((entry) => !driver || entry.driver === driver),
     generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input),
     ontologies: () => require('./ontology/links').listOntologies(),
-    views: () => require('./views').getViews().list(),
     ontologyTerms: (_parent, args) => require('./ontology/links').searchTerms(args),
     oboKeys: () => Object.entries(obo.KEYS).map(([key, spec]) => ({
       key,
@@ -714,7 +663,6 @@ const resolvers = {
     }))
   },
   Mutation: {
-    refreshView: (_parent, { name }) => require('./views').getViews().requestRefresh(name),
     ingestOntology: (_parent, { input }) => require('./ontology').parseOntology(input)
   },
   CatalogAuth: {

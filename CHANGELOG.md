@@ -124,26 +124,12 @@ verified against the live APIs, and joined up across sources.
 - **SDK** (`sdk/`, `@skitionek/mozg-sdk`; not yet published to npm).  A
   dependency-free JavaScript client with TypeScript types for Node 18+ and
   browsers: awaitable immutable query builders (`mozg.source('uniprot').from('protein')
-  .where({…}).include(…)`), views, ontology links, `stream()` / `streamAll()`
+  .where({…}).include(…)`), ontology links, `stream()` / `streamAll()`
   for `/stream`, discovery (`catalog`, `oboKeys`, `introspect`), retries for
   reads only, timeouts and cancellation, and a `MozgError` carrying the
   server's code and the request id that appears in its logs.  The query always
   travels as a GraphQL variable.  Run against a real server in
   `tests/sdk.test.js`; the declarations were compiled under `tsc --strict`.
-- **Materialised views.**  A named, operator-defined query (`MOZG_VIEWS`, Helm
-  `mozg.views`) whose rows Mozg stores and serves instead of reading live data
-  each time: `query(input: { view: "name", where, select, orderBy, limit })`
-  filters (a value, or `eq ne in gt gte lt lte contains`), orders and pages the
-  stored rows.  Freshness is always visible (`meta`: `refreshedAt`, `ageMs`,
-  `stale`, `total`, `truncated`; the `views` query).  Refresh by `ttlMs` with
-  stale-while-revalidate, on a timer (`everyMs`), at start, or by the
-  `refreshView` mutation (single-flight, once per `minIntervalMs`); a failed
-  refresh keeps the last good rows and is not retried more than once per
-  interval.  Bounded by `maxRows` and `MOZG_VIEWS_MAX_BYTES`; credentials can
-  be `{ env: VAR }`; callers cannot define a view.  Per replica, in memory.
-  `QueryInput.from` is optional (a view needs none).  Metrics:
-  `mozg_view_rows`, `mozg_view_age_seconds`, `mozg_view_refreshes_total`,
-  `mozg_view_refresh_seconds`.
 - **Link database values to ontology terms.**  `QueryInput.link` resolves a
   result field's values to the terms of an ontology and writes the term beside
   the value (`<field>Term`, or `as`): by identifier (any spelling, the IRI, or

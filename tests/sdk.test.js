@@ -13,37 +13,24 @@ const path = require('node:path')
 const { spawnSync } = require('node:child_process')
 
 const { createMozgServer } = require('../src/server')
-const { resetViews } = require('../src/views')
 
 const SAMPLE_DB = path.join(__dirname, '..', 'examples', 'sample.db')
 
 let sdk
 let server
 let mozg
-let savedViews
 
 before(async () => {
   if (!fs.existsSync(SAMPLE_DB)) {
     const result = spawnSync(process.execPath, [path.join(__dirname, '..', 'examples', 'seed.js')], { stdio: 'pipe' })
     if (result.status !== 0) throw new Error(`Seed failed: ${result.stderr.toString()}`)
   }
-  savedViews = process.env.MOZG_VIEWS
-  process.env.MOZG_VIEWS = JSON.stringify([{
-    name: 'users-view',
-    description: 'The sample users',
-    query: { connection: { driver: 'sqlite3', database: SAMPLE_DB }, from: 'users' },
-    refresh: { ttlMs: 3_600_000, minIntervalMs: 0 }
-  }])
-  resetViews()
   sdk = await import('../sdk/src/index.js')
   server = createMozgServer()
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   mozg = new sdk.Mozg({ url: `http://127.0.0.1:${server.address().port}` })
 })
 after(async () => {
-  if (savedViews === undefined) delete process.env.MOZG_VIEWS
-  else process.env.MOZG_VIEWS = savedViews
-  resetViews()
   await new Promise((resolve) => { server.closeAllConnections?.(); server.close(resolve) })
 })
 
@@ -79,7 +66,6 @@ describe('SDK: building queries', () => {
     let finished = false
     await users().limit(1).finally(() => { finished = true })
     assert.equal(finished, true)
-    assert.equal((await mozg.view('users-view').limit(1).catch(() => null)).count, 1)
   })
 
   test('does not send what was left undefined', () => {
@@ -118,22 +104,6 @@ describe('SDK: against a real server', () => {
     const obo = '[Term]\nid: PEOPLE:1\nname: Alice Müller\n'
     const { data } = await users().limit(5).link({ field: 'name', content: obo, format: 'obo', as: 'person' })
     assert.equal(data.find((r) => r.name === 'Alice Müller').person.id, 'PEOPLE:1')
-  })
-
-  test('reads, describes and refreshes a materialised view', async () => {
-    const { data, meta } = await mozg.view('users-view').where({ name: { contains: 'a' } }).orderBy('name').select('id', 'name').limit(3)
-    assert.ok(data.length > 0)
-    assert.equal(meta.view, 'users-view')
-    assert.equal(meta.stale, false)
-
-    const info = await mozg.view('users-view').info()
-    assert.equal(info.name, 'users-view')
-    assert.ok(info.rowCount >= 4)
-    assert.deepEqual((await mozg.views()).map((v) => v.name), ['users-view'])
-
-    const refreshed = await mozg.view('users-view').refresh()
-    assert.equal(refreshed.error, null)
-    await assert.rejects(mozg.view('nope').info(), /Unknown view "nope"\. Defined: users-view\./)
   })
 
   test('discovers sources, entities, identifier spaces and tables', async () => {
@@ -217,9 +187,8 @@ describe('SDK: retries, timeouts and cancelling', () => {
   test('never retries a mutation, which may have taken effect', async () => {
     let calls = 0
     const down = new sdk.Mozg({ url: 'http://x', retries: 5, fetch: async () => { calls++; throw new TypeError('fetch failed') } })
-    await assert.rejects(down.refreshView('v'), /Cannot reach Mozg/)
     await assert.rejects(down.ingestOntology({ content: 'x' }), /Cannot reach Mozg/)
-    assert.equal(calls, 2, 'one attempt each')
+    assert.equal(calls, 1, 'one attempt, however many retries a read would get')
   })
 
   test('does not retry an answer that says no', async () => {

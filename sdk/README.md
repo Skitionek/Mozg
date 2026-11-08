@@ -34,7 +34,7 @@ const { data } = await mozg.source('uniprot').from('protein')
 
 You can also pass the input yourself: `mozg.query({ source: 'chembl', from: 'molecule', where: { chemblId: 'CHEMBL25' } })`.
 
-The result is `{ count, data, meta }`.  `meta` appears when the server has something to say: whether the answer came from its result cache (`meta.cache`), or how old a view's rows are.
+The result is `{ count, data, meta }`.  `meta` appears when the server has something to say: whether the answer came from the server's result cache (`meta.cache`, with `ageMs` for a hit).
 
 The query always travels as a GraphQL **variable**, never as query text, so nothing you pass can change what is asked.
 
@@ -48,17 +48,6 @@ const { data } = await mozg.source('opentargets').from('diseasePhenotypes')
 ```
 
 `mozg.ontologies()` lists what the server has configured; `mozg.ontologyTerms({ search: 'seizure', ontology: 'hpo' })` searches one.
-
-## Materialised views
-
-```js
-const rows = await mozg.view('tp53').where({ symbol: 'TP53' }).orderBy('length', 'desc').limit(10)
-rows.meta   // { refreshedAt, ageMs, stale, total, truncated, … } — a stored answer says how old it is
-
-await mozg.views()                    // what the server keeps, with sizes, ages and last errors
-await mozg.view('tp53').info()
-await mozg.view('tp53').refresh()     // refused, with the time to wait, if refreshed too recently
-```
 
 ## Streaming
 
@@ -103,7 +92,7 @@ Each request carries an `X-Request-Id`, which Mozg writes into every log line th
 
 ## Retries and timeouts
 
-`new Mozg({ retries: 2, timeoutMs: 120000 })`.  A network failure or a 429/502/503/504 is retried with backoff (and `Retry-After`), but **reads only**: `refreshView` and `ingestOntology` are never retried, since they may have taken effect.  An answer that says no (a bad column, a database error) is not retried, nor is a timeout.  Pass `{ signal }` to any call to cancel it.  Mozg is slow by design, so the default timeout is generous.
+`new Mozg({ retries: 2, timeoutMs: 120000 })`.  A network failure or a 429/502/503/504 is retried with backoff (and `Retry-After`), but **reads only**: `ingestOntology` is never retried, since it may have taken effect.  An answer that says no (a bad column, a database error) is not retried, nor is a timeout.  Pass `{ signal }` to any call to cancel it.  Mozg is slow by design, so the default timeout is generous.
 
 ## TypeScript
 
