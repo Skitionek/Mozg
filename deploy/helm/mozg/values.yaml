@@ -169,6 +169,17 @@ mozg:
   #     label: Mondo Disease Ontology
   #     maxBytes: 268435456  # optional download cap
   ontologies: []
+  # Model Context Protocol endpoint (POST /mcp), for AI assistants.
+  mcp:
+    # -- Serve /mcp.  The tools take the same arguments as the GraphQL query;
+    # with no authentication in front of Mozg they reach what /graphql reaches.
+    enabled: true
+    # -- Web pages that may call /mcp from a browser, by origin, e.g.
+    # ["https://app.example.com"].  Clients that are not browsers send no
+    # origin and are unaffected.  A request from any other origin is refused.
+    allowedOrigins: []
+    # -- Largest tool result, in bytes.  A longer one is cut and says so; models read these.
+    maxResultBytes: 100000
   # -- Allow callers to point a public catalog source at a private-network mirror
   allowPrivateMirrors: false
   # -- How long SIGTERM waits for in-flight queries

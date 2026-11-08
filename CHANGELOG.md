@@ -135,6 +135,24 @@ verified against the live APIs, and joined up across sources.
   without JavaScript sees.  Light and dark, and a layout that adapts to a
   phone.  No library is loaded.  The in-browser tests run where Playwright is
   installed and skip where it is not.
+- **MCP endpoint** (`POST /mcp`; [docs](docs/mcp.md)).  Mozg is a Model
+  Context Protocol server, so an AI assistant can use it directly.  Six
+  tools — `catalog`, `query`, `introspect`, `obo_keys`, `ontologies`,
+  `ontology_terms`, none of which writes on purpose (all but `query` are marked
+  read-only, since a Thrift method can change data) — each a fixed GraphQL document run against the same schema
+  as `/graphql`; the catalog is offered as a short list to choose from and then
+  in full for the source chosen, results are capped in size
+  (`MOZG_MCP_MAX_RESULT_BYTES`) and say when they were cut, and a bad argument
+  comes back as a message the model can act on.  One endpoint serves both
+  generations of clients: the stateless 2026-07-28 protocol (`server/discover`,
+  per-request `_meta`, header/body validation, `UnsupportedProtocolVersion`)
+  and the `initialize` handshake of 2025-03-26 to 2025-11-25.  No sessions are
+  kept.  Browsers are refused unless the operator names their origin
+  (`MOZG_MCP_ALLOWED_ORIGINS`); `MOZG_MCP=off` removes the endpoint; Helm
+  `mozg.mcp`.  Checked against the official SDK clients, 1.x over the
+  handshake and 2.x over both protocols (`tests/mcp.test.js`, which adds
+  `@modelcontextprotocol/sdk` and `@modelcontextprotocol/client` as dev
+  dependencies).
 - **SDK** (`sdk/`, `@skitionek/mozg-sdk`; not yet published to npm).  A
   dependency-free JavaScript client with TypeScript types for Node 18+ and
   browsers: awaitable immutable query builders (`mozg.source('uniprot').from('protein')

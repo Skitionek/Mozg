@@ -232,6 +232,15 @@
             }
           }
         },
+        "mcp": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "allowedOrigins": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "maxResultBytes": { "type": "integer", "minimum": 1000 }
+          },
+          "additionalProperties": false
+        },
         "allowPrivateMirrors": { "type": "boolean" },
         "shutdownGraceMs": { "type": "integer", "minimum": 0 },
         "wakeTimeoutMs": { "type": "integer", "minimum": 0 },
