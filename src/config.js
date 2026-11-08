@@ -50,7 +50,9 @@ const OPTIONS = {
   MOZG_CONNECTION_CACHE_MAX: 32,
   MOZG_CONNECTION_IDLE_MS: 10 * 60_000,
   // Parsed ontologies kept in memory.
-  MOZG_ONTOLOGY_CACHE_MAX: 20
+  MOZG_ONTOLOGY_CACHE_MAX: 20,
+  // How long a loaded ontology's terms are kept before it is read again.
+  MOZG_ONTOLOGY_TTL_MS: 24 * 60 * 60_000
 }
 
 module.exports = { intOption, boolOption, enumOption, OPTIONS }

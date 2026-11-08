@@ -215,6 +215,23 @@
         "connectionCacheMax": { "type": "integer", "minimum": 1 },
         "connectionIdleMs": { "type": "integer", "minimum": 0 },
         "ontologyCacheMax": { "type": "integer", "minimum": 1 },
+        "ontologyTtlMs": { "type": "integer", "minimum": 0 },
+        "ontologies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "url": { "type": "string", "minLength": 1 },
+              "format": { "enum": ["obo", "turtle", "rdfxml", "owlxml"] },
+              "obo": { "type": "string" },
+              "label": { "type": "string" },
+              "maxBytes": { "type": "integer", "minimum": 1 },
+              "timeoutMs": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
         "allowPrivateMirrors": { "type": "boolean" },
         "shutdownGraceMs": { "type": "integer", "minimum": 0 },
         "wakeTimeoutMs": { "type": "integer", "minimum": 0 },

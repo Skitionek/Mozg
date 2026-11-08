@@ -211,6 +211,27 @@ mutation {
 
 ---
 
+## Linking values to ontology terms
+
+A database column holding `MONDO:0005015`, `diabetes mellitus` or `MESH:D003920` is a name for something an ontology defines.  A query can ask Mozg to resolve those values to the ontology's terms:
+
+```graphql
+{
+  query(input: {
+    source: "opentargets", from: "diseasePhenotypes", where: { diseaseId: "MONDO_0007739" }
+    link: [{ field: "hpoId", ontology: "hpo", as: "phenotype" }]
+  }) { data }
+}
+```
+
+Each row gains `phenotype`: the term (`iri`, `id`, `label`, `matchedBy`), or `null` when the value names none.  A value may be an identifier (`MONDO:0005015`, `MONDO_0005015`, the IRI, or a bare `0005015` given the ontology's OBO key), a label, a synonym or a cross-reference; `match: [id, label, synonym, xref]` chooses which and in what order, `details: true` adds definition, synonyms, cross-references and parents, and `field: "target.diseaseId"` links a field of an included relation or a list.  A `field` the rows do not have is an error naming the ones they do, never a column of nulls.
+
+- **Named ontologies** are configured by the operator (`MOZG_ONTOLOGIES`, Helm `mozg.ontologies`) and load on first use.  The `ontologies` query lists them and whether each has loaded.  There is deliberately no way for a caller to register or replace one: with no authentication in front of Mozg that would let anyone change what everybody's links resolve to.
+- **Inline ontologies** are given as `url` or `content` in the link itself, with the same screening as `ingestOntology` (no private addresses, 10 MB, 10 s).
+- **Formats:** the OBO flat-file format (`obo`) is the compact way to load a large ontology — OBO ontologies publish it about a tenth the size of their OWL; Turtle and RDF/XML give labels, synonyms, cross-references and definitions; OWL/XML gives labels and nothing else.  Human Phenotype Ontology's `hp.obo` (20,482 terms, 10 MB) loads in under half a second.
+- `ontologyTerms(search:, ontology:)` searches an ontology's terms, for the query builder and the SDK.
+- On `/stream`, links apply to the main rows; related rows stream separately and are not linked.
+
 ## Example queries
 
 ### Introspect a SQLite database
@@ -266,6 +287,8 @@ mutation {
 | `MOZG_CONNECTION_CACHE_MAX` | `32` | Database clients (connection pools) kept per driver; the least recently used is closed |
 | `MOZG_CONNECTION_IDLE_MS` | `600000` | A database client unused for this long is closed |
 | `MOZG_ONTOLOGY_CACHE_MAX` | `20` | Parsed ontologies kept in memory |
+| `MOZG_ONTOLOGIES` | unset | JSON array of ontologies queries may link values to, by name: `[{"name":"mondo","url":"https://…/mondo.obo","format":"obo","obo":"mondo"}]`; each loads on first use |
+| `MOZG_ONTOLOGY_TTL_MS` | `86400000` | A loaded ontology is read again after this long |
 | `MOZG_SOAP_OPERATIONS` | unset | SOAP operations Mozg may run besides those named like reads (`Get…`, `List…`, `Search…`): comma-separated, `*` a wildcard, `*` alone for all |
 | `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
 | `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |

@@ -157,6 +157,17 @@ mozg:
   connectionIdleMs: 600000
   # -- Parsed ontologies kept in memory
   ontologyCacheMax: 20
+  # -- An ontology loaded for linking is read again after this long
+  ontologyTtlMs: 86400000
+  # -- Ontologies queries may link database values to, by name.  Each loads on
+  # first use.  e.g.
+  #   - name: mondo
+  #     url: https://purl.obolibrary.org/obo/mondo.obo
+  #     format: obo          # obo (compact), turtle, rdfxml or owlxml
+  #     obo: mondo           # OBO key of its identifiers, so 0005015 reads as MONDO:0005015
+  #     label: Mondo Disease Ontology
+  #     maxBytes: 268435456  # optional download cap
+  ontologies: []
   # -- Allow callers to point a public catalog source at a private-network mirror
   allowPrivateMirrors: false
   # -- How long SIGTERM waits for in-flight queries
