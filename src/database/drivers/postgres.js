@@ -23,7 +23,7 @@
 
 const { executeKnexQuery, createConnectionCache } = require('./knex-query')
 
-const pool = createConnectionCache()
+const pool = createConnectionCache('postgres')
 
 /** How long to wait for a PostgreSQL server to accept a connection (the MySQL client's default). */
 const CONNECT_TIMEOUT_MS = 10_000
