@@ -61,6 +61,21 @@ export default [
     }
   },
   {
+    // The documentation site's page scripts run in a browser, not in Node.
+    files: ['scripts/site/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        matchMedia: 'readonly',
+        requestAnimationFrame: 'readonly',
+        getComputedStyle: 'readonly',
+        ResizeObserver: 'readonly'
+      }
+    }
+  },
+  {
     ignores: ['node_modules/', 'examples/sample.db']
   }
 ]

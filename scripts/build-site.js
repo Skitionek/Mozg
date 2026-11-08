@@ -16,6 +16,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
+const { buildModelGraph, sharedKeyTable } = require('./model-graph')
 
 const ROOT = path.join(__dirname, '..')
 const REPOSITORY = `https://github.com/${process.env.GITHUB_REPOSITORY || 'Skitionek/Mozg'}`
@@ -26,12 +27,16 @@ const HIGHLIGHT = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1'
 const PAGES = [
   { src: 'README.md', out: 'index.html', nav: 'Overview' },
   { src: 'docs/sources.md', out: 'sources.html', nav: 'Sources' },
+  { src: 'docs/model.md', out: 'model.html', nav: 'Model', graph: true },
   { examples: 'examples/queries.json', out: 'examples.html', nav: 'Examples', title: 'Examples' },
   { src: 'docs/connectors.md', out: 'connectors.html', nav: 'Connectors' },
   { src: 'docs/deploy.md', out: 'deploy.html', nav: 'Deploy' },
   { src: 'docs/dumps.md', out: 'dumps.html', nav: 'Database dumps' },
   { src: 'CHANGELOG.md', out: 'changelog.html', nav: 'Changelog' }
 ]
+
+/** Where docs/model.md says the force graph goes. */
+const MODEL_MARKER = '<!-- model-graph -->'
 
 const MEDIA_DIR = 'docs/media'
 const DEMO_VIDEO = 'mozg-demo.mp4'
@@ -167,7 +172,62 @@ function demoSection (media) {
     '<figcaption>Mozg\'s query builder: picking a life-science source, running a query across several databases, and following OBO-key joins.</figcaption></figure>'
 }
 
-function layout ({ page, nav, title, body, toc, hero, commit, paper }) {
+/** JSON safe to put inside a <script> element: no "</script>", no "<!--". */
+function jsonForScript (value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
+}
+
+/**
+ * The force graph's markup, data and a complete fallback table.  The table is
+ * the first example's connections: what a reader without JavaScript (or whose
+ * script failed) sees, and what the script replaces.
+ */
+function modelFigure (graph) {
+  const first = graph.presets[0]
+  const rows = sharedKeyTable(graph, first.sources).map(({ key, databases }) => {
+    const carried = databases.map((d) => `<div class="model-cell-db"><strong>${escapeHtml(d.source)}</strong>: ${escapeHtml(d.entities.join(', '))}</div>`).join('')
+    return `<tr><th scope="row">${escapeHtml(key.prefix)}<div class="model-cell-sub">${escapeHtml(key.label)}</div></th><td>${key.ontology ? 'ontology' : 'identifier space'}</td><td>${carried}</td></tr>`
+  }).join('')
+  const shared = graph.keys.filter((k) => k.sources >= 2).length
+  return `<section class="model" id="model-graph" aria-label="Interactive graph of how databases connect through shared ontologies and identifier spaces">
+  <div class="model-bar">
+    <div class="model-presets" role="group" aria-label="Example models"></div>
+    <details class="model-picker"><summary>Choose databases</summary><div class="model-picker-list"></div></details>
+    <div class="model-options">
+      <label><input type="checkbox" name="relations"> Declared relations</label>
+      <label><input type="checkbox" name="unshared"> Identifier spaces used by one database</label>
+    </div>
+  </div>
+  <p class="model-status" role="status" aria-live="polite"></p>
+  <div class="model-main">
+    <div class="model-stage">
+      <canvas role="img" aria-label="Force-directed graph. Coloured shapes are entities of the chosen databases; pills are the ontologies and identifier spaces they share. The table below lists every connection."></canvas>
+      <div class="model-tooltip" role="tooltip" hidden></div>
+      <div class="model-zoom" role="group" aria-label="View">
+        <button type="button" data-action="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" data-action="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" data-action="fit">Fit</button>
+        <button type="button" data-action="reset">Reset layout</button>
+      </div>
+    </div>
+    <aside class="model-side" aria-label="Legend and details">
+      <ul class="model-legend" aria-label="Databases; press one to show only it"></ul>
+      <div class="model-detail" aria-live="polite"></div>
+    </aside>
+  </div>
+  <details class="model-table">
+    <summary>Table: every connection shown</summary>
+    <div class="table-wrap"><table>
+      <caption class="model-cell-sub">Identifier spaces and ontologies shared by two or more of the chosen databases, and the entities that carry each.  Of the catalog's ${graph.keys.length} identifier spaces, ${shared} are shared by two or more of its ${graph.sources.length} databases.</caption>
+      <thead><tr><th scope="col">Identifier space</th><th scope="col">Kind</th><th scope="col">Carried by</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </details>
+  <script type="application/json" id="model-data">${jsonForScript(graph)}</script>
+</section>`
+}
+
+function layout ({ page, nav, title, body, toc, hero, commit, paper, scripts = '' }) {
   const links = nav.map((p) => `<a href="${p.out}"${p.out === page.out ? ' aria-current="page"' : ''}>${escapeHtml(p.nav)}</a>`).join('')
   const paperLink = paper ? '<a href="mozg.pdf">Paper (PDF)</a>' : ''
   const source = page.src ? `${REPOSITORY}/blob/${BRANCH}/${page.src}` : `${REPOSITORY}/blob/${BRANCH}/${page.examples}`
@@ -190,7 +250,7 @@ function layout ({ page, nav, title, body, toc, hero, commit, paper }) {
 ${hero}
 <div class="page${toc ? ' has-toc' : ''}">
   ${toc}
-  <main class="content">
+  <main class="content${page.graph ? ' content-wide' : ''}">
 ${body}
   </main>
 </div>
@@ -204,7 +264,7 @@ ${body}
   const toc = document.querySelector('.toc details')
   if (toc && matchMedia('(min-width: 64rem)').matches) toc.open = true
 </script>
-</body>
+${scripts}</body>
 </html>
 `
 }
@@ -239,6 +299,7 @@ async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROO
   const hasPaper = Boolean(paper && fs.existsSync(paper))
   if (hasPaper) fs.copyFileSync(paper, path.join(out, 'mozg.pdf'))
   fs.copyFileSync(path.join(__dirname, 'site', 'style.css'), path.join(out, 'style.css'))
+  fs.copyFileSync(path.join(__dirname, 'site', 'graph.js'), path.join(out, 'graph.js'))
   fs.writeFileSync(path.join(out, '.nojekyll'), '')
 
   const written = []
@@ -248,11 +309,17 @@ async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROO
     else markdown = fs.readFileSync(path.join(root, page.src), 'utf8')
     const isIndex = page.out === 'index.html'
     const rendered = await renderMarkdown(isIndex ? withoutTitle(markdown) : markdown, page.src || 'docs/examples.md', pageBySrc)
+    let body = rendered.html
+    if (page.graph) {
+      if (!body.includes(MODEL_MARKER)) throw new Error(`${page.src} has no ${MODEL_MARKER} for the force graph`)
+      body = body.replace(MODEL_MARKER, modelFigure(buildModelGraph()))
+    }
     const html = layout({
       page,
       nav: PAGES,
       title: page.title || rendered.title,
-      body: rendered.html,
+      body,
+      scripts: page.graph ? '<script src="graph.js" defer></script>\n' : '',
       toc: tableOfContents(rendered.headings),
       hero: isIndex ? hero(media) : '',
       commit,
@@ -264,7 +331,7 @@ async function build ({ out = path.join(ROOT, '_site'), paper = null, root = ROO
   return { out, pages: written, media, paper: hasPaper }
 }
 
-module.exports = { PAGES, createSlugger, rewriteHref, renderMarkdown, examplesMarkdown, withoutTitle, build, tableOfContents }
+module.exports = { PAGES, modelFigure, jsonForScript, createSlugger, rewriteHref, renderMarkdown, examplesMarkdown, withoutTitle, build, tableOfContents }
 
 if (require.main === module) {
   const argv = process.argv.slice(2)

@@ -439,3 +439,449 @@ h4:hover .anchor,
 .site-footer p {
   margin: 0;
 }
+
+/* The Model page: a force graph of the databases and the ontologies they share
+   (scripts/site/graph.js).  The eight series colours are the validated
+   categorical palette, stepped separately for the dark surface; each database
+   also has its own node shape, so colour is never the only cue. */
+
+.content-wide {
+  max-width: none;
+}
+
+.content-wide > :not(.model) {
+  max-width: var(--content);
+}
+
+.model {
+  --m-s1: #2a78d6;
+  --m-s2: #eb6834;
+  --m-s3: #1baf7a;
+  --m-s4: #eda100;
+  --m-s5: #e87ba4;
+  --m-s6: #008300;
+  --m-s7: #6250d6;
+  --m-s8: #e34948;
+  --m-surface: var(--surface);
+  --m-ink: var(--text);
+  --m-ink2: var(--muted);
+  --m-muted: #898781;
+  --m-line: var(--border);
+  --m-ontology: var(--accent-soft);
+  --m-space: var(--surface);
+  --m-accent: var(--accent);
+
+  margin: 1.5rem 0 2rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .model {
+    --m-s1: #3987e5;
+    --m-s2: #d95926;
+    --m-s3: #199e70;
+    --m-s4: #c98500;
+    --m-s5: #d55181;
+    --m-s6: #008300;
+    --m-s7: #9085e9;
+    --m-s8: #e66767;
+  }
+}
+
+/* Until the script has run, only the table (a complete answer on its own) shows. */
+.model:not(.is-ready) .model-bar,
+.model:not(.is-ready) .model-status,
+.model:not(.is-ready) .model-main {
+  display: none;
+}
+
+.model-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.model-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.model button,
+.model summary {
+  font: inherit;
+}
+
+.model-preset,
+.model-zoom button {
+  min-block-size: 2.25rem;
+  min-inline-size: 2.25rem;
+  padding: 0.25rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.model-preset:hover,
+.model-zoom button:hover {
+  border-color: var(--accent);
+}
+
+.model-preset[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.model :where(button, summary, input, a):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.model-picker {
+  position: relative;
+  font-size: 0.875rem;
+}
+
+.model-picker summary {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.25rem;
+  padding: 0.25rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.model-picker[open] summary {
+  border-color: var(--accent);
+}
+
+.model-picker-list {
+  position: absolute;
+  z-index: 5;
+  inline-size: min(34rem, 86vw);
+  max-block-size: 22rem;
+  margin-top: 0.4rem;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 8px 32px rgb(0 0 0 / 12%);
+  columns: 2 14rem;
+  column-gap: 1.5rem;
+}
+
+.model-picker-group {
+  break-inside: avoid;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 0;
+}
+
+.model-picker-group legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.model-picker-item {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  min-block-size: 1.75rem;
+  cursor: pointer;
+}
+
+.model-picker-item input[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.model-picker-count {
+  margin-inline-start: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.model-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.875rem;
+}
+
+.model-options label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  min-block-size: 1.75rem;
+  cursor: pointer;
+}
+
+.model-status {
+  min-block-size: 1.5rem;
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.model-main {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (width >= 60rem) {
+  .model-main {
+    grid-template-columns: minmax(0, 1fr) 17rem;
+  }
+}
+
+.model-stage {
+  position: relative;
+  min-inline-size: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.model-stage canvas {
+  display: block;
+  inline-size: 100%;
+  touch-action: pan-x pan-y pinch-zoom;
+
+  /* Safari needs the prefix to stop a drag from selecting text. */
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.model-zoom {
+  position: absolute;
+  inset: 0.5rem 0.5rem auto auto;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.model-zoom button {
+  padding-inline: 0.5rem;
+  border-radius: 8px;
+}
+
+.model-tooltip {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 3;
+  display: grid;
+  gap: 0.15rem;
+  max-inline-size: 20rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 16%);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.model-tooltip[hidden] {
+  display: none;
+}
+
+.model-tooltip-sub {
+  color: var(--muted);
+}
+
+.model-tooltip-line {
+  color: var(--text);
+}
+
+.model-side {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-inline-size: 0;
+}
+
+.model-legend {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model-legend-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: 2rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+
+.model-legend-item:hover {
+  background: var(--code-bg);
+}
+
+.model-legend-item[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.model-legend-name {
+  font-weight: 600;
+}
+
+.model-legend-count {
+  margin-inline-start: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.model-legend-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0.5rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.model-key-sample {
+  padding: 0.05rem 0.55rem;
+  border: 1.5px solid var(--muted);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.model-key-sample.is-ontology {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.model-detail {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.model-detail h3 {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.model-detail p {
+  margin: 0.25rem 0;
+}
+
+.model-detail-sub,
+.model-hint,
+.model-cell-sub {
+  color: var(--muted);
+}
+
+.model-chips {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.4rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model-link {
+  min-block-size: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.model-link:hover {
+  color: var(--accent-strong);
+}
+
+.model-table {
+  margin-top: 1rem;
+}
+
+.model-table > summary {
+  min-block-size: 2rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.model-table caption {
+  padding: 0.5rem 0.75rem;
+  text-align: start;
+}
+
+.model-table .table-wrap {
+  max-block-size: 28rem;
+  overflow: auto;
+}
+
+.model-table th[scope="row"] {
+  white-space: nowrap;
+}
+
+.model-table tr.is-selected {
+  background: var(--accent-soft);
+}
+
+.model-cell-db {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.25rem;
+  align-items: center;
+}
+
+.model-cell-db svg {
+  flex: none;
+}
+
+@media (pointer: coarse) {
+  .model-link,
+  .model-legend-item,
+  .model-picker-item {
+    min-block-size: 2.75rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .model-key-sample,
+  .model-preset,
+  .model-legend-item {
+    border-color: ButtonText;
+  }
+
+  .model-preset[aria-pressed="true"],
+  .model-legend-item[aria-pressed="true"] {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+  }
+}
