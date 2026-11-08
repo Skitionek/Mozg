@@ -23,6 +23,16 @@ spec:
       from:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+    {{- if .Values.metrics.enabled }}
+    # Prometheus scrapes the metrics port.
+    - ports:
+        - port: metrics
+          protocol: TCP
+      {{- with .Values.metrics.scrapeFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
     # Peer pods ask each other for demand.
     - from:
         - podSelector:

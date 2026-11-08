@@ -27,6 +27,7 @@
 const { version } = require('../../package.json')
 const { LruCache } = require('../cache')
 const { intOption, OPTIONS } = require('../config')
+const telemetry = require('../telemetry')
 
 const USER_AGENT = `mozg/${version} (+https://github.com/Skitionek/Mozg)`
 
@@ -260,8 +261,15 @@ async function request (url, options = {}) {
         response = await limiter.run(async () => {
           const controller = new AbortController()
           const timer = setTimeout(() => controller.abort(), timeoutMs)
+          const began = process.hrtime.bigint()
+          const elapsed = () => Number(process.hrtime.bigint() - began) / 1e9
           try {
-            return await globalThis.fetch(url, { method, headers, body, signal: controller.signal })
+            const answer = await globalThis.fetch(url, { method, headers, body, signal: controller.signal })
+            telemetry.recordUpstream(host, answer.status, elapsed())
+            return answer
+          } catch (err) {
+            telemetry.recordUpstream(host, 'error', elapsed())
+            throw err
           } finally {
             clearTimeout(timer)
           }
@@ -272,6 +280,7 @@ async function request (url, options = {}) {
         // a caller tells a server that is not up yet from a wrong request.
         lastError = new HttpError(`${method} ${displayUrl} failed: ${reason}`, { url: displayUrl, cause: err })
         if (i < retries) {
+          telemetry.recordUpstreamRetry(host)
           await sleep(retryDelay(i, null, backoffMs))
           continue
         }
@@ -298,6 +307,7 @@ async function request (url, options = {}) {
         { status: response.status, url: displayUrl, body: detail }
       )
       if (RETRYABLE_STATUS.has(response.status) && i < retries) {
+        telemetry.recordUpstreamRetry(host)
         await sleep(retryDelay(i, response, backoffMs))
         continue
       }

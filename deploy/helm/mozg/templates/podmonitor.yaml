@@ -1,0 +1,22 @@
+{{- if and .Values.metrics.enabled .Values.metrics.podMonitor.enabled }}
+# Prometheus Operator: scrape Mozg's metrics port.  A PodMonitor, not a
+# ServiceMonitor, because the metrics port is deliberately absent from the
+# Service.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "mozg.fullname" . }}
+  labels:
+    {{- include "mozg.labels" . | nindent 4 }}
+    {{- with .Values.metrics.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "mozg.selectorLabels" . | nindent 6 }}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.metrics.podMonitor.interval }}
+{{- end }}

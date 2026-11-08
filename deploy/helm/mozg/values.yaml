@@ -83,6 +83,26 @@ networkPolicy:
   # -- Who may reach Mozg (NetworkPolicy `from` peers); empty = anyone
   ingressFrom: []
 
+# Prometheus metrics (GET /metrics).  Served on a port of their own, which the
+# Service and Ingress do not route to, so scraping stays inside the cluster and
+# a public Mozg does not publish its usage.
+metrics:
+  # -- Serve /metrics
+  enabled: true
+  # -- Port of the metrics listener (it serves /metrics and nothing else)
+  port: 9464
+  # -- Who may scrape (NetworkPolicy `from` peers); empty = anything that can reach the pod
+  scrapeFrom: []
+  # -- Annotate the pods for annotation-based Prometheus discovery
+  annotations: true
+  podMonitor:
+    # -- Create a Prometheus Operator PodMonitor (needs the Operator's CRDs)
+    enabled: false
+    # -- Scrape interval
+    interval: 30s
+    # -- Extra labels, e.g. the `release` label a Prometheus selects monitors by
+    labels: {}
+
 # Resources of the helm test pod
 testResources:
   requests:
@@ -147,6 +167,12 @@ mozg:
   # -- A self-hosted database counts as in demand for this long after its last
   # query; KEDA keeps it up while demand is 1
   demandWindowMs: 60000
+  # -- Log level: error, warn, info or debug
+  logLevel: info
+  # -- Log format: json (one object per line) or text
+  logFormat: json
+  # -- Log queries slower than this at warn (0 = off)
+  slowQueryMs: 10000
   # -- Names of extra ConfigMaps whose *.json keys are catalog entries to
   # register (your own sources, alongside those of `databases`)
   extraSourcesConfigMaps: []

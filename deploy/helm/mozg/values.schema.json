@@ -174,12 +174,32 @@
       }
     },
     "testResources": { "$ref": "#/definitions/resources" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "scrapeFrom": { "type": "array" },
+        "annotations": { "type": "boolean" },
+        "podMonitor": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "interval": { "type": "string" },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        }
+      }
+    },
     "mozg": {
       "type": "object",
       "properties": {
         "httpTimeoutMs": { "type": "integer", "minimum": 1 },
         "httpRetries": { "type": "integer", "minimum": 0 },
         "httpCacheTtlMs": { "type": "integer", "minimum": 0 },
+        "logLevel": { "enum": ["error", "warn", "info", "debug"] },
+        "logFormat": { "enum": ["json", "text"] },
+        "slowQueryMs": { "type": "integer", "minimum": 0 },
         "httpCacheMaxEntries": { "type": "integer", "minimum": 1 },
         "resultCache": {
           "type": "object",
