@@ -16,7 +16,7 @@
  * checked by hand against public OpenAPI, OData and SOAP services.
  */
 
-const { test, describe, after } = require('node:test')
+const { test, describe, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { makeExecutableSchema } = require('@graphql-tools/schema')
 const { GraphQLScalarType } = require('graphql')
@@ -153,7 +153,10 @@ describe('mesh adapter: Neo4j-shaped schema', () => {
   })
 })
 
-// ── MySQL ───────────────────────────────────────────────────────────────────
+// ── A handler with String-typed filters and input-object ordering ──────────
+// The shape the MySQL handler had.  MySQL itself no longer goes through the
+// adapter (src/database/drivers/mysql.js), but the adapter's handling of such
+// schemas stays, for any handler that types its filters that way.
 
 const seenMysqlArgs = []
 const MYSQL = register({ driver: 'mysql', host: 'shape-test', database: 'blog', user: 'u', password: 'pw' }, /* GraphQL */ `
@@ -174,23 +177,24 @@ const MYSQL = register({ driver: 'mysql', host: 'shape-test', database: 'blog', 
         const [[field, dir]] = Object.entries(args.orderBy)
         out = [...out].sort((a, b) => String(a[field]).localeCompare(String(b[field])) * (dir === 'desc' ? -1 : 1))
       }
-      return out.slice(0, args.limit ?? undefined)
+      const start = args.offset ?? 0
+      return out.slice(start, args.limit != null ? start + args.limit : undefined)
     }
   }
 })
 
-describe('mesh adapter: MySQL-shaped schema', () => {
+describe('mesh adapter: String-typed filters', () => {
   test('coerces where values to the String the handler declares', async () => {
     const { data } = await mesh.executeQuery({ connection: MYSQL, from: 'users', where: { id: 2 } })
     assert.deepEqual(data.map((u) => u.name), ['Barbara'])
   })
 
-  test('applies offset itself, because the handler swaps LIMIT and OFFSET', async () => {
+  test('passes limit and offset straight to a handler that takes them', async () => {
     seenMysqlArgs.length = 0
     const { data } = await mesh.executeQuery({ connection: MYSQL, from: 'users', orderBy: 'name', limit: 1, offset: 1 })
     assert.deepEqual(data.map((u) => u.name), ['Barbara'])
-    assert.equal(seenMysqlArgs[0].limit, 2, 'asks for offset + limit rows')
-    assert.equal(seenMysqlArgs[0].offset, undefined, 'never sends offset')
+    assert.equal(seenMysqlArgs[0].limit, 1)
+    assert.equal(seenMysqlArgs[0].offset, 1)
   })
 })
 
@@ -297,6 +301,15 @@ const SOAP = register({ driver: 'soap', database: 'https://shape-test/service?WS
 })
 
 describe('mesh adapter: SOAP-shaped schema', () => {
+  // NumberToWords is a pure function, but nothing in its name says so: the
+  // operator has to allow it (src/database/drivers/soap-policy.js).
+  const saved = process.env.MOZG_SOAP_OPERATIONS
+  before(() => { process.env.MOZG_SOAP_OPERATIONS = 'NumberToWords' })
+  after(() => {
+    if (saved === undefined) delete process.env.MOZG_SOAP_OPERATIONS
+    else process.env.MOZG_SOAP_OPERATIONS = saved
+  })
+
   test('runs an operation by its short name, wrapping where in its input', async () => {
     const { data } = await mesh.executeQuery({ connection: SOAP, from: 'NumberToWords', where: { ubiNum: '42' } })
     assert.deepEqual(data, [{ NumberToWordsResult: 'words for 42' }])

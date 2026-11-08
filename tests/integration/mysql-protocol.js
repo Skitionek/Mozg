@@ -2,7 +2,7 @@
 
 /**
  * The connector suite for servers speaking the MySQL protocol, through the
- * graphql-mesh MySQL handler (driver `mysql`): Oracle MySQL and MariaDB.
+ * knex/mysql2 driver (`mysql`): Oracle MySQL and MariaDB.
  */
 
 const { TABLES, COLUMNS, connectionFromUrl } = require('./fixture')
@@ -32,7 +32,7 @@ function runMysqlProtocolSuite (name) {
     connection,
     badCredentials: badCredentialsFor(connection, { refusesUnknownUsers: true }),
     async seed () {
-      const mysql = require('mysql')
+      const mysql = require('mysql2')
       const conn = mysql.createConnection({
         host: connection.host,
         port: connection.port,
@@ -52,7 +52,7 @@ function runMysqlProtocolSuite (name) {
       }
     },
     async teardown () {
-      await require('../../src/database/drivers/mesh-adapter').destroyAll()
+      await require('../../src/database/drivers/mysql').destroyAll()
     }
   })
 }

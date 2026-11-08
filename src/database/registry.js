@@ -8,8 +8,9 @@
  * dependencies (graphql-mesh, knex, …) only fail at the point a query
  * actually uses them — not at server startup or test-file load time.
  *
- * SQL databases (postgres, mysql), Neo4j, and all new source types are
- * accessed through graphql-mesh handlers in mesh-adapter.js.
+ * PostgreSQL and MySQL are accessed through knex.  Neo4j and the other
+ * spec-described source types go through graphql-mesh handlers in
+ * mesh-adapter.js.
  *
  * SQLite3 uses a legacy knex-based driver because @graphql-mesh/tuql depends
  * on a critically vulnerable version of sequelize and cannot be used until a
@@ -29,8 +30,13 @@ function getDriver (driverName) {
     case 'postgres':
       return require('./drivers/postgres')
 
-    // ── Mesh-backed drivers ────────────────────────────────────────────────
+    // MySQL / MariaDB: knex over mysql2, like postgres — the mesh handler's
+    // client could not log in to MySQL 8's default or MySQL 9 at all (see
+    // src/database/drivers/mysql.js).
     case 'mysql':
+      return require('./drivers/mysql')
+
+    // ── Mesh-backed drivers ────────────────────────────────────────────────
     case 'neo4j':
     case 'openapi':
     case 'soap':

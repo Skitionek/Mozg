@@ -167,6 +167,10 @@ mozg:
   # -- A self-hosted database counts as in demand for this long after its last
   # query; KEDA keeps it up while demand is 1
   demandWindowMs: 60000
+  # -- SOAP operations Mozg may run besides those named like reads (Get…, List…,
+  # Search…): comma-separated names, * a wildcard.  A SOAP operation may change
+  # data and a WSDL does not say, so the rest are refused.  "*" allows all.
+  soapOperations: ""
   # -- Log level: error, warn, info or debug
   logLevel: info
   # -- Log format: json (one object per line) or text

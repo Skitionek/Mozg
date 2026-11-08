@@ -232,6 +232,65 @@ function valueAt (row, key) {
   return Object.hasOwn(row, key) ? row[key] : getPath(row, key)
 }
 
+/** Split `items` into runs of at most `size`. */
+function chunks (items, size) {
+  const out = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
+/** Parent keys sent in one request when a relation is `batch`. */
+const BATCH_SIZE = 50
+
+/**
+ * Fetch a hasMany / hasOne relation for all rows in a few requests, by
+ * repeating the filter: `/posts?userId=1&userId=2&…`.  Only for a relation
+ * that says `batch: true`, i.e. whose API is known to take the filter that way
+ * (json-server and so JSONPlaceholder do; most APIs take one value).
+ *
+ * Returns false, leaving the rows untouched, when it cannot be sure of the
+ * answer — fewer than two distinct keys to fetch, a failed request, or a
+ * record whose key was not asked for (the API ignored the filter) — so the
+ * caller falls back to one request per row and the result is never wrong.
+ */
+async function loadBatchedFilter (ctx, rows, rel, { base, entityPath, withWhere, fetchRows, isScalar }) {
+  const { localKey = 'id', foreignKey, type = 'hasMany', select, limit, relations: nested } = rel
+  const resultKey = rel.alias || rel.entity
+  const wanted = [...new Set(rows.map((row) => row[localKey]).filter(isScalar).map(String))]
+  if (wanted.length < 2) return false
+
+  let related
+  try {
+    related = []
+    for (const keys of chunks(wanted, BATCH_SIZE)) {
+      const url = withWhere(`${base}${entityPath}`)
+      for (const key of keys) url.searchParams.append(foreignKey, key)
+      related.push(...await fetchRows(url.toString()))
+    }
+    if (related.some((record) => !wanted.includes(String(valueAt(record, foreignKey))))) return false
+  } catch {
+    return false
+  }
+
+  const groups = new Map()
+  for (const record of related) {
+    const key = String(valueAt(record, foreignKey))
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(record)
+  }
+  // Group, then trim: `select` may leave out the very field the grouping used.
+  // (loadRelations reports a nested failure on the row it concerns.)
+  for (const row of rows) {
+    const parentValue = row[localKey]
+    let group = isScalar(parentValue) ? (groups.get(String(parentValue)) || []) : []
+    if (type === 'hasMany' && limit != null) group = group.slice(0, limit)
+    group = applySelect(structuredClone(group), select)
+    if (nested && nested.length > 0 && group.length > 0) await loadRelations(ctx, group, nested)
+    row[resultKey] = type === 'hasMany' ? group : (group[0] ?? null)
+  }
+  return true
+}
+
 /**
  * Relations, as RelationInput documents them:
  *   belongsTo         the parent's `foreignKey` value identifies the record
@@ -245,12 +304,14 @@ function valueAt (row, key) {
  * `types[].type.url`): the parent then names the records itself.  An entity
  * path with `{field}` placeholders is filled from the parent and fetched as
  * is (Fake Store: `/carts/user/{id}`).
- * Lookups for different rows run a few at a time.
+ * Lookups for different rows run a few at a time, and rows that name the same
+ * record fetch it once.  A hasMany / hasOne relation that says `batch: true`
+ * fetches for all rows at once (see loadBatchedFilter).
  */
 async function loadRelations (ctx, rows, relations) {
   if (!rows.length) return
   const { connection, base, headers, settings } = ctx
-  const fetchRows = (url) => fetchAndNormalise(buildAuth(connection, url).url, headers, settings)
+  const fetchUncached = (url) => fetchAndNormalise(buildAuth(connection, url).url, headers, settings)
 
   for (const rel of relations) {
     // A relation naming another catalog entry is resolved against that
@@ -275,6 +336,14 @@ async function loadRelations (ctx, rows, relations) {
     } = rel
 
     const resultKey = alias || entity
+
+    // Rows that name the same record (fifty posts by five authors) fetch it
+    // once.  Each use gets its own copy: nested relations write into rows.
+    const fetched = new Map()
+    const fetchRows = (url) => {
+      if (!fetched.has(url)) fetched.set(url, fetchUncached(url))
+      return fetched.get(url).then((rows) => structuredClone(rows))
+    }
     const entityPath = entity.startsWith('/') ? entity : `/${entity}`
     const placeholders = [...entityPath.matchAll(/\{([^{}]+)\}/g)].map((m) => m[1])
     const withWhere = (url) => {
@@ -283,6 +352,10 @@ async function loadRelations (ctx, rows, relations) {
       return u
     }
     const isScalar = (v) => v != null && v !== '' && typeof v !== 'object'
+
+    if (rel.batch && placeholders.length === 0 && type !== 'belongsTo' && !/[.[]/.test(foreignKey)) {
+      if (await loadBatchedFilter(ctx, rows, rel, { base, entityPath, withWhere, fetchRows, isScalar })) continue
+    }
 
     await mapLimited(rows, 4, async (row) => {
       const none = () => { row[resultKey] = type === 'hasMany' ? [] : null }

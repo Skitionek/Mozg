@@ -31,7 +31,8 @@ function register (connection, typeDefs, resolvers, { executor = false } = {}) {
 describe('buildHandlerDescriptor', () => {
   test('describes each handler from a connection', () => {
     const d = (driver, conn) => mesh.buildHandlerDescriptor(driver, conn)
-    assert.deepEqual(d('mysql', { database: 'db', user: 'u' }), { pkg: '@graphql-mesh/mysql', config: { host: 'localhost', port: 3306, database: 'db', user: 'u', password: '' } })
+    // MySQL is a knex driver now (src/database/drivers/mysql.js), not a mesh handler.
+    assert.throws(() => d('mysql', { database: 'db' }), /No mesh handler available for driver: mysql/)
     assert.equal(d('neo4j', { host: 'h', scheme: 'neo4j+s', database: 'movies', user: 'u', password: 'p' }).config.endpoint, 'neo4j+s://h:7687')
     assert.deepEqual(d('openapi', { database: 'spec.json' }).config, { source: 'spec.json' })
     assert.deepEqual(d('openapi', { database: 'spec.json', host: 'https://api' }).config, { source: 'spec.json', endpoint: 'https://api' })

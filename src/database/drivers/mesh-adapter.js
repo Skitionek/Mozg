@@ -3,6 +3,8 @@
 const {
   parse,
   execute,
+  print,
+  astFromValue,
   isObjectType,
   isScalarType,
   isEnumType,
@@ -14,6 +16,7 @@ const { MeshStore, InMemoryStoreStorageAdapter } = require('@graphql-mesh/store'
 const { PubSub, DefaultLogger } = require('@graphql-mesh/utils')
 
 const { assertSafeCypherIdentifier } = require('./neo4j-identifiers')
+const { assertSoapOperationAllowed } = require('./soap-policy')
 const { patchNeo4jIntrospectorTypes } = require('./neo4j-types')
 const { LruCache } = require('../../cache')
 const { intOption, OPTIONS } = require('../../config')
@@ -48,18 +51,6 @@ const registeredMeshSources = new Map()
  */
 function buildHandlerDescriptor (driver, connection) {
   switch (driver) {
-    case 'mysql':
-      return {
-        pkg: '@graphql-mesh/mysql',
-        config: {
-          host: connection.host || 'localhost',
-          port: connection.port || 3306,
-          database: connection.database,
-          user: connection.user,
-          password: connection.password || ''
-        }
-      }
-
     case 'neo4j':
       return {
         pkg: '@graphql-mesh/neo4j',
@@ -355,9 +346,11 @@ function coerceLeaf (named, value) {
     case 'ID':
       return typeof value === 'object' ? JSON.stringify(value) : String(value)
     case 'Int': {
-      const n = Number.parseInt(value, 10)
-      if (Number.isNaN(n)) throw new Error(`"${value}" is not an integer`)
-      return n
+      // parseInt alone reads "2) { evil } #" as 2 and 2.5 as 2: a value that is
+      // not an integer must be refused, not quietly turned into one.
+      const isInteger = typeof value === 'number' ? Number.isInteger(value) : /^\s*[+-]?\d+\s*$/.test(String(value))
+      if (!isInteger) throw new Error(`"${value}" is not an integer`)
+      return Number.parseInt(value, 10)
     }
     case 'Float': {
       const n = Number(value)
@@ -606,7 +599,8 @@ async function executeQuery (input) {
 
   // SOAP has no read/write distinction, so the SOAP handler exposes every
   // operation as a mutation; for that driver alone, naming an operation in
-  // `from` runs it.  Every other driver is read-only through Mozg.
+  // `from` runs it — so which ones may run is a policy (soap-policy.js).
+  // Every other driver is read-only through Mozg.
   const rootType = connection?.driver === 'soap' ? (schema.getMutationType() || queryType) : queryType
   const operation = rootType === queryType ? 'query' : 'mutation'
 
@@ -616,6 +610,8 @@ async function executeQuery (input) {
     const known = Object.keys(queryFields).filter((f) => !/^count_|Connection$|Aggregate$|^placeholder$/.test(f)).map(shortName).join(', ')
     throw new Error(`No query field found for entity "${from}". Available: ${known}`)
   }
+
+  if (connection?.driver === 'soap') assertSoapOperationAllowed(shortName(fieldName))
 
   const field = queryFields[fieldName]
   const args = field.args || []
@@ -641,16 +637,26 @@ async function executeQuery (input) {
   const varDefs = []
   const argParts = []
   const variables = {}
+  const bound = new Set()
+  // The Thrift executor drops arguments that arrive as variables (found by
+  // calling a real Thrift server: with literals it receives them, with
+  // variables an empty argument struct), so for that driver alone each value is
+  // written into the document as a literal.  The literal comes from GraphQL's
+  // own serializer, which escapes it against the argument's type, so a value can
+  // still never become query text.
+  const inline = connection?.driver === 'thrift'
   const bind = (arg, value) => {
+    bound.add(arg.name)
+    if (inline) {
+      const literal = astFromValue(value, arg.type)
+      if (literal == null) throw new Error(`"${from}": cannot pass ${JSON.stringify(value)} as ${arg.name} (${String(arg.type)})`)
+      argParts.push(`${arg.name}: ${print(literal)}`)
+      return
+    }
     variables[arg.name] = value
     varDefs.push(`$${arg.name}: ${String(arg.type)}`)
     argParts.push(`${arg.name}: $${arg.name}`)
   }
-
-  // @graphql-mesh/transport-mysql renders `LIMIT ${limit},${offset}`, which
-  // MySQL reads as offset-then-count — the two arrive swapped — and it drops
-  // zeros.  For MySQL, ask only for a row count and skip the offset here.
-  const skipHere = connection?.driver === 'mysql' && offset ? offset : 0
 
   // Paging and ordering the handler cannot do are done here instead, so the
   // same query means the same thing on every driver.
@@ -670,8 +676,8 @@ async function executeQuery (input) {
     const offsetArg = findArg(args, 'offset', 'skip')
     if ((limit != null && !limitArg) || (offset && !offsetArg)) pageHere = true
     if (!pageHere) {
-      if (limitArg && limit != null) bind(limitArg, limit + skipHere)
-      if (offsetArg && offset != null && !skipHere) bind(offsetArg, offset)
+      if (limitArg && limit != null) bind(limitArg, limit)
+      if (offsetArg && offset != null) bind(offsetArg, offset)
     }
 
     if (where && Object.keys(where).length > 0) {
@@ -682,9 +688,9 @@ async function executeQuery (input) {
       }
       const whereArg = findArg(args, 'where', 'condition', 'filter')
       if (whereArg) bind(whereArg, buildWhere(whereArg, where, from))
-      else bindDirectArgs(args.filter((a) => !varDefs.some((d) => d.startsWith(`$${a.name}:`))), where, from, bind)
+      else bindDirectArgs(args.filter((a) => !bound.has(a.name)), where, from, bind)
     } else {
-      bindDirectArgs(args.filter((a) => !varDefs.some((d) => d.startsWith(`$${a.name}:`))), {}, from, bind)
+      bindDirectArgs(args.filter((a) => !bound.has(a.name)), {}, from, bind)
     }
 
     if (orderBy) {
@@ -718,7 +724,6 @@ async function executeQuery (input) {
   }
   // Handlers may return their own result objects; give callers plain ones.
   rows = rows.map((row) => (returnsScalar || row === null || typeof row !== 'object' ? { value: row } : { ...row }))
-  if (skipHere) rows = rows.slice(skipHere)
   if (sortHere) rows = sortRows(rows, orderBy, orderDirection)
   if (pageHere) rows = rows.slice(offset || 0, limit != null ? (offset || 0) + limit : undefined)
 
@@ -741,11 +746,88 @@ async function mapLimited (items, limit, fn) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
+/** Parent keys sent in one `in` filter. */
+const BATCH_SIZE = 200
+
 /**
- * Load related entities with one mesh query per parent row.  The handlers'
- * filter types do not share an `in` operator (MySQL's are plain equality), so
- * rows cannot be batched generically; they are fetched a few at a time
- * instead of one after another.
+ * Whether the entity's `where` argument takes `{ key: { in: [...] } }` — as
+ * @neo4j/graphql's filter types do.  The schema decides; a handler whose
+ * filters are plain equality (OpenAPI, SOAP, OData's options) says no.
+ */
+async function acceptsIn (connection, entity, key) {
+  try {
+    const { schema } = await getOrCreateMeshSource(connection)
+    const queryType = schema.getQueryType()
+    if (!queryType) return false
+    const fields = queryType.getFields()
+    const fieldName = findQueryField(fields, entity)
+    if (!fieldName) return false
+    const whereArg = findArg(fields[fieldName].args || [], 'where', 'condition', 'filter')
+    const inputType = whereArg && unwrap(whereArg.type)
+    if (!inputType || !isInputObjectType(inputType)) return false
+    const keyField = inputType.getFields()[key]
+    const keyType = keyField && unwrap(keyField.type)
+    return Boolean(keyType) && isInputObjectType(keyType) && Object.hasOwn(keyType.getFields(), 'in')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * One query per chunk of parent keys instead of one per row.  Returns false,
+ * leaving the rows untouched, when it fails, so the caller can fall back to
+ * the per-row path and the result is never worse for having tried.
+ */
+async function loadBatched (connection, rows, rel, values) {
+  const { entity, localKey = 'id', foreignKey, ownerKey = 'id', alias, type = 'hasMany', select: relSelect, where: relWhere, limit: relLimit, relations: nested } = rel
+  const resultKey = alias || entity
+  const isBelongsTo = type === 'belongsTo'
+  const matchField = isBelongsTo ? ownerKey : foreignKey
+  const parentField = isBelongsTo ? foreignKey : localKey
+
+  const related = []
+  try {
+    for (let i = 0; i < values.length; i += BATCH_SIZE) {
+      const { data } = await executeQuery({
+        connection,
+        from: entity,
+        // The grouping below needs the matched field even if the caller did not ask for it.
+        select: relSelect && relSelect.length > 0 ? [...new Set([matchField, ...relSelect])] : relSelect,
+        where: { ...relWhere, [matchField]: { in: values.slice(i, i + BATCH_SIZE) } },
+        relations: nested
+      })
+      related.push(...data)
+    }
+  } catch {
+    return false
+  }
+
+  const groups = new Map()
+  for (const record of related) {
+    const key = String(record[matchField])
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(record)
+  }
+  for (const row of rows) {
+    const value = row[parentField]
+    if (value == null) {
+      row[resultKey] = type === 'hasMany' ? [] : null
+      continue
+    }
+    // A copy per row: two parents with the same key must not share (and later
+    // both write into) the same related objects.
+    let group = structuredClone(groups.get(String(value)) || [])
+    if (type === 'hasMany' && relLimit != null) group = group.slice(0, relLimit)
+    row[resultKey] = type === 'hasMany' ? group : (group[0] ?? null)
+  }
+  return true
+}
+
+/**
+ * Load related entities.  Where the handler's filter takes an `in` list
+ * (Neo4j) all parents are fetched in a few queries; otherwise — its filters
+ * are plain equality — one query per distinct parent key, a few at a time.
+ * Parents sharing a key fetch it once either way.
  */
 async function loadRelations (connection, rows, relations) {
   for (const rel of relations) {
@@ -772,23 +854,40 @@ async function loadRelations (connection, rows, relations) {
       relations: nested
     } = rel
     const resultKey = alias || entity
+    const isBelongsTo = type === 'belongsTo'
+    const parentField = isBelongsTo ? foreignKey : localKey
+    const matchField = isBelongsTo ? ownerKey : foreignKey
+
+    const distinct = [...new Set(rows.map((row) => row[parentField]).filter((v) => v != null).map((v) => (typeof v === 'bigint' ? v.toString() : v)))]
+    if (distinct.length > 1 && await acceptsIn(connection, entity, matchField)) {
+      if (await loadBatched(connection, rows, rel, distinct)) continue
+    }
+
+    // One query per distinct key, shared by every row that has it.
+    const lookups = new Map()
+    const lookup = (value) => {
+      const key = `${typeof value}:${String(value)}`
+      if (!lookups.has(key)) {
+        lookups.set(key, executeQuery({
+          connection,
+          from: entity,
+          select: relSelect,
+          where: { ...relWhere, [matchField]: value },
+          limit: type === 'hasMany' ? relLimit : 1,
+          relations: nested
+        }).then(({ data }) => data))
+      }
+      return lookups.get(key).then((data) => structuredClone(data))
+    }
 
     await mapLimited(rows, 4, async (row) => {
-      const isBelongsTo = type === 'belongsTo'
-      const value = isBelongsTo ? row[foreignKey] : row[localKey]
+      const value = row[parentField]
       if (value == null) {
         row[resultKey] = type === 'hasMany' ? [] : null
         return
       }
       try {
-        const { data: relData } = await executeQuery({
-          connection,
-          from: entity,
-          select: relSelect,
-          where: { ...relWhere, [isBelongsTo ? ownerKey : foreignKey]: value },
-          limit: type === 'hasMany' ? relLimit : 1,
-          relations: nested
-        })
+        const relData = await lookup(value)
         row[resultKey] = type === 'hasMany' ? relData : (relData[0] ?? null)
       } catch (err) {
         row[resultKey] = { error: `relation fetch failed for ${entity}: ${err.message}` }
@@ -831,9 +930,23 @@ async function introspect (connection) {
       : returnTypeName
 
     const type = entityTypeName && schema.getType(entityTypeName)
-    if (!type || !isObjectType(type)) continue
+    if (!type) continue
 
     const name = connection.driver === 'soap' ? shortName(fieldName) : fieldName
+
+    // A field returning a scalar (a count, a Thrift i32, a SOAP string) is
+    // queried as a single { value } row, so that is the table it describes.
+    if (!isObjectType(type)) {
+      if ((isScalarType(type) || isEnumType(type)) && fieldName !== 'placeholder' && !seen.has(name)) {
+        seen.add(name)
+        tables.push({
+          name,
+          columns: [{ name: 'value', type: type.name, nullable: !isNonNullType(field.type), defaultValue: null, isPrimaryKey: false }]
+        })
+      }
+      continue
+    }
+
     if (seen.has(name)) continue
     seen.add(name)
 

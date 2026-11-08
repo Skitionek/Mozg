@@ -224,6 +224,13 @@ const typeDefs = /* GraphQL */ `
     """Maximum related rows per parent row (hasMany)"""
     limit: Int
     """
+    Fetch this relation for all parent rows in a few requests, by repeating the
+    filter (?userId=1&userId=2), when the REST API is known to accept that.
+    Falls back to one request per row if the API answers with anything it was
+    not asked for.  Without it, rows sharing a key still fetch it once.
+    """
+    batch: Boolean
+    """
     Join by OBO key instead of naming fields: the parent field carrying this
     key and the target parameter accepting it are found from the catalog
     (e.g. obo: "uniprot").  Explicit localKey / foreignKey still win.

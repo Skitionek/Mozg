@@ -45,9 +45,9 @@ Mozg has left the concept phase.  Some parts are production-ready; others are st
 | Life-science sources (`api` driver, 47 sources) | **Stable.** Every entity's example and every relation is verified against the live APIs weekly; requests are throttled to each provider's published limits and retried on transient failures. |
 | PostgreSQL, SQLite | **Stable.** A shared behavioural suite runs against real servers in CI. |
 | KEGG, plain REST | **Stable.** |
-| MySQL, Neo4j (via graphql-mesh), ArangoDB, Elasticsearch | **Beta.** The same suite runs against real servers in CI; MySQL needs `mysql_native_password`. |
+| MySQL and MariaDB, Neo4j (via graphql-mesh), ArangoDB, Elasticsearch | **Beta.** The same suite runs against real servers in CI. MySQL logs in with either method (`caching_sha2_password`, MySQL 8's default and MySQL 9's only one, or `mysql_native_password`). |
 | OpenAPI, OData (via graphql-mesh), BioCyc | **Beta.** Checked against live services; BioCyc needs an account for more than a few requests. |
-| SOAP, Thrift (via graphql-mesh) | **Experimental.** |
+| SOAP, Thrift (via graphql-mesh) | **Experimental.** SOAP runs only read-named operations unless you allow more (`MOZG_SOAP_OPERATIONS`). Thrift is tested end to end against a real server for integer and boolean parameters and scalar results; string parameters and struct results do not work (upstream). |
 | Self-hosted databases on Kubernetes (Helm, scale to zero) | **Beta.** Every engine (PostgreSQL, MySQL/MariaDB, Neo4j, ArangoDB, Elasticsearch, SQLite) exercised end to end on a kind cluster in CI. |
 | OWL ontology ingestion | **Experimental.** |
 
@@ -266,6 +266,7 @@ mutation {
 | `MOZG_CONNECTION_CACHE_MAX` | `32` | Database clients (connection pools) kept per driver; the least recently used is closed |
 | `MOZG_CONNECTION_IDLE_MS` | `600000` | A database client unused for this long is closed |
 | `MOZG_ONTOLOGY_CACHE_MAX` | `20` | Parsed ontologies kept in memory |
+| `MOZG_SOAP_OPERATIONS` | unset | SOAP operations Mozg may run besides those named like reads (`Get…`, `List…`, `Search…`): comma-separated, `*` a wildcard, `*` alone for all |
 | `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
 | `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |
 | `MOZG_SOURCES_DIR` | unset | Directory of JSON catalog entries to register at startup (self-hosted databases; see [docs/deploy.md](docs/deploy.md)) |
