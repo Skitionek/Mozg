@@ -24,6 +24,7 @@
  */
 
 const http = require('../http')
+const { LruCache } = require('../../cache')
 
 const MAX_WINDOW = 10_000 // index.max_result_window default
 const MAPPING_TTL_MS = 60_000
@@ -66,7 +67,7 @@ function hitsToRows (response) {
 
 // ── Mappings ────────────────────────────────────────────────────────────────
 
-const mappingCache = new Map()
+const mappingCache = new LruCache({ max: 200, ttlMs: MAPPING_TTL_MS })
 
 /** Flatten an index mapping into { field: { type, keyword } }. */
 function flattenProperties (properties, prefix = '') {
@@ -83,13 +84,13 @@ function flattenProperties (properties, prefix = '') {
 async function getFields (connection, index) {
   const key = `${baseUrl(connection)}|${index}|${connection.user || ''}`
   const hit = mappingCache.get(key)
-  if (hit && hit.expires > Date.now()) return hit.fields
+  if (hit) return hit
   const json = await request(connection, `/${encodeURIComponent(index)}/_mapping`)
   const fields = {}
   for (const idx of Object.values(json || {})) {
     Object.assign(fields, flattenProperties(idx.mappings && idx.mappings.properties))
   }
-  mappingCache.set(key, { fields, expires: Date.now() + MAPPING_TTL_MS })
+  mappingCache.set(key, fields)
   return fields
 }
 
