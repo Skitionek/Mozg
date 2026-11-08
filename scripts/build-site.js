@@ -29,6 +29,7 @@ const PAGES = [
   { src: 'docs/sources.md', out: 'sources.html', nav: 'Sources' },
   { src: 'docs/model.md', out: 'model.html', nav: 'Model', graph: true },
   { examples: 'examples/queries.json', out: 'examples.html', nav: 'Examples', title: 'Examples' },
+  { src: 'docs/mcp.md', out: 'mcp.html', nav: 'MCP' },
   { src: 'docs/connectors.md', out: 'connectors.html', nav: 'Connectors' },
   { src: 'docs/deploy.md', out: 'deploy.html', nav: 'Deploy' },
   { src: 'docs/dumps.md', out: 'dumps.html', nav: 'Database dumps' },

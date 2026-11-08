@@ -183,6 +183,17 @@ spec:
             - name: MOZG_ONTOLOGIES
               value: {{ .Values.mozg.ontologies | toJson | quote }}
             {{- end }}
+            {{- if .Values.mozg.mcp.enabled }}
+            - name: MOZG_MCP_MAX_RESULT_BYTES
+              value: {{ .Values.mozg.mcp.maxResultBytes | int64 | quote }}
+            {{- if .Values.mozg.mcp.allowedOrigins }}
+            - name: MOZG_MCP_ALLOWED_ORIGINS
+              value: {{ join "," .Values.mozg.mcp.allowedOrigins | quote }}
+            {{- end }}
+            {{- else }}
+            - name: MOZG_MCP
+              value: "off"
+            {{- end }}
             {{- if .Values.mozg.allowPrivateMirrors }}
             - name: MOZG_ALLOW_PRIVATE_MIRRORS
               value: "1"

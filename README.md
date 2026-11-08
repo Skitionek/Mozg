@@ -68,6 +68,7 @@ Per-connector details, test coverage and known limitations: [docs/connectors.md]
 - 🧪 **GraphiQL** – full IDE at `/graphql`
 - ⚡ **Streaming** – `POST /stream` returns progressive JSON as relations resolve
 - 🕸 **[The model](https://skitionek.github.io/Mozg/model.html)** – an interactive force graph, drawn from the live catalog, of how the databases connect their entities through shared ontologies and identifier spaces
+- 🤖 **MCP** – `POST /mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server for AI assistants: find a source, read its fields and the identifiers they carry, and run the same joined-up queries.  Both the current stateless protocol (2026-07-28) and the `initialize` handshake older clients use
 - 🧰 **SDK** – a dependency-free JavaScript/TypeScript client in [`sdk/`](sdk/README.md): query builders, streaming, ontology links, retries and typed errors
 - 🦉 **OWL ontology ingestion** – parse Turtle, RDF/XML, OWL/XML and Manchester Syntax ontologies via `ingestOntology` mutation
 
@@ -291,6 +292,9 @@ Each row gains `phenotype`: the term (`iri`, `id`, `label`, `matchedBy`), or `nu
 | `MOZG_ONTOLOGY_CACHE_MAX` | `20` | Parsed ontologies kept in memory |
 | `MOZG_ONTOLOGIES` | unset | JSON array of ontologies queries may link values to, by name: `[{"name":"mondo","url":"https://…/mondo.obo","format":"obo","obo":"mondo"}]`; each loads on first use |
 | `MOZG_ONTOLOGY_TTL_MS` | `86400000` | A loaded ontology is read again after this long |
+| `MOZG_MCP` | `on` | Set `off` to serve no `/mcp` |
+| `MOZG_MCP_ALLOWED_ORIGINS` | unset | Comma-separated origins (or `*`) of web pages that may call `/mcp` from a browser. Clients that are not browsers send no origin and need nothing; a request from any other origin is refused with 403 |
+| `MOZG_MCP_MAX_RESULT_BYTES` | `100000` | Largest tool result; a longer one is cut at the end and says so |
 | `MOZG_SOAP_OPERATIONS` | unset | SOAP operations Mozg may run besides those named like reads (`Get…`, `List…`, `Search…`): comma-separated, `*` a wildcard, `*` alone for all |
 | `MOZG_ALLOW_PRIVATE_MIRRORS` | unset | Set to `1` to let callers point a catalog source at a private-network mirror (`connection.database`); otherwise such URLs are refused |
 | `MOZG_SHUTDOWN_GRACE_MS` | `30000` | How long SIGTERM waits for in-flight queries |
@@ -299,7 +303,7 @@ Each row gains `phenotype`: the term (`iri`, `id`, `label`, `matchedBy`), or `nu
 | `MOZG_DEMAND_WINDOW_MS` | `60000` | How long after its last use `/demand/<source>` keeps reporting a self-hosted database as wanted (what KEDA scales on) |
 | `MOZG_PEERS` | unset | Headless-service host name of the other Mozg replicas, so `/demand` counts their in-flight queries too |
 
-- **Metrics.** `GET /metrics` is Prometheus text: inbound requests by route and status, queries by driver and source (relation fetches counted separately as `nested`), rows returned, outbound requests by host and status with retries, cold starts of self-hosted databases, every cache's size and hit counts, and process memory and CPU.  Source and host labels are capped, so a caller cannot create series by naming new hosts.  Set `MOZG_METRICS_PORT` to serve it on a port of its own; the Helm chart does by default, so it never reaches the Service or the Ingress.
+- **Metrics.** `GET /metrics` is Prometheus text: inbound requests by route and status, MCP requests by protocol era, method and outcome and tool calls by tool, queries by driver and source (relation fetches counted separately as `nested`), rows returned, outbound requests by host and status with retries, cold starts of self-hosted databases, every cache's size and hit counts, and process memory and CPU.  Source and host labels are capped, so a caller cannot create series by naming new hosts.  Set `MOZG_METRICS_PORT` to serve it on a port of its own; the Helm chart does by default, so it never reaches the Service or the Ingress.
 - **Logs.** One JSON line per request and per query, each with the request's `requestId` (taken from the caller's `X-Request-Id` if it is short and plain, else generated, and returned in the response).  Queries log the *names* of their `where` keys, never the values, and every message is scrubbed of connection-string passwords.  Probes and scrapes log at `debug`.  There is no tracing SDK; the request id is what ties a request's lines together.
 - `GET /healthz` answers `{"status":"ok"}` without touching any upstream, for load balancers and orchestrators.
 - The container runs as an unprivileged user and declares a `HEALTHCHECK`.

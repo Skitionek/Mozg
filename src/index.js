@@ -1,6 +1,7 @@
 'use strict'
 
 const { createMozgServer, createMetricsServer, metricsSettings } = require('./server')
+const { mcpSettings } = require('./mcp')
 const { logger } = require('./telemetry')
 
 const PORT = process.env.PORT || 4000
@@ -8,12 +9,14 @@ const PORT = process.env.PORT || 4000
 const server = createMozgServer()
 const metricsServer = createMetricsServer()
 const metrics = metricsSettings()
+const mcp = mcpSettings()
 
 server.listen(PORT, () => {
   console.log('Mozg server is running')
   console.log(`  Web interface  →  http://localhost:${PORT}/`)
   console.log(`  GraphQL API    →  http://localhost:${PORT}/graphql`)
   console.log(`  Streaming API  →  http://localhost:${PORT}/stream`)
+  if (mcp.enabled) console.log(`  MCP (AI tools) →  http://localhost:${PORT}/mcp`)
   console.log(`  Health check   →  http://localhost:${PORT}/healthz`)
   console.log(`  Demand         →  http://localhost:${PORT}/demand`)
   if (metrics.enabled && !metricsServer) console.log(`  Metrics        →  http://localhost:${PORT}/metrics`)
