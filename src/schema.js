@@ -78,6 +78,26 @@ const typeDefs = /* GraphQL */ `
     ingestOntology).
     """
     generateSchema(input: OntologyInput!): OntologyResult!
+
+    """
+    The ontologies the operator configured for linking (MOZG_ONTOLOGIES), and
+    whether each has been loaded yet.
+    """
+    ontologies: [OntologyInfo!]!
+
+    """
+    Search an ontology's terms by label, synonym, identifier or cross-reference.
+    Name a configured ontology, or give url or content.
+    """
+    ontologyTerms(
+      search: String!
+      ontology: String
+      url: String
+      content: String
+      format: TermFormat
+      match: [OntologyMatch!]
+      limit: Int
+    ): [OntologyTerm!]!
   }
 
   type Mutation {
@@ -117,6 +137,12 @@ const typeDefs = /* GraphQL */ `
     apiKeys: JSON
     """Return records exactly as the source sent them instead of the catalog's normalized fields (api sources)"""
     raw: Boolean
+    """
+    Link database values to ontology terms.  Once the rows are in, each link
+    looks the value of its field up in an ontology and writes the term it names
+    beside it, as <field>Term (or as).  At most 5 per query.
+    """
+    link: [OntologyLinkInput!]
     """
     Read live data even if the server caches results (MOZG_RESULT_CACHE_TTL_MS).  Reaches
     every relation fetched for this query, and refreshes the cached result for others.
@@ -290,6 +316,88 @@ const typeDefs = /* GraphQL */ `
     validate: Boolean
     """Database connection used for schema validation (required when validate is true)"""
     connection: ConnectionInput
+  }
+
+  """Link the values of one result field to the terms of an ontology"""
+  input OntologyLinkInput {
+    """
+    The result field holding the value.  a.b follows related rows and lists,
+    so a field of an included relation can be linked.
+    """
+    field: String!
+    """The name of an ontology the operator configured (see the ontologies query)"""
+    ontology: String
+    """Or an ontology fetched from a URL (screened like ingestOntology: no private addresses, 10 MB)"""
+    url: String
+    """Or an ontology given as text"""
+    content: String
+    """Serialization of url or content; detected when omitted"""
+    format: TermFormat
+    """
+    How a value may name a term, tried in this order (default: id, label,
+    synonym, xref)
+    """
+    match: [OntologyMatch!]
+    """Where to put the term in the row (default: the field name plus Term)"""
+    as: String
+    """
+    OBO key of the identifiers in this field (e.g. mondo), so a bare local id
+    such as 0005015 reads as MONDO:0005015.  Defaults to the configured
+    ontology's own.
+    """
+    obo: String
+    """Also return the term's definition, synonyms, cross-references and parents"""
+    details: Boolean
+  }
+
+  enum OntologyMatch {
+    """The term's identifier or IRI, as MONDO:0005015 or MONDO_0005015"""
+    id
+    """The term's label, ignoring case and spacing"""
+    label
+    """One of the term's synonyms"""
+    synonym
+    """A cross-reference the term lists, such as MESH:D003920"""
+    xref
+  }
+
+  """Formats terms can be read from; obo is the compact OBO flat-file format"""
+  enum TermFormat {
+    auto
+    obo
+    turtle
+    rdfxml
+    owlxml
+  }
+
+  """An ontology the operator configured for linking"""
+  type OntologyInfo {
+    name: String!
+    label: String
+    url: String!
+    format: String
+    """OBO key of its identifiers"""
+    obo: String
+    """Loaded on first use"""
+    loaded: Boolean!
+    termCount: Int
+    """Why the last attempt to load it failed, if it did"""
+    error: String
+  }
+
+  """A term of an ontology"""
+  type OntologyTerm {
+    iri: String!
+    """Identifier such as MONDO:0005015, when the ontology gives one"""
+    id: String
+    label: String
+    synonyms: [String!]!
+    definition: String
+    xrefs: [String!]!
+    """IRIs of its named superclasses"""
+    parents: [String!]!
+    deprecated: Boolean!
+    ontology: String!
   }
 
   enum OntologyFormat {
@@ -543,6 +651,8 @@ const resolvers = {
       .filter((entry) => !category || entry.category === category)
       .filter((entry) => !driver || entry.driver === driver),
     generateSchema: (_parent, { input }) => require('./ontology').parseOntology(input),
+    ontologies: () => require('./ontology/links').listOntologies(),
+    ontologyTerms: (_parent, args) => require('./ontology/links').searchTerms(args),
     oboKeys: () => Object.entries(obo.KEYS).map(([key, spec]) => ({
       key,
       label: spec.label,

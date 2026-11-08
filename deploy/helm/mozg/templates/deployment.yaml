@@ -177,6 +177,12 @@ spec:
               value: {{ .Values.mozg.connectionIdleMs | quote }}
             - name: MOZG_ONTOLOGY_CACHE_MAX
               value: {{ .Values.mozg.ontologyCacheMax | quote }}
+            - name: MOZG_ONTOLOGY_TTL_MS
+              value: {{ .Values.mozg.ontologyTtlMs | int64 | quote }}
+            {{- if .Values.mozg.ontologies }}
+            - name: MOZG_ONTOLOGIES
+              value: {{ .Values.mozg.ontologies | toJson | quote }}
+            {{- end }}
             {{- if .Values.mozg.allowPrivateMirrors }}
             - name: MOZG_ALLOW_PRIVATE_MIRRORS
               value: "1"
